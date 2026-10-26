@@ -22,6 +22,10 @@ struct Element {
     Vektor3 schwerpunkt_m{};
     std::array<double, 9> traegheit_kg_m2{};
     std::optional<Mesh> volumen;
+    // Open-edge vertices of a shell mass mesh (e.g. the gunwale of a hull
+    // without deck). Only kept when the element also has a displacement
+    // volume; non-empty means the element can flood (A-C-00047).
+    std::vector<Vektor3> flutrand_m;
 };
 
 struct Modell {
@@ -51,6 +55,8 @@ struct Modell {
 // Inertia is row-major, about the respective centre of mass, in model axes.
 // Drawing-only elements have zero mass/inertia and no displacement. A model
 // without positive physical total mass is rejected with CORE-MOD-0004.
+// Flooding (A-C-00047): a shell mass mesh with open edges whose element also
+// has a displacement volume is floodable; its open-edge vertices form the rim.
 // Volume/solid meshes must be closed, consistently outward oriented manifolds.
 // Every disconnected closed component must have positive signed volume.
 // Component AABBs with positive interior overlap are conservatively rejected;
@@ -67,5 +73,27 @@ struct Modell {
 // fassung is a non-cryptographic FNV-1a fingerprint of JSON and the actually
 // imported physics OBJ contents, including boundaries; not of display files.
 Modell lade_modell(const std::filesystem::path& datei);
+
+// Tolerant description reader for catalogue and display purposes. It does not
+// validate physics and throws (CORE-MOD-0001/0002/0005) only if the JSON
+// itself is unusable. Element order matches lade_modell (groups by name).
+struct ElementBeschreibung {
+    std::string id;
+    std::string gruppe;
+    std::optional<std::filesystem::path> darstellung;
+    std::optional<std::filesystem::path> volumen;
+};
+struct ModellBeschreibung {
+    std::string id;
+    std::string name;
+    std::optional<std::string> beschreibung;
+    std::vector<std::string> gruppen;
+    std::vector<ElementBeschreibung> elemente;
+};
+ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei);
+
+// Fingerprint over the JSON and all readable physics OBJ files in import
+// order. For an importable model it equals lade_modell(datei).fassung.
+std::string modell_fassung(const std::filesystem::path& datei);
 
 }

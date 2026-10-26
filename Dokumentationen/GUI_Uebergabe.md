@@ -117,10 +117,10 @@ Maßgeblich ist die
 
 | Oberfläche | Verfügbarer Stand |
 |---|---|
-| C++ | Modellimport, Pose, Hydrostatik, Gleichgewicht, einzelner Dynamikschritt, synchrone Gesamtläufe, Ergebnisserialisierung, Fehlerkatalog |
+| C++ | Modellimport, Pose, Hydrostatik, Gleichgewicht, einzelner Dynamikschritt, synchrone Gesamtläufe, Ergebnisserialisierung, Fehlerkatalog, Kraft-/Momentenbilanz (`bilanz`), Modellkatalog (`katalog.hpp`) |
 | CLI | `--help`, `--build-info`, `--fehlerdoku`, `--pruefen`, `--statisch`, `--dynamisch` |
-| Aufzeichnung | Version 1, JSON-Array oder JSONL; echte statische/dynamische Quaderreferenzen liegen bei |
-| Noch nicht vorhanden | Asynchrone Sitzungs-/Befehls-API, Live-Abonnement, explizite Live-Laufkennung, GUI-Adapter, Shared-Memory-Transport, Webserver |
+| Aufzeichnung | Version 2 (additiv zu Version 1: Beitragsklassifikation, Summen, Bilanzstatus, Gleichgewichtsresiduen), JSON-Array oder JSONL; echte statische/dynamische Quaderreferenzen liegen bei |
+| Noch nicht vorhanden | Asynchrone Sitzungs-/Befehls-API, Live-Abonnement, explizite Live-Laufkennung, Shared-Memory-Transport, Webserver, CLI-Befehle für den Modellkatalog |
 
 Position ist die Lage des festen Modellursprungs in Weltkoordinaten.
 Quaternion xyzw rotiert Modell nach Welt. Punkte werden rotiert und
@@ -144,8 +144,9 @@ Zusammenstellung, nicht vollständige Serialisierung oder GUI-Empfang.
 Die Rohdaten liegen im Paket bei; keine Echtzeitgarantie.
 
 Die konservative AABB-Überlappungsprüfung kann getrennte Körper ablehnen.
-Folkeboot und Optimist sind derzeit deshalb abgelehnt, 420 mangels
-Hydrostatikmasse. Das Quaderbeispiel ist als startfähige Referenz
+Folkeboot ist derzeit deshalb abgelehnt, 420 mangels
+Hydrostatikmasse. Der Optimist wurde nachträglich überarbeitet und
+ist gültig (siehe Beispiel-README, Abschnitt „Ueberarbeitung Optimist“). Das Quaderbeispiel ist als startfähige Referenz
 beigefügt. Allgemeine Genauigkeits-/Performanceabnahme bleibt offen.
 
 ## Inhalt und Verwendung der ZIP
@@ -166,3 +167,11 @@ Zur direkten Anbindung ist die passende Core-Bibliothek aus demselben
 Quellstand mit kompatiblem Compiler und Laufzeit zu bauen.
 Die ZIP enthält keine ausführbaren Programme oder fertigen GUI-Binaries.
 `MANIFEST.json` im Archiv benennt Dateien und SHA-256-Fingerprints.
+
+## Nachtrag C-0.2: Volllaufen offener Rümpfe (A-C-00047)
+
+Additiv im Vertrag V2: `geflutete_elemente` je Zustand und `geflutet` je
+Eintrag in `elementvolumina`; bei `unloesbar` nennt die Diagnose
+`; geflutet: <IDs>`. Über `Laufoptionen::start` kann ein Lauf von einem
+vorhandenen Zustand inklusive Flutung starten; die GUI nutzt das beim
+Moduswechsel. Details: [Schnittstelle_Core_GUI.md](Schnittstelle_Core_GUI.md).

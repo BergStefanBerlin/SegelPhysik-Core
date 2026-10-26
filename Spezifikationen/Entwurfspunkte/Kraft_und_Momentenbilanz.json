@@ -1,0 +1,98 @@
+{
+  "status": "finalisiert",
+  "thema": "Offene Entscheidungen zur Kraft- und Momentenbilanz im Ergebnisvertrag",
+  "spezifikation": "../Spezifikation_Kraft_und_Momentenbilanz.md",
+  "hinweis": "Am 26.10.2026 auf Nutzerentscheidung finalisiert: Vorschläge zu allen Punkten übernommen. Übernommene Punkte verweisen auf ihre A-Kennung; zurückgestellte Punkte sind keine Anforderungen.",
+  "punkte": [
+    {
+      "id": "IDEE-C-00011",
+      "status": "übernommen",
+      "thema": "Momentenbezugspunkt",
+      "frage": "Bleibt der aktuelle Gesamtschwerpunkt S der einzige Momentenbezug, oder soll zusätzlich der feste Konstruktionsursprung bzw. ein frei wählbarer Bezug geliefert werden?",
+      "vorschlag": "Standard S wie bisher; Bezug je Zustand ausdrücklich nennen. Weitere Bezüge erst bei konkretem Bedarf.",
+      "herkunft": "Altprojekt V0.11 Abschnitt 3.3 (A-V0.11-00006)",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00035"
+    },
+    {
+      "id": "IDEE-C-00012",
+      "status": "übernommen",
+      "thema": "Quellen, Gruppen und ID-Schema",
+      "frage": "Welche Quellen- und Gruppennamen werden verbindlich (heute nur Schwerkraft und Hydrostatik)? Wie werden spätere Kraftmodelle (IDEE-C-00003) eingeordnet?",
+      "vorschlag": "Quellen: schwerkraft, hydrostatik; Gruppe 'gewicht_auftrieb'. Erweiterbare Liste im Ergebnisvertrag; unbekannte Quelle = 'nicht_zugeordnet'.",
+      "herkunft": "Altprojekt V0.11 Abschnitte 3.1, 3.2, 3.4 (A-V0.11-00004, -00005, -00007)",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00034"
+    },
+    {
+      "id": "IDEE-C-00013",
+      "status": "übernommen",
+      "thema": "Feldform der Datenzustände",
+      "frage": "Wie werden die Zustände gueltig, null, deaktiviert, nicht_berechnet und ungueltig im JSON abgebildet (eigenes Feld je Beitrag, Fehler-ID)?",
+      "vorschlag": "Feld 'zustand' je Beitrag; bei ungueltig zusätzlich 'fehler_id' aus dem Fehlerkatalog; 'vektor' und 'punkt_m' dann null.",
+      "herkunft": "Altprojekt V0.11 Abschnitt 3.8 und 6 (A-V0.11-00041)",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00037"
+    },
+    {
+      "id": "IDEE-C-00014",
+      "status": "übernommen",
+      "thema": "Erwarteter Quellenumfang",
+      "frage": "Woraus ergibt sich der erwartete Quellenumfang: aus dem Modell, dem Rechenmodus oder einer Laufkonfiguration?",
+      "vorschlag": "Aus Modell und Rechenmodus; heute je Element Gewicht und Auftrieb.",
+      "herkunft": "Altprojekt V0.11 Abschnitt 3.6 (A-V0.11-00039)",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00038"
+    },
+    {
+      "id": "IDEE-C-00015",
+      "status": "übernommen",
+      "thema": "Gleichgewichtsangaben",
+      "frage": "Welche Angaben liefert die Statik genau (Toleranzen, Residuen, Freiheitsgrade, Iterationen)? Gibt es später eine Aussage 'stationärer Zustand' für die Dynamik?",
+      "vorschlag": "Statik: krafttoleranz_n, momenttoleranz_nm, residuum_kraft_n, residuum_moment_nm, freiheitsgrade, iterationen. Dynamik vorerst ohne Gleichgewichtsaussage.",
+      "herkunft": "Altprojekt V0.11 Abschnitt 3.7 (A-V0.11-00040)",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00039"
+    },
+    {
+      "id": "IDEE-C-00016",
+      "status": "übernommen",
+      "thema": "Wirkungslinie und Restmoment",
+      "frage": "Berechnet der Core äquivalente Wirkungslinie A_eq und Restmoment M_rest, oder rechnet die GUI diese rein geometrisch aus dem gelieferten Wrench?",
+      "vorschlag": "GUI berechnet geometrisch aus Wrench und Bezug (keine Physik, nur Vektoralgebra). Der Core liefert echte Angriffspunkte und kennzeichnet sie als 'real'.",
+      "herkunft": "Altprojekt V0.11 Abschnitte 3.5 und 3.8 (A-V0.11-00008, -00041)",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00034"
+    },
+    {
+      "id": "IDEE-C-00017",
+      "status": "übernommen",
+      "thema": "Vertragsversion und Kompatibilität",
+      "frage": "Neue Vertragsversion '2' mit Übergangsregel oder abwärtskompatible Erweiterung von Version '1' um optionale Felder?",
+      "vorschlag": "Version '2'; bestehende Felder bleiben erhalten, neue Felder kommen hinzu. GUI liest beide Versionen.",
+      "herkunft": "A-C-00016, A-C-00028",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00041"
+    },
+    {
+      "id": "IDEE-C-00018",
+      "status": "übernommen",
+      "thema": "Frame der Summen",
+      "frage": "Intern liegt die Gesamtkraft im Weltframe (kraft_welt_n), Beiträge im Modellframe. In welchem Frame werden ΣF und ΣM geliefert?",
+      "vorschlag": "Alle Beiträge und Summen im Modellframe wie die Vektorliste; die GUI transformiert mit der Pose.",
+      "herkunft": "Altprojekt V0.11 Abschnitt 3.3; A-C-00016",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00035"
+    },
+    {
+      "id": "IDEE-C-00019",
+      "status": "übernommen",
+      "thema": "Parität bei Dynamik",
+      "frage": "Welcher Auswertungszeitpunkt eines Dynamikschritts wird geliefert (Start- oder Endzustand), und mit welcher Toleranz wird gegen die Integratorbilanz verglichen?",
+      "vorschlag": "Kräfte zum gelieferten Zustand (Endzustand des Schritts) neu auswerten und so kennzeichnen; Toleranz wie Referenzfälle.",
+      "herkunft": "Altprojekt V0.11 Abschnitt 7.6 (A-V0.11-00048)",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00040"
+    }
+  ]
+}

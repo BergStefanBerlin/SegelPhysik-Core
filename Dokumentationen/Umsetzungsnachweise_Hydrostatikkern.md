@@ -50,6 +50,10 @@ Folkeboot und Optimist werden mit `CORE-MOD-0007` abgelehnt, weil
 die aktuelle konservative Prüfung keine Überschneidungsfreiheit
 nachweist. Modelle wurden nicht still korrigiert oder teilgerechnet.
 
+Nachtrag: Der Optimist wurde danach auf Nutzervorgabe überarbeitet
+(Beispiel-README, Abschnitt „Ueberarbeitung Optimist“). Er besteht
+jetzt `--pruefen`, und `--statisch` meldet `konvergiert`.
+
 Die [statische Referenz](Beispiele_Core_GUI/statisch.json) und
 [dynamische Referenz](Beispiele_Core_GUI/dynamisch.json) sind tatsächlich
 erzeugte Quaderläufe. Die Dateien wurden unabhängig als JSON gelesen:

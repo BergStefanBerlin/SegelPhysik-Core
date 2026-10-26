@@ -145,6 +145,62 @@
       "fail_kriterium": "Die Masseninterpretation ist nach den dokumentierten Pruefregeln ungeeignet oder nicht eindeutig.",
       "handlungsanweisung": "Das Modell fachlich korrigieren; keine automatische Umdeutung von Schale zu Vollkoerper voraussetzen.",
       "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-BIL-0001",
+      "kurztext": "Kraft- oder Momentenbeitrag nicht endlich.",
+      "pass_kriterium": "Vektor, Punkt und Moment jedes Beitrags sind endlich.",
+      "fail_kriterium": "Ein Beitrag enthaelt NaN oder Unendlich; er wird als ungueltig markiert und nicht summiert.",
+      "handlungsanweisung": "Modell, Pose und Parameter pruefen; die Bilanz ist nur eine Teilsumme.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-KAT-0001",
+      "kurztext": "Modellordner nicht lesbar.",
+      "pass_kriterium": "Der gewaehlte Ordner existiert und kann aufgelistet werden.",
+      "fail_kriterium": "Der Ordner fehlt, ist kein Ordner oder kann nicht gelesen werden.",
+      "handlungsanweisung": "Ordnerwahl und Zugriffsrechte pruefen.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-KAT-0002",
+      "kurztext": "Modell-ID mehrfach im Ordner vergeben.",
+      "pass_kriterium": "Jede Modell-ID kommt im Katalog genau einmal vor.",
+      "fail_kriterium": "Mehrere modell.json tragen dieselbe id; alle betroffenen Modelle sind fehlerhaft.",
+      "handlungsanweisung": "IDs in den Modellbeschreibungen eindeutig vergeben.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-KAT-0003",
+      "kurztext": "Unbekannte Modell-ID.",
+      "pass_kriterium": "Die angefragte Modell-ID steht im Katalog.",
+      "fail_kriterium": "Die Modell-ID ist im Katalogobjekt nicht enthalten.",
+      "handlungsanweisung": "Katalog neu abrufen und eine gelistete Modell-ID verwenden.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-KAT-0004",
+      "kurztext": "Modellfassung veraltet.",
+      "pass_kriterium": "Die erwartete modell_fassung entspricht den aktuellen Modelldateien.",
+      "fail_kriterium": "Die Modelldateien wurden seit dem Katalogabruf geaendert oder sind nicht mehr lesbar.",
+      "handlungsanweisung": "Katalog neu abrufen und die Anfrage mit der neuen Fassung wiederholen.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-KAT-0005",
+      "kurztext": "Darstellungsnetz nicht lesbar.",
+      "pass_kriterium": "Das Darstellungsnetz bzw. der Volumenersatz ist ein lesbares OBJ mit Dreiecken oder Polygonen.",
+      "fail_kriterium": "Die Datei fehlt, ist nicht lesbar oder enthaelt ungueltige Punkte oder Indizes.",
+      "handlungsanweisung": "Darstellungsdatei des Elements pruefen; die uebrige Geometrie bleibt verfuegbar.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-KAT-0006",
+      "kurztext": "Unbekannte Element-ID.",
+      "pass_kriterium": "Die angefragte Element-ID ist im Modell enthalten.",
+      "fail_kriterium": "Das Modell enthaelt kein Element mit dieser ID.",
+      "handlungsanweisung": "Element-IDs aus modellstruktur verwenden.",
+      "pruefstatus": "implementiert"
     }
   ]
 }

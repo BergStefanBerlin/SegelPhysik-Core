@@ -268,6 +268,16 @@ void masse_tests(Dateien& d)
     gleich(m.masse_kg, 8.);
     gleich(m.schwerpunkt_m[0], 0.);
     gleich(m.elemente.front().volumen->punkte.front()[0], 10.);
+    // A-C-00047: only open shells with displacement volume get a flooding rim.
+    pruefe(m.elemente.front().flutrand_m.empty(), "Vollkoerper mit Flutrand");
+    d.schreiben("mesh.obj", dreieck);
+    m = d.laden(modell(element(schale(), "volumen.obj")));
+    pruefe(m.elemente.front().flutrand_m.size() == 3, "Offene Schale ohne Flutrand");
+    m = d.laden(modell(element(schale())));
+    pruefe(m.elemente.front().flutrand_m.empty(), "Flutrand ohne Volumen");
+    d.schreiben("mesh.obj", wuerfel);
+    m = d.laden(modell(element(schale(), "volumen.obj")));
+    pruefe(m.elemente.front().flutrand_m.empty(), "Geschlossene Schale mit Flutrand");
     fehler([&] { d.laden(modell(element(
         R"({"art":"vollkoerper","dichte_kg_pro_m3":1e308,"datei":"mesh.obj"})"))); }, "CORE-MOD-0004");
     fehler([&] { d.laden(modell(element(solid("fehlt.obj")))); }, "CORE-MOD-0005", "Element e");

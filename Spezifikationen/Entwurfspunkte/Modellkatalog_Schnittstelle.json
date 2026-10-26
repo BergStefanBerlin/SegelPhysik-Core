@@ -1,0 +1,71 @@
+{
+  "status": "finalisiert",
+  "thema": "Offene Entscheidungen zur Modellkatalog-Schnittstelle Core -> GUI",
+  "spezifikation": "../Spezifikation_Modellkatalog_Schnittstelle.md",
+  "hinweis": "Am 26.10.2026 auf Nutzerentscheidung finalisiert: Vorschläge zu allen Punkten übernommen. Übernommene Punkte verweisen auf ihre A-Kennung; zurückgestellte Punkte sind keine Anforderungen.",
+  "punkte": [
+    {
+      "id": "IDEE-C-00020",
+      "status": "übernommen",
+      "thema": "Was ist ein Hauptobjekt",
+      "frage": "Ist ein Hauptobjekt genau ein Modell (eine modell.json im Ordner bzw. in einem direkten Unterordner, wie heute in der GUI), oder kann eine Modelldatei mehrere Hauptobjekte enthalten?",
+      "vorschlag": "Ein Hauptobjekt = ein Modell; Suchregel wie heute (Ordner selbst und direkte Unterordner).",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00043"
+    },
+    {
+      "id": "IDEE-C-00021",
+      "status": "übernommen",
+      "thema": "Felder des Katalogs",
+      "frage": "Reichen modell_id, name, modell_fassung, status und fehleranzahl? Werden Beschreibung oder Vorschaubild benötigt?",
+      "vorschlag": "Ja, nur diese Felder; Beschreibung optional, kein Vorschaubild.",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00043"
+    },
+    {
+      "id": "IDEE-C-00022",
+      "status": "übernommen",
+      "thema": "Form der Modell-ID",
+      "frage": "Wird die Modell-ID aus der Modellbeschreibung (Feld id) oder aus dem relativen Ordnernamen gebildet? Was gilt bei doppelten IDs?",
+      "vorschlag": "ID aus der Modellbeschreibung; doppelte IDs im Katalog sind ein Fehler mit Fehler-ID, beide Modelle als fehlerhaft markiert.",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00043"
+    },
+    {
+      "id": "IDEE-C-00023",
+      "status": "übernommen",
+      "thema": "Umfang der Details",
+      "frage": "Welche Angaben gehören zu modellstruktur (Gesamtmasse, Schwerpunkt, Abmessungen) und welche Darstellungsangaben (Farbe, Transparenz) zur Geometrie?",
+      "vorschlag": "Struktur: Gruppen, Elemente, Gesamtmasse, Hüllquader. Geometrie: Eckpunkte, Dreiecke, Farbe.",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00044"
+    },
+    {
+      "id": "IDEE-C-00024",
+      "status": "übernommen",
+      "thema": "Datenform der Geometrie",
+      "frage": "JSON-Arrays (einfach, auch für Web) oder zusätzlich direkte C++-Strukturen bzw. Binärform für große Netze?",
+      "vorschlag": "C++-Strukturen für die Desktop-GUI, JSON-Serialisierung für Web und Tests; Binärform erst bei gemessenem Bedarf.",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00044, A-C-00046"
+    },
+    {
+      "id": "IDEE-C-00025",
+      "status": "übernommen",
+      "thema": "Zustand im Core",
+      "frage": "Hält der Core den Katalog zwischen Aufrufen (Sitzungsobjekt) oder ist jeder Aufruf zustandslos mit Ordner und Modell-ID?",
+      "vorschlag": "Kleines Katalogobjekt, das die GUI hält; Aufrufe ohne globalen Zustand.",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00043"
+    },
+    {
+      "id": "IDEE-C-00026",
+      "status": "übernommen",
+      "thema": "Version der Schnittstelle",
+      "frage": "Eigene Versionsnummer für den Katalog oder gemeinsame Vertragsversion mit dem Ergebnisvertrag?",
+      "vorschlag": "Eigene Feld katalogversion, beschrieben in Schnittstelle_Core_GUI.md.",
+      "entscheidung": "Nutzerentscheidung 26.10.2026: Vorschlag übernommen.",
+      "uebernommen_als": "A-C-00046"
+    }
+  ]
+}

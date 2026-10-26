@@ -694,6 +694,15 @@ void masse_lesen(Element& e, const Json& masse, const std::filesystem::path& bas
         const std::string mesh_ort = ort + ".masse, Mesh " + datei.u8string();
         validieren(mesh, solid, mesh_ort);
         masseneigenschaften(e, mesh, solid, dichte, mesh_ort);
+        if (!solid) {
+            std::map<std::pair<std::size_t, std::size_t>, int> kanten;
+            for (const auto& t : mesh.dreiecke)
+                for (std::size_t i = 0; i < 3; ++i) ++kanten[std::minmax(t[i], t[(i+1)%3])];
+            std::set<std::size_t> rand;
+            for (const auto& [k, anzahl] : kanten)
+                if (anzahl == 1) { rand.insert(k.first); rand.insert(k.second); }
+            for (const auto i : rand) e.flutrand_m.push_back(mesh.punkte[i]);
+        }
     } else fehler(4, ort, "Unbekannte Massenart: " + art);
 }
 
@@ -786,6 +795,7 @@ Modell lade_modell(const std::filesystem::path& datei)
                             "; Vergleich mit Element " + andere.second);
                     volumenboxen.emplace_back(b, e.id);
                 }
+                if (!e.volumen) e.flutrand_m.clear();
             }
             modell.elemente.push_back(std::move(e));
         }
@@ -796,6 +806,96 @@ Modell lade_modell(const std::filesystem::path& datei)
             "reine Darstellungsmodelle sind nicht simulierbar");
     modell.fassung = fassung.text();
     return modell;
+}
+
+namespace {
+const Json* text_feld(const Json& wert, const char* feld)
+{
+    if (wert.typ != Json::Typ::objekt) return nullptr;
+    const auto* kind = optional(wert, feld);
+    return kind && kind->typ == Json::Typ::text && !kind->text.empty() ? kind : nullptr;
+}
+
+std::optional<std::filesystem::path> relativ(const Json& objekt_wert, const char* feld,
+                                             const std::filesystem::path& basis)
+{
+    const auto* wert = text_feld(objekt_wert, feld);
+    if (!wert || wert->text.find('\0') != std::string::npos) return std::nullopt;
+    const auto pfad = std::filesystem::u8path(wert->text);
+    if (pfad.is_absolute() || pfad.has_root_name() || pfad.has_root_directory()) return std::nullopt;
+    return basis / pfad;
+}
+}
+
+ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei)
+{
+    const std::string ort = datei.u8string();
+    const auto root = Parser(lesen(datei, ort), ort).lesen();
+    if (root.typ != Json::Typ::objekt) fehler(2, ort, "Objekt erwartet");
+    ModellBeschreibung result;
+    result.id = text(pflicht(root, "id", ort), ort + ".id");
+    if (const auto* name = text_feld(root, "name")) result.name = name->text;
+    else result.name = result.id;
+    if (const auto* beschreibung = text_feld(root, "beschreibung")) result.beschreibung = beschreibung->text;
+    const auto* gruppen = optional(root, "gruppen");
+    if (!gruppen || gruppen->typ != Json::Typ::objekt) return result;
+    const auto basis = datei.parent_path();
+    for (const auto& gruppe : gruppen->objekt) {
+        result.gruppen.push_back(gruppe.first);
+        const auto* elemente = optional(gruppe.second, "elemente");
+        if (gruppe.second.typ != Json::Typ::objekt || !elemente || elemente->typ != Json::Typ::liste) continue;
+        for (const auto& element : elemente->liste) {
+            const auto* id = text_feld(element, "id");
+            if (!id) continue;
+            ElementBeschreibung e;
+            e.id = id->text;
+            e.gruppe = gruppe.first;
+            if (const auto* darstellung = optional(element, "Darstellung"))
+                e.darstellung = relativ(*darstellung, "datei", basis);
+            if (const auto* hydro = optional(element, "Hydrostatik"))
+                if (hydro->typ == Json::Typ::objekt)
+                    if (const auto* volumen = optional(*hydro, "volumen"))
+                        e.volumen = relativ(*volumen, "datei", basis);
+            result.elemente.push_back(std::move(e));
+        }
+    }
+    return result;
+}
+
+std::string modell_fassung(const std::filesystem::path& datei)
+{
+    const std::string ort = datei.u8string();
+    const auto inhalt = lesen(datei, ort);
+    Fingerabdruck fassung;
+    fassung.datei(inhalt);
+    Json root;
+    try { root = Parser(inhalt, ort).lesen(); }
+    catch (const std::runtime_error&) { return fassung.text(); }
+    auto hashen = [&](const std::optional<std::filesystem::path>& pfad) {
+        if (!pfad) return;
+        std::ifstream strom(*pfad, std::ios::binary);
+        if (!strom) return;
+        std::string text{std::istreambuf_iterator<char>(strom), std::istreambuf_iterator<char>()};
+        if (!strom.bad()) fassung.datei(text);
+    };
+    const auto* gruppen = root.typ == Json::Typ::objekt ? optional(root, "gruppen") : nullptr;
+    if (!gruppen || gruppen->typ != Json::Typ::objekt) return fassung.text();
+    const auto basis = datei.parent_path();
+    for (const auto& gruppe : gruppen->objekt) {
+        const auto* elemente = gruppe.second.typ == Json::Typ::objekt ? optional(gruppe.second, "elemente") : nullptr;
+        if (!elemente || elemente->typ != Json::Typ::liste) continue;
+        for (const auto& element : elemente->liste) {
+            const auto* hydro = element.typ == Json::Typ::objekt ? optional(element, "Hydrostatik") : nullptr;
+            if (!hydro || hydro->typ != Json::Typ::objekt) continue;
+            if (const auto* masse = optional(*hydro, "masse")) {
+                const auto* art = text_feld(*masse, "art");
+                if (art && (art->text == "vollkoerper" || art->text == "schale"))
+                    hashen(relativ(*masse, "datei", basis));
+            }
+            if (const auto* volumen = optional(*hydro, "volumen")) hashen(relativ(*volumen, "datei", basis));
+        }
+    }
+    return fassung.text();
 }
 
 }

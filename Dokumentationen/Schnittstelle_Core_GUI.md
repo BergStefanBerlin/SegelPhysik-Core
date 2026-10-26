@@ -2,18 +2,25 @@
 
 ## Status und Geltungsbereich
 
-Stand: 26.10.2026. Technische Dokumentation zu A-C-00016, A-C-00028,
+Stand: C-0.2 in Arbeit. Technische Dokumentation zu A-C-00016, A-C-00028,
 A-C-00031 und A-C-00032 der
-[Hydrostatikspezifikation](../Spezifikationen/Spezifikation_Hydrostatikkern.md).
-Keine weitere fachliche Spezifikation.
+[Hydrostatikspezifikation](../Spezifikationen/Spezifikation_Hydrostatikkern.md)
+sowie zu den Umsetzungen der
+[Kraft- und Momentenbilanz](../Spezifikationen/Spezifikation_Kraft_und_Momentenbilanz.md)
+(Ergebnisvertrag Version 2, Abschnitt 3) und der
+[Modellkatalog-Schnittstelle](../Spezifikationen/Spezifikation_Modellkatalog_Schnittstelle.md)
+(Abschnitt 4). Keine weitere fachliche Spezifikation.
 
 **Tatsächlich verfügbar:** Bibliotheks-/CLI-Abfrage des Fehlerkatalogs,
 CLI-Buildinformation und CLI-Fehler mit eindeutigen IDs sowie
 Pose-Transformationen, Modellimport/-prüfung, statischer Solver,
-Starrkörperdynamik und versionierte Ergebnisaufzeichnungen.
-**Noch nicht verfügbar:** GUI-Verbindung oder Live-Transport.
-Technischer Sicherungsstand: **C-0.1**, kein GitHub-Release und
-keine vorbehaltlose fachliche Gesamtabnahme.
+Starrkörperdynamik, versionierte Ergebnisaufzeichnungen mit
+Beitragsklassifikation, Summen und Bilanzstatus (Version 2) sowie
+der Modellkatalog als Bibliotheksschnittstelle.
+**Noch nicht verfügbar:** Live-Transport (WebSocket o. Ä.) und
+CLI-Befehle für den Modellkatalog.
+Technischer Sicherungsstand: **C-0.1** plus uncommittete C-0.2-Umsetzung,
+kein GitHub-Release und keine vorbehaltlose fachliche Gesamtabnahme.
 
 ## 1. Anfrage: „gib mir Fehlerdoku“
 
@@ -56,8 +63,9 @@ abfragen und keine unabhängig gepflegte Kopie verwenden.
 | `fehler[].handlungsanweisung` | String, Pflicht in Version 1 | Korrekturhinweis; falls nicht möglich, ausdrücklich begründen |
 | `fehler[].pruefstatus` | String, Pflicht | `"implementiert"` oder `"geplant"` |
 
-Es gibt aktuell 18 Katalogeinträge: zwei CLI-, drei Pose-, acht
-Modell-, vier Simulations- und eine Ausgabediagnose.
+Es gibt aktuell 25 Katalogeinträge: zwei CLI-, drei Pose-, acht
+Modell-, vier Simulations-, eine Ausgabe-, eine Bilanz- (`CORE-BIL-0001`)
+und sechs Modellkatalogdiagnosen (`CORE-KAT-0001` bis `-0006`).
 Prüfstatus beschreibt die Verfügbarkeit der Prüfung, nicht das
 Prüfergebnis eines konkreten Modells. Alle aktuellen Einträge
 bezeichnen implementierte Prüfungen innerhalb der unten dokumentierten
@@ -140,7 +148,7 @@ Die folgenden Felder beschreiben den implementierten Vertrag.
 
 | Feld | Typ / Einheit / Bedeutung |
 |---|---|
-| `vertragsversion` | String `"1"` |
+| `vertragsversion` | String `"2"` (seit C-0.2; Version 1 siehe unten) |
 | `modell_id`, `modell_fassung` | Strings; Fassung ist ein FNV-1a-Inhaltsfingerprint des Imports, keine Sicherheitsprüfung |
 | `status`, `diagnose` | Strings; leere Diagnose bei regulärem Erfolg |
 | `zeit_s`, `schritt` | Simulationszeit in s, nicht negative laufende Ganzzahl |
@@ -149,8 +157,9 @@ Die folgenden Felder beschreiben den implementierten Vertrag.
 | `geschwindigkeit_welt_m_s` | Drei Zahlen: Geschwindigkeit des Gesamtschwerpunkts im Weltframe |
 | `omega_modell_rad_s` | Drei Zahlen: Winkelgeschwindigkeit im Modellframe |
 | `volumen_m3` | Gesamte eingetauchte Verdrängung |
+| `geflutete_elemente` | Array der Element-IDs, die dauerhaft vollgelaufen sind (A-C-00047, seit C-0.2 additiv); leer, wenn nichts geflutet ist |
 | `vektoren` | Array der nachfolgend beschriebenen Beiträge |
-| `elementvolumina` | Array mit Element-ID, `volumen_m3`, `auftriebspunkt_modell_m` |
+| `elementvolumina` | Array mit Element-ID, `volumen_m3`, `geflutet` (bool, A-C-00047), `auftriebspunkt_modell_m` |
 | `moment_modell_nm` | Gesamtes Moment im Modellframe |
 | `moment_bezug_modell_m` | Gesamtschwerpunkt im Modellframe |
 
@@ -158,6 +167,16 @@ Alle Felder sind vorhanden. Ein nicht existierender Auftriebspunkt wird
 als JSON-`null` ausgegeben, nicht als scheinbar gültiger Ursprung.
 Auch ein Element ohne Volumen wird mit exakt null Verdrängung geführt.
 Einheiten sind SI; Zeit ist nicht die Rechenlaufzeit.
+
+**Volllaufen (A-C-00047):** Ein Element mit offenem Schalen-Massennetz
+und Verdrängungsvolumen läuft voll, sobald ein Punkt seines Bordrands
+(Kanten mit nur einer Fläche) unter der Wasserebene liegt. Es bleibt bis
+Laufende geflutet, behält sein Gewicht und liefert Auftrieb null
+(`zustand: null`, Bezugspunkt). Die Statik wiederholt die Suche nach
+neuer Flutung und nennt geflutete Elemente in der Diagnose bei
+`unloesbar`. Ein Lauf kann über `Laufoptionen::start` (Bibliothek) von
+einem vorhandenen Zustand inklusive Flutung starten; die Statik verwendet
+davon nur Pose und Flutung als Startschätzung.
 
 Vektorbeiträge enthalten `id`, `element_id`, `art`, `einheit`,
 `frame: "modell"`, `punkt_m` und `vektor`.
@@ -168,6 +187,44 @@ reservierten Gesamtmodellbezug. IDs `<Element-ID>:gewicht` und
 `<Element-ID>:auftrieb` identifizieren Elementkräfte.
 Richtung und Länge werden aus den drei Vektorkomponenten gewonnen;
 die GUI wählt den grafischen Maßstab. Nullvektoren haben keine Richtung.
+
+### Erweiterungen der Vertragsversion 2
+
+Version 2 ist additiv: Alle Felder der Version 1 bleiben mit gleicher
+Bedeutung erhalten. Ein Leser der Version 1 kann unbekannte Felder
+ignorieren. Zusätzlich gilt:
+
+| Feld je Vektor | Bedeutung |
+|---|---|
+| `quelle` | `schwerkraft`, `hydrostatik`, `summe` oder `nicht_zugeordnet` |
+| `gruppe` | Darstellungs-/Summengruppe, derzeit `gewicht_auftrieb` bzw. `gesamt` |
+| `rolle` | `einzelbeitrag`, `gruppensumme` oder `gesamtsumme` |
+| `punktart` | `angriffspunkt` oder `bezugspunkt` |
+| `zustand` | `gueltig`, `null`, `deaktiviert`, `ungueltig`, `nicht_berechnet` |
+| `fehler_id` | `null` oder Fehler-ID (z. B. `CORE-BIL-0001`) |
+| `moment_s_nm` | Moment des Beitrags um den Gesamtschwerpunkt im Modellframe |
+
+Bei `ungueltig` und `nicht_berechnet` sind `punkt_m`, `vektor` und
+`moment_s_nm` JSON-`null`. Ein Element mit Volumen, das trocken ist,
+liefert einen `:auftrieb`-Beitrag mit `zustand: "null"`, Nullvektor und
+dem Elementschwerpunkt als `bezugspunkt` – fehlende Einträge sind damit
+nicht mehr mit „kein Auftrieb“ verwechselbar.
+
+| Feld oberste Ebene | Bedeutung |
+|---|---|
+| `beitraege_auswertung` | `"gelieferter_zustand"`: Beiträge gelten für Pose/Zeit des Zustands |
+| `summen.gesamt` | `gruppe`, `frame`, `kraft_modell_n`, `moment_s_nm`, `quellen[]` (summierte Beitrags-IDs) |
+| `summen.gruppen[]` | Gleiche Felder je Gruppe |
+| `bilanzstatus` | `vollstaendig`, `teilsumme` oder `ungeklaert` |
+| `erwartete_beitraege`, `fehlende_beitraege` | Beitrags-IDs je Element (`:gewicht`, `:auftrieb` bei Volumen) |
+| `gleichgewicht` | Bei Statik Objekt mit `krafttoleranz_n`, `momenttoleranz_nm`, `residuum_kraft_n`, `residuum_moment_nm`, `freiheitsgrade[]`, `iterationen`; sonst `null` |
+
+Summiert werden nur Einzelbeiträge mit `gueltig` oder `null`.
+Residuen sind die tatsächlich an der gelieferten Pose berechneten
+Weltgrößen `|F_z|` bzw. `max(|M_x|, |M_y|)`.
+Die Prüfantwort (`--pruefen`) bleibt bei Vertragsversion 1.
+Bibliotheksfunktionen: `segelphysik::bilanz(modell, beitraege)` und
+`segelphysik::moment_um(...)` ([Header](../Code/include/segelphysik/hydrostatik.hpp)).
 
 Statische Statuswerte sind `konvergiert`, `nicht_konvergiert`,
 `unloesbar`, `abgebrochen`. Dynamische Aufzeichnungen enthalten
@@ -220,7 +277,45 @@ Array-Zusammenstellung günstiger sein. Belege:
 [Performancevergleich](PerformanceOptimiert.json).
 Ein späterer Live-Transport bleibt separat.
 
-## 4. Tests und Beispiele
+Nach der C-0.2-Erweiterung (Version 2) liegt der Kernpfad im kleinen
+Benchmarkfall bei 0,243 ms Median je 500 Auswertungen (Vergleich:
+0,326 ms); die Serialisierung von 1000 Zuständen dauert wegen der
+zusätzlichen Felder rund 0,21–0,24 ms statt 0,013 ms. Zusammengesetzter
+und großer Benchmarkfall wurden nicht erneut gemessen.
+
+## 4. Modellkatalog (Katalogversion 1)
+
+Bibliotheksschnittstelle
+([Header](../Code/include/segelphysik/katalog.hpp)), kein globaler
+Zustand. Die GUI wählt und überwacht den Ordner; der Core liest ihn.
+
+| Funktion | Antwort |
+|---|---|
+| `modellkatalog(ordner)` | Katalog über `ordner/modell.json` und `ordner/*/modell.json`, sortiert nach Ordnername |
+| `katalog_json(kat)` | `katalogversion`, `modelle[]` mit `modell_id`, `name`, `beschreibung`, `modell_fassung`, `status` (`verwendbar`/`fehlerhaft`), `fehleranzahl` |
+| `modellstruktur(kat, id, fassung)` | Gruppen und Elemente (`darstellung`, `hydrostatik_volumen`), `gesamtmasse_kg`, `huellquader_m{min,max}` |
+| `darstellungsgeometrie(kat, id, fassung[, element])` | `teile[]` mit `element_id`, `gruppe`, `herkunft` (`darstellung`/`volumen_ersatz`), `farbe_rgb`, `punkte_m`, `dreiecke`; dazu `diagnosen` |
+| `modelldiagnose(kat, id, fassung)` | Diagnosen mit `fehler_id`, `text`, `fundstelle` |
+| `katalogmodell(kat, id, fassung)` | Geladenes `Modell` für Prüfung/Simulation |
+| `katalogfehler_json(text)` | Fehlerantwort mit `fehler_id` und `text` |
+
+Antworten enthalten keine Dateipfade; Fundstellen sind relativ zum
+Modellordner. Detailabrufe verlangen die im Katalog gemeldete Fassung:
+`CORE-KAT-0003` unbekannte ID, `-0004` veraltete Fassung (neu einlesen),
+`-0002` doppelte ID, `-0006` unbekanntes Element; ein nicht lesbares
+Darstellungsnetz (`-0005`) erscheint als Diagnose, die übrigen Teile
+bleiben verfügbar. Ohne Darstellungsnetz wird das Hydrostatikvolumen
+als `volumen_ersatz` geliefert. OBJ-Polygone werden für die Darstellung
+fächertrianguliert.
+
+Einschränkungen: Das Modellformat 0.1-entwurf kennt keine Elementnamen,
+Farben oder Beschreibungen; `name` ist daher die ID, `farbe_rgb` und
+`beschreibung` sind `null`. Die Modellfassung enthält bewusst keine
+Darstellungsdateien; die GUI leert ihren Geometriepuffer daher bei
+Dateiänderungen selbst. `fehleranzahl` beruht auf dem ersten
+Importfehler (plus ggf. Duplikat). CLI-Befehle sind nicht implementiert.
+
+## 5. Tests und Beispiele
 
 Die CTest-Fälle `cli_error_catalog`, `cli_no_arguments`,
 `cli_invalid_argument` und `cli_extra_argument` prüfen Katalogabfrage
@@ -237,13 +332,18 @@ Unicode, JSON-Duplikate, Nichtendlichkeit, OBJ-Indices und fehlerhafte
 Volumennetze. `hydrostatik_referenzen` prüft Schnitt, Statik, freien Fall,
 Rotation und Schrittweitenkonvergenz. `simulation_gesamtlauf` prüft
 Aufzeichnung, Modellfehler, Abbruch, Gesamttimer und Überschreibschutz.
+`kraft_momentenbilanz` prüft Referenzfälle, Wrench/Frame-Wechsel,
+ID-Stabilität, Datenzustände, Summen, Gleichgewichtsresiduen und die
+Felder der Version 2. `modellkatalog_schnittstelle` prüft Katalog,
+Fassung, Detailabrufe, Fehler-IDs und Pfadfreiheit an den Beispielmodellen.
 
 Der aktuelle Katalog selbst ist eine gültige vollständige Referenzantwort.
 Die Dateien unter [Beispiele_Core_GUI](Beispiele_Core_GUI) enthalten
-echte statische und dynamische CLI-Aufzeichnungen als GUI-Eingangsdaten.
+echte statische und dynamische CLI-Aufzeichnungen (Version 2, Quader;
+dynamisch 0,1 s mit dt 0,01 s) als GUI-Eingangsdaten.
 Sie sind Beispiele, keine zusätzliche Spezifikation.
 
-## 5. Abgrenzung zur GUI-Planung
+## 6. Abgrenzung zur GUI-Planung
 
 Die Desktop-/Web-Architektur wurde auf Nutzerauftrag **in GUI übernommen**.
 Die [GUI-Übergabe](GUI_Uebergabe.md) enthält die Entscheidungen zu

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <limits>
 #include <stdexcept>
 
@@ -119,37 +120,148 @@ VolumenWerte wasseranteil(const Mesh& mesh, const Pose& pose)
     return {volumen,plus(apex,mal(moment,1./volumen))};
 }
 
-Kraefte hydrostatik(const Modell& modell,const Pose& pose,double rho,double g)
+Vektor3 moment_um(const Vektor3& a,const Vektor3& p,const Vektor3& f,const Vektor3& eigen)
+{
+    return plus(cross(plus(a,mal(p,-1.)),f),eigen);
+}
+
+Kraefte hydrostatik(const Modell& modell,const Pose& pose,double rho,double g,
+    const std::vector<std::string>& geflutet)
 {
     SEGEL_MESSUNG("hydrostatikauswertung");
     positiv(rho);positiv(g);positiv(modell.masse_kg);
     Kraefte result;
+    result.beitraege.reserve(2*modell.elemente.size()+1);
     const auto gewicht_richtung=pose.weltvektor_nach_modell({0.,0.,-g});
     for (const auto& e : modell.elemente) {
         const auto gewicht=mal(gewicht_richtung,e.masse_kg);
-        result.beitraege.push_back({e.id+":gewicht",e.id,"kraft",e.schwerpunkt_m,gewicht});
+        const auto moment_g=moment_um(e.schwerpunkt_m,modell.schwerpunkt_m,gewicht);
+        auto& bg=result.beitraege.emplace_back();
+        bg.id=e.id+":gewicht";bg.element_id=e.id;bg.art="kraft";bg.punkt_m=e.schwerpunkt_m;
+        bg.vektor=gewicht;bg.quelle=Quelle::schwerkraft;bg.moment_s_nm=moment_g;
         result.kraft_welt_n[2]-=e.masse_kg*g;
-        result.moment_modell_nm=plus(result.moment_modell_nm,
-            cross(plus(e.schwerpunkt_m,mal(modell.schwerpunkt_m,-1.)),gewicht));
+        result.moment_modell_nm=plus(result.moment_modell_nm,moment_g);
         if (e.volumen) {
-            const auto wet=wasseranteil(*e.volumen,pose);
+            const bool voll=!geflutet.empty() &&
+                std::binary_search(geflutet.begin(),geflutet.end(),e.id);
+            VolumenWerte wet;
+            if(voll) wet.geflutet=true;else wet=wasseranteil(*e.volumen,pose);
             result.elementvolumina.emplace_back(e.id,wet);
             result.volumen_m3+=wet.volumen_m3;
+            auto& ba=result.beitraege.emplace_back();
+            ba.id=e.id+":auftrieb";ba.element_id=e.id;ba.art="kraft";ba.quelle=Quelle::hydrostatik;
             if (wet.schwerpunkt_m) {
                 const auto f=pose.weltvektor_nach_modell({0.,0.,rho*g*wet.volumen_m3});
-                result.beitraege.push_back({e.id+":auftrieb",e.id,"kraft",*wet.schwerpunkt_m,f});
+                const auto moment_a=moment_um(*wet.schwerpunkt_m,modell.schwerpunkt_m,f);
+                ba.punkt_m=*wet.schwerpunkt_m;ba.vektor=f;ba.moment_s_nm=moment_a;
                 result.kraft_welt_n[2]+=rho*g*wet.volumen_m3;
-                result.moment_modell_nm=plus(result.moment_modell_nm,
-                    cross(plus(*wet.schwerpunkt_m,mal(modell.schwerpunkt_m,-1.)),f));
+                result.moment_modell_nm=plus(result.moment_modell_nm,moment_a);
+            } else {
+                // Dry or flooded body: valid zero buoyancy, shown at the element reference point.
+                ba.punkt_m=e.schwerpunkt_m;ba.punktart=Punktart::bezugspunkt;ba.zustand=Datenzustand::null;
             }
         } else result.elementvolumina.emplace_back(e.id,VolumenWerte{});
     }
-    result.beitraege.push_back({"gesamt:moment","","moment",modell.schwerpunkt_m,result.moment_modell_nm});
+    auto& gm=result.beitraege.emplace_back();
+    gm.id="gesamt:moment";gm.art="moment";gm.punkt_m=modell.schwerpunkt_m;gm.vektor=result.moment_modell_nm;
+    gm.quelle=Quelle::summe;gm.gruppe="gesamt";gm.rolle=Rolle::gesamtsumme;gm.punktart=Punktart::bezugspunkt;
+    gm.moment_s_nm=result.moment_modell_nm;
     return result;
 }
 
-SolverErgebnis gleichgewicht(const Modell& modell,const Zustand& start,
-    double ftol,double mtol,std::size_t budget,const std::atomic_bool* abbruch)
+std::vector<std::string> flutung(const Modell& modell,const Pose& pose,std::vector<std::string> bisher)
+{
+    std::sort(bisher.begin(),bisher.end());
+    bisher.erase(std::unique(bisher.begin(),bisher.end()),bisher.end());
+    for (const auto& e : modell.elemente) {
+        if (e.flutrand_m.empty() || !e.volumen ||
+            std::binary_search(bisher.begin(),bisher.end(),e.id)) continue;
+        for (const auto& p : e.flutrand_m)
+            if (pose.modellpunkt_nach_welt(p)[2]<0.) {
+                bisher.insert(std::lower_bound(bisher.begin(),bisher.end(),e.id),e.id);
+                break;
+            }
+    }
+    return bisher;
+}
+
+const char* name(Quelle wert)
+{
+    switch (wert) {
+    case Quelle::schwerkraft: return "schwerkraft";
+    case Quelle::hydrostatik: return "hydrostatik";
+    case Quelle::summe: return "summe";
+    default: return "nicht_zugeordnet";
+    }
+}
+const char* name(Rolle wert)
+{
+    switch (wert) {
+    case Rolle::gruppensumme: return "gruppensumme";
+    case Rolle::gesamtsumme: return "gesamtsumme";
+    default: return "einzelbeitrag";
+    }
+}
+const char* name(Punktart wert)
+{
+    return wert==Punktart::bezugspunkt?"bezugspunkt":"angriffspunkt";
+}
+const char* name(Datenzustand wert)
+{
+    switch (wert) {
+    case Datenzustand::null: return "null";
+    case Datenzustand::deaktiviert: return "deaktiviert";
+    case Datenzustand::nicht_berechnet: return "nicht_berechnet";
+    case Datenzustand::ungueltig: return "ungueltig";
+    default: return "gueltig";
+    }
+}
+
+Bilanz bilanz(const Modell& modell,std::vector<Beitrag>& beitraege)
+{
+    Bilanz result;
+    result.gesamt.gruppe="gesamt";
+    for (const auto& e : modell.elemente) {
+        result.erwartete_beitraege.push_back(e.id+":gewicht");
+        if (e.volumen) result.erwartete_beitraege.push_back(e.id+":auftrieb");
+    }
+    auto endlich=[](const Vektor3& v) {return std::isfinite(v[0])&&std::isfinite(v[1])&&std::isfinite(v[2]);};
+    for (auto& b : beitraege) {
+        const bool hat_werte=b.zustand==Datenzustand::gueltig||b.zustand==Datenzustand::null;
+        if (hat_werte && (!endlich(b.vektor)||!endlich(b.punkt_m)||!endlich(b.moment_s_nm))) {
+            b.zustand=Datenzustand::ungueltig;b.fehler_id="CORE-BIL-0001";
+        }
+        if (b.rolle!=Rolle::einzelbeitrag ||
+            (b.zustand!=Datenzustand::gueltig && b.zustand!=Datenzustand::null)) continue;
+        auto gruppe=std::find_if(result.gruppen.begin(),result.gruppen.end(),
+            [&](const Summe& s) {return s.gruppe==b.gruppe;});
+        if (gruppe==result.gruppen.end()) {
+            result.gruppen.push_back({std::string(b.gruppe),{},{},{}});
+            gruppe=std::prev(result.gruppen.end());
+        }
+        const Vektor3 kraft=b.art=="kraft"?b.vektor:Vektor3{};
+        for (auto* s : {&*gruppe,&result.gesamt}) {
+            s->kraft_modell_n=plus(s->kraft_modell_n,kraft);
+            s->moment_s_nm=plus(s->moment_s_nm,b.moment_s_nm);
+            s->quellen.push_back(b.id);
+        }
+    }
+    bool luecke=false;
+    for (const auto& id : result.erwartete_beitraege) {
+        const auto fund=std::find_if(beitraege.begin(),beitraege.end(),[&](const Beitrag& b) {return b.id==id;});
+        if (fund==beitraege.end() || fund->zustand==Datenzustand::nicht_berechnet ||
+            fund->zustand==Datenzustand::ungueltig) {
+            result.fehlende_beitraege.push_back(id);luecke=true;
+        }
+    }
+    result.status=modell.elemente.empty()?"ungeklaert":(luecke?"teilsumme":"vollstaendig");
+    return result;
+}
+
+namespace {
+SolverErgebnis gleichgewicht_suche(const Modell& modell,const Zustand& start,
+    double ftol,double mtol,std::size_t budget,const std::atomic_bool* abbruch,
+    const std::vector<std::string>& geflutet)
 {
     SEGEL_MESSUNG("gleichgewichtssuche");
     positiv(ftol);positiv(mtol);
@@ -162,15 +274,16 @@ SolverErgebnis gleichgewicht(const Modell& modell,const Zustand& start,
         std::asin(std::clamp(2*(q[3]*q[1]-q[2]*q[0]),-1.,1.))};
     const double yaw=std::atan2(2*(q[3]*q[2]+q[0]*q[1]),1-2*(q[1]*q[1]+q[2]*q[2]));
     SolverErgebnis result{start,"nicht_konvergiert","CORE-SIM-0004: Iterationsbudget erschoepft",0};
+    result.zustand.geflutet=geflutet;
     auto pose=[&](const Vektor3& p) {return euler(p[0],p[1],p[2],yaw,start.pose.position_m()[0],start.pose.position_m()[1]);};
     auto residuum=[&](const Vektor3& p) {
-        const auto k=hydrostatik(modell,pose(p));
+        const auto k=hydrostatik(modell,pose(p),1000.,9.81,geflutet);
         const auto mw=pose(p).modellvektor_nach_welt(k.moment_modell_nm);
         return Vektor3{k.kraft_welt_n[2]/ftol,mw[0]/mtol,mw[1]/mtol};
     };
     double gesamtvolumen=0.;
     for(const auto& e:modell.elemente) {
-        if(e.volumen) {
+        if(e.volumen && !std::binary_search(geflutet.begin(),geflutet.end(),e.id)) {
             double maxz=-std::numeric_limits<double>::infinity();
             for(const auto& p:e.volumen->punkte) maxz=std::max(maxz,p[2]);
             gesamtvolumen+=wasseranteil(*e.volumen,Pose{{0,0,-maxz-1.},{0,0,0,1}}).volumen_m3;
@@ -221,6 +334,42 @@ SolverErgebnis gleichgewicht(const Modell& modell,const Zustand& start,
     }
     return result;
 }
+}
+
+SolverErgebnis gleichgewicht(const Modell& modell,const Zustand& start,
+    double ftol,double mtol,std::size_t budget,const std::atomic_bool* abbruch)
+{
+    // The start pose is only an initial guess and does not flood anything.
+    auto geflutet=start.geflutet;
+    std::sort(geflutet.begin(),geflutet.end());
+    geflutet.erase(std::unique(geflutet.begin(),geflutet.end()),geflutet.end());
+    SolverErgebnis result;
+    std::size_t iterationen=0;
+    // Each repetition floods at least one more element, so this terminates.
+    for(;;) {
+        result=gleichgewicht_suche(modell,start,ftol,mtol,budget,abbruch,geflutet);
+        iterationen+=result.iterationen;
+        if(result.status!="konvergiert") break;
+        auto neu=flutung(modell,result.zustand.pose,geflutet);
+        if(neu==geflutet) break;
+        geflutet=std::move(neu);
+    }
+    result.iterationen=iterationen;
+    result.zustand.geflutet=geflutet;
+    // An equilibrium is a state at rest, whatever motion the start carried.
+    result.zustand.geschwindigkeit_welt_m_s={};
+    result.zustand.omega_modell_rad_s={};
+    if(!geflutet.empty() && result.status=="unloesbar") {
+        result.diagnose+="; geflutet:";
+        for(const auto& id:geflutet) result.diagnose+=" "+id;
+    }
+    // Residuals of the reported pose, measured exactly like the convergence test.
+    const auto k=hydrostatik(modell,result.zustand.pose,1000.,9.81,geflutet);
+    const auto mw=result.zustand.pose.modellvektor_nach_welt(k.moment_modell_nm);
+    result.gleichgewicht=Gleichgewichtsangaben{ftol,mtol,std::abs(k.kraft_welt_n[2]),
+        std::max(std::abs(mw[0]),std::abs(mw[1])),{"position_z","rollen","stampfen"},result.iterationen};
+    return result;
+}
 
 Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,double rho,double g)
 {
@@ -236,7 +385,8 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,double rh
     if (I[0]<=0. || I[0]*I[4]-I[1]*I[3]<=0. ||
         I[0]*(I[4]*I[8]-I[5]*I[7])-I[1]*(I[3]*I[8]-I[5]*I[6])+I[2]*(I[3]*I[7]-I[4]*I[6])<=0.)
         throw std::invalid_argument("CORE-SIM-0002: Dynamiktraegheit nicht positiv definit.");
-    const auto k=hydrostatik(modell,s.pose,rho,g);
+    const auto geflutet=flutung(modell,s.pose,s.geflutet);
+    const auto k=hydrostatik(modell,s.pose,rho,g,geflutet);
     const auto a=mal(k.kraft_welt_n,1./modell.masse_kg);
     Vektor3 impuls{};
     for (std::size_t i=0;i<3;++i)
@@ -256,7 +406,7 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,double rh
     const Pose midrotation{{},midq};
     const auto midcg=plus(plus(cg,mal(s.geschwindigkeit_welt_m_s,dt/2)),mal(a,dt*dt/8));
     const Pose midpose{plus(midcg,mal(midrotation.modellvektor_nach_welt(modell.schwerpunkt_m),-1.)),midq};
-    const auto midforce=hydrostatik(modell,midpose,rho,g);
+    const auto midforce=hydrostatik(modell,midpose,rho,g,geflutet);
     Vektor3 midimpuls{};
     for(std::size_t i=0;i<3;++i)
         for(std::size_t j=0;j<3;++j) midimpuls[i]+=I[3*i+j]*omega_mid[j];
@@ -270,6 +420,7 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,double rh
         mal(midforce.kraft_welt_n,dt/modell.masse_kg));
     result.omega_modell_rad_s=plus(s.omega_modell_rad_s,mal(midalpha,dt));
     result.zeit_s=s.zeit_s+dt;result.schritt=s.schritt+1;
+    result.geflutet=flutung(modell,result.pose,geflutet);
     for(double value:result.geschwindigkeit_welt_m_s)
         if(!std::isfinite(value)) throw std::overflow_error("CORE-SIM-0001: Geschwindigkeitsueberlauf.");
     for(double value:result.omega_modell_rad_s)

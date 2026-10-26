@@ -17,6 +17,52 @@ segelphysik::Mesh box()
             {{0,2,1},{0,3,2},{4,5,6},{4,6,7},{0,1,5},{0,5,4},
              {1,2,6},{1,6,5},{2,3,7},{2,7,6},{3,0,4},{3,4,7}}};
 }
+// A-C-00047: open hull (rim at local z=-0.5) plus a sealed tank, both the
+// unit box. The hull floods once its rim is under water; the tank never does.
+segelphysik::Modell flutmodell(double rumpf_kg,double tank_kg)
+{
+    using namespace segelphysik;
+    Modell m;
+    m.id="flutung";m.masse_kg=rumpf_kg+tank_kg;m.schwerpunkt_m={0,0,-.75};
+    m.traegheit_kg_m2={2000,0,0,0,2000,0,0,0,2000};
+    Element r;r.id="Rumpf";r.masse_kg=rumpf_kg;r.schwerpunkt_m=m.schwerpunkt_m;r.volumen=box();
+    r.flutrand_m={{-1,-1,-.5},{1,-1,-.5},{1,1,-.5},{-1,1,-.5}};
+    Element t;t.id="Tank";t.masse_kg=tank_kg;t.schwerpunkt_m=m.schwerpunkt_m;t.volumen=box();
+    m.elemente={r,t};
+    return m;
+}
+void flutungstest()
+{
+    using namespace segelphysik;
+    const std::vector<std::string> rumpf{"Rumpf"};
+    auto r=gleichgewicht(flutmodell(3000.,500.),Zustand{});
+    if(r.status!="konvergiert"||!r.zustand.geflutet.empty())
+        throw std::runtime_error("Trockener Rand geflutet: "+r.diagnose);
+    near(r.zustand.pose.position_m()[2],1.-3500./8000.,1e-6);
+    r=gleichgewicht(flutmodell(6000.,500.),Zustand{});
+    if(r.status!="konvergiert"||r.zustand.geflutet!=rumpf)
+        throw std::runtime_error("Flutung in Statik fehlt: "+r.diagnose);
+    near(r.zustand.pose.position_m()[2],1.-6500./4000.,1e-6);
+    const auto k=hydrostatik(flutmodell(6000.,500.),r.zustand.pose,1000.,9.81,r.zustand.geflutet);
+    near(k.kraft_welt_n[2],0.,.001);
+    if(!k.elementvolumina[0].second.geflutet||k.elementvolumina[0].second.volumen_m3!=0.
+       ||k.elementvolumina[1].second.geflutet)
+        throw std::runtime_error("Volumenwerte der Flutung falsch");
+    r=gleichgewicht(flutmodell(9000.,500.),Zustand{});
+    if(r.status!="unloesbar"||r.diagnose.find("geflutet: Rumpf")==std::string::npos)
+        throw std::runtime_error("Geflutete Ueberlast ohne Diagnose: "+r.diagnose);
+    const auto m=flutmodell(6000.,500.);
+    Zustand z;z.pose=Pose{{0,0,5},{0,0,0,1}};
+    z=dynamikschritt(m,z,.01);
+    if(!z.geflutet.empty()) throw std::runtime_error("Dynamik flutet trockenen Rand");
+    z.pose=Pose{{},{0,0,0,1}};
+    z=dynamikschritt(m,z,.01);
+    if(z.geflutet!=rumpf) throw std::runtime_error("Dynamik flutet nicht");
+    z.pose=Pose{{0,0,5},{0,0,0,1}};
+    z=dynamikschritt(m,z,.01);
+    if(z.geflutet!=rumpf) throw std::runtime_error("Flutung nicht dauerhaft");
+    if(flutung(m,Pose{{0,0,-10},{0,0,0,1}},{})!=rumpf) throw std::runtime_error("Vollkoerper geflutet");
+}
 void pruefen()
 {
     using namespace segelphysik;
@@ -105,6 +151,7 @@ void pruefen()
     if(std::abs(fine-reference)>.001)
         throw std::runtime_error("Numerischer Hoehenfehler groesser als 1 mm");
     m.elemente[0].volumen.reset();
+    flutungstest();
     testmessungen_zuruecksetzen();
     hydrostatik(m,fall.pose);
     if(!testmessungen().empty()) throw std::runtime_error("Detailtimer ohne Aktivierung");

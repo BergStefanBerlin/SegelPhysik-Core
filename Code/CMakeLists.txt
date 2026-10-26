@@ -44,7 +44,7 @@ endif()
 configure_file(src/fehlerkatalog.hpp.in generated/fehlerkatalog.hpp @ONLY)
 
 add_library(segelphysik_core STATIC src/core.cpp src/pose.cpp src/modell.cpp
-    src/hydrostatik.cpp src/messung.cpp src/simulation.cpp)
+    src/hydrostatik.cpp src/messung.cpp src/simulation.cpp src/katalog.cpp)
 target_include_directories(segelphysik_core PUBLIC include)
 target_include_directories(segelphysik_core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_compile_features(segelphysik_core PUBLIC cxx_std_17)
@@ -86,6 +86,16 @@ if(BUILD_TESTING)
     add_test(NAME modell_import COMMAND modell_tests
         "${CMAKE_CURRENT_SOURCE_DIR}/../Spezifikationen/Beispiele_Modellformat/modelle/quader/modell.json")
     add_test(NAME core_build_configuration COMMAND core_tests)
+    add_executable(bilanz_tests tests/bilanz_tests.cpp)
+    target_link_libraries(bilanz_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets bilanz_tests)
+    add_test(NAME kraft_momentenbilanz COMMAND bilanz_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Spezifikationen/Beispiele_Modellformat/modelle/quader/modell.json")
+    add_executable(katalog_tests tests/katalog_tests.cpp)
+    target_link_libraries(katalog_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets katalog_tests)
+    add_test(NAME modellkatalog_schnittstelle COMMAND katalog_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Spezifikationen/Beispiele_Modellformat/modelle")
     foreach(scenario help build_info error_catalog no_arguments invalid_argument extra_argument)
         add_test(NAME cli_${scenario}
             COMMAND "${CMAKE_COMMAND}"

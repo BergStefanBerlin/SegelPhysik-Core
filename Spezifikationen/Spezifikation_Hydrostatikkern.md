@@ -81,7 +81,9 @@ Oberfläche, konstanter Wasserdichte und konstanter Schwerebeschleunigung.
 Modellteile bleiben einzeln identifizierbar, sind aber starr verbunden.
 
 Hydrodynamischer Widerstand, Tragflächenkräfte, Aerodynamik, Wellen,
-Flutung und bewegliche Gelenke sind nicht Teil dieser Ausbaustufe.
+Wassereinbruch über Lecks oder Teilflutung und bewegliche Gelenke sind
+nicht Teil dieser Ausbaustufe. Das vollständige Volllaufen offener
+Rümpfe über den Bordrand regelt A-C-00047.
 Dynamik mit lageabhängig neu berechnetem hydrostatischem Auftrieb ist
 nicht mit einer vollständigen Hydrodynamik gleichzusetzen.
 
@@ -261,6 +263,41 @@ Dämpfung bedarf eines eigenen ausdrücklich beschriebenen Physikvertrags.
 ausgelenkte hydrostatische Bewegung werden geprüft. Schrittweitenstudien
 belegen Genauigkeit und Stabilität. Ein ungedämpftes Modell darf nicht
 durch unbenannte Kräfte künstlich zur Ruhe gebracht werden.
+
+#### A-C-00047: Volllaufen offener Rümpfe über den Bordrand
+
+Ein Element ist flutbar, wenn seine Masse als offene Schale modelliert
+ist und es ein Verdrängungsvolumen besitzt. Der Bordrand sind die
+Eckpunkte aller Kanten des Schalen-Massennetzes, die nur zu einer
+Fläche gehören; er wird beim Modellimport automatisch bestimmt.
+Geschlossene Schalen, Vollkörper, Punktmassen und Elemente ohne
+Volumen sind nie flutbar.
+
+Liegt ein Bordrandpunkt in der aktuellen Pose unter der Wasserebene
+(Welt-z < 0), ist das Element ab diesem Zeitpunkt **dauerhaft geflutet**
+bis zum Laufende. Ein geflutetes Element behält sein Gewicht, liefert
+aber keinen Auftrieb (Beitrag mit Zustand `null` am Bezugspunkt). Alle
+übrigen Elemente tragen unverändert weiter; spätere Lufttanks werden
+als eigene geschlossene Volumenelemente modelliert.
+
+- Statik: Die Suche läuft zunächst mit dem Flutungsstand des
+  Startzustands. Liegt im Ergebnis ein Bordrand unter Wasser, wird das
+  Element geflutet und die Suche wiederholt. Die Startpose selbst ist
+  nur Startschätzung und flutet nichts. Bei Unlösbarkeit nennt die
+  Diagnose die gefluteten Elemente.
+- Dynamik: Vor jedem Schritt wird der Flutungsstand an der Startpose
+  des Schritts, danach an der Endpose aktualisiert.
+- Ein Lauf kann von einem übergebenen Startzustand ausgehen
+  (`Laufoptionen::start`); dessen Flutungsstand gilt weiter.
+- Der Ergebnisvertrag V2 nennt additiv `geflutete_elemente` je Zustand
+  und `geflutet` je Eintrag in `elementvolumina`.
+
+**Abnahme:** Modellimport bestimmt den Bordrand nur für offene Schalen
+mit Volumen. Ein Referenzfall aus offener Schale und geschlossenem Tank
+bleibt bei leichter Last trocken, flutet bei schwerer Last und schwimmt
+dann allein auf dem Tank; bei Überlast meldet die Statik `unloesbar`
+mit den gefluteten Elementen. In der Dynamik bleibt die Flutung nach
+dem Auftauchen erhalten; Vollkörper fluten nie.
 
 #### A-C-00015: Reproduzierbarer und kontrollierbarer Lauf
 
@@ -723,6 +760,7 @@ Freigaben, Schnittstellen und Messgrenzen werden nicht automatisch übernommen.
 | A-C-00007 bis A-C-00010 | Modellprüfung und Masseneigenschaften | Implementiert und Referenztests; konservative AABB-Grenze dokumentiert |
 | A-C-00011 bis A-C-00012 | Wasserschnitt und gemeinsame Physik | Implementiert und analytisch geprüft |
 | A-C-00013 bis A-C-00015 | Statik, Dynamik, Laufsteuerung | Implementiert; Referenz-, Konvergenz-, Fehler- und Abbruchtests |
+| A-C-00047 | Volllaufen offener Rümpfe | C-0.2, U-C-000031: implementiert; `modell_import`, `hydrostatik_referenzen`, `kraft_momentenbilanz` |
 | A-C-00016 bis A-C-00017 | Ergebnisse und GUI-Anschlussfähigkeit | Versionierte Aufzeichnungen vorhanden; keine GUI-/Live-Integration |
 | A-C-00028 | Schnittstellenbeschreibung unter Dokumentationen | Implementierten Stand und echte Referenzdaten dokumentiert |
 | A-C-00029 | SI-Einheiten und bedarfsgerechte Genauigkeit | SI und Referenztests; allgemeine fachliche Fehlerbudgets/Abnahme offen |
