@@ -149,8 +149,9 @@ Modell fehlerhaft und liefert keine Farbe.
 
 Ein Element darf in `Darstellung` das optionale Feld `oberflaeche` mit
 einem der Werte `"matt"`, `"glaenzend"`, `"metall"`, `"chrom"`, `"lack"`,
-`"glas"`, `"leuchtend"`, `"schillernd"`, `"facettiert"`, `"drahtgitter"`
-oder `"perlmutt"` tragen. Der Core
+`"glas"`, `"leuchtend"`, `"schillernd"`, `"facettiert"`, `"drahtgitter"`,
+`"perlmutt"` oder `"unsichtbar"` (Teil wird nicht gezeichnet, z. B.
+Luftkörper nach A-C-00051) tragen. Der Core
 reicht den Wert unverändert über `darstellungsgeometrie` als
 `oberflaeche` weiter (A-C-00044). Ohne Angabe ist `oberflaeche` `null`
 und die GUI verwendet ihr Standardmaterial. Die Oberfläche hat keinen
@@ -164,7 +165,8 @@ Effektwert erscheinen in Struktur und JSON; ein ungültiger Wert (z. B.
 
 **Herkunft:** Nutzerauftrag vom 27.10.2026 (Grafikeffekte, Materialien);
 Effektwerte ergänzt auf Nutzerauftrag vom 26.10.2026 (einfache Körper
-grell und je mit eigenem Effekt).
+grell und je mit eigenem Effekt); `"unsichtbar"` ergänzt auf
+Nutzerauftrag vom 28.10.2026 (Luft muss durchsichtig sein).
 
 ## Quellen und Abgrenzung zur Historie
 

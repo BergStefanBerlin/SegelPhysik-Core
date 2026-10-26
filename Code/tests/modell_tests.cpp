@@ -352,7 +352,7 @@ void mesh_tests(Dateien& d)
                                       element(punkt(), "andere.obj", "b"))); }, "CORE-MOD-0007", "Element b");
     fehler([&] { d.laden(modell(element(punkt(), "mesh.obj", "a") + "," +
                                       element(punkt(), "andere.obj", "b"))); }, "CORE-MOD-0007",
-           "Ueberschneidungsfreiheit nicht nachgewiesen (konservative AABB-Pruefung)");
+           "Verdraengungsvolumina durchdringen oder enthalten sich");
     // Merely touching AABBs have no positive-volume overlap.
     d.schreiben("andere.obj", tetra(false, 1.));
     gleich(d.laden(modell(element(punkt(), "mesh.obj", "a") + "," +
@@ -388,21 +388,19 @@ void fassung_tests(Dateien& d)
     pruefe(vorher.fassung == d.laden(darstellung).fassung, "Grafikinhalt veraendert Physikfassung");
 }
 
-void konservative_volumen_tests(Dateien& d)
+void volumen_ueberschneidung_tests(Dateien& d)
 {
     const auto paar = [&] {
         return d.laden(modell(element(punkt(), "a.obj", "a") + "," +
                               element(punkt(), "b.obj", "b")));
     };
-    const std::string diagnose =
-        "Ueberschneidungsfreiheit nicht nachgewiesen (konservative AABB-Pruefung)";
+    const std::string diagnose = "Verdraengungsvolumina durchdringen oder enthalten sich";
     d.schreiben("a.obj", tetra());
-    // x+y+z <= 1 versus x+y+z >= 2: provably disjoint, identical AABBs.
-    // Record the deliberate conservative false rejection, not exact detection.
+    // A-C-00050: x+y+z <= 1 versus x+y+z >= 2: disjoint despite identical AABBs.
     d.schreiben("b.obj",
         "v 1 1 1\nv 0 1 1\nv 1 0 1\nv 1 1 0\n"
         "f 1 2 3\nf 1 4 2\nf 1 3 4\nf 2 4 3\n");
-    fehler(paar, "CORE-MOD-0007", diagnose);
+    gleich(paar().masse_kg, 2.);
     // Positive-volume intersection.
     d.schreiben("b.obj", tetra(false, .25));
     fehler(paar, "CORE-MOD-0007", diagnose);
@@ -411,15 +409,32 @@ void konservative_volumen_tests(Dateien& d)
         "v .1 .1 .1\nv .2 .1 .1\nv .1 .2 .1\nv .1 .1 .2\n"
         "f 1 3 2\nf 1 2 4\nf 1 4 3\nf 2 3 4\n");
     fehler(paar, "CORE-MOD-0007", diagnose);
-    // A point of contact only, with AABB interiors separated.
-    d.schreiben("b.obj", tetra(false, 1.));
+    // An air body in a hollow of a hull, separated by a small gap, is legal:
+    // a U-shaped hull (two towers on a slab) with a box between the towers.
+    const auto quader = [](double x0, double y0, double z0, double x1, double y1, double z1, int basis) {
+        std::ostringstream s;
+        s << "v " << x0 << ' ' << y0 << ' ' << z0 << "\nv " << x1 << ' ' << y0 << ' ' << z0
+          << "\nv " << x1 << ' ' << y1 << ' ' << z0 << "\nv " << x0 << ' ' << y1 << ' ' << z0
+          << "\nv " << x0 << ' ' << y0 << ' ' << z1 << "\nv " << x1 << ' ' << y0 << ' ' << z1
+          << "\nv " << x1 << ' ' << y1 << ' ' << z1 << "\nv " << x0 << ' ' << y1 << ' ' << z1 << '\n';
+        const int f[12][3] = {{1,3,2},{1,4,3},{5,6,7},{5,7,8},{1,2,6},{1,6,5},
+                              {2,3,7},{2,7,6},{3,4,8},{3,8,7},{4,1,5},{4,5,8}};
+        for (const auto& t : f) s << "f " << t[0]+basis << ' ' << t[1]+basis << ' ' << t[2]+basis << '\n';
+        return s.str();
+    };
+    d.schreiben("a.obj", quader(0, 0, 0, 3, 1, 1, 0) + quader(0, 0, 1.5, 1, 1, 3, 8) +
+                         quader(2, 0, 1.5, 3, 1, 3, 16));
+    d.schreiben("b.obj", quader(1.1, .1, 1.1, 1.9, .9, 2.9, 0));
     gleich(paar().masse_kg, 2.);
-    // A shared oblique face, with AABB interiors overlapping: also deliberately
-    // conservative until boundary-aware solid intersection predicates exist.
+    // A shared oblique face is surface contact without common volume: legal.
+    d.schreiben("a.obj", tetra());
     d.schreiben("b.obj",
         "v 1 1 1\nv 1 0 0\nv 0 1 0\nv 0 0 1\n"
         "f 1 2 3\nf 1 4 2\nf 1 3 4\nf 2 4 3\n");
-    fehler(paar, "CORE-MOD-0007", diagnose);
+    gleich(paar().masse_kg, 2.);
+    // A point of contact only, with AABB interiors separated.
+    d.schreiben("b.obj", tetra(false, 1.));
+    gleich(paar().masse_kg, 2.);
 }
 
 void sweep_tests(Dateien& d)
@@ -476,7 +491,7 @@ int main(int argc, char** argv)
         json_tests(dateien);
         masse_tests(dateien);
         mesh_tests(dateien);
-        konservative_volumen_tests(dateien);
+        volumen_ueberschneidung_tests(dateien);
         sweep_tests(dateien);
         fassung_tests(dateien);
         messung_test(dateien);

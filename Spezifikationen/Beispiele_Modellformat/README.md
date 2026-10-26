@@ -88,7 +88,8 @@ Modell-JSON. Optional traegt `Darstellung` eine Farbe `"farbe": "#rrggbb"`
 (nur Anzeige, A-C-00048); ohne Angabe nutzt die GUI ihre Standardfarbe.
 Ebenso optional ist `"oberflaeche": "matt" | "glaenzend" | "metall"` oder
 ein Effektwert `"chrom" | "lack" | "glas" | "leuchtend" | "schillernd" |
-"facettiert" | "drahtgitter" | "perlmutt"`
+"facettiert" | "drahtgitter" | "perlmutt"` bzw. `"unsichtbar"` fuer
+Luftkoerper, die nicht gezeichnet werden sollen
 (nur Anzeige, A-C-00049); ohne Angabe nutzt die GUI ihr Standardmaterial.
 `/` ist darin der portable Trenner. `quelle: obj` ist
 redundant zur Dateiendung und entfaellt. Ein zentraler Geometriekatalog

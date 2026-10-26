@@ -299,7 +299,7 @@ std::optional<std::array<double, 3>> farbe_hex(const Json& wert)
 }
 
 constexpr const char* OBERFLAECHEN[] = {"matt", "glaenzend", "metall", "chrom", "lack", "glas",
-    "leuchtend", "schillernd", "facettiert", "drahtgitter", "perlmutt"};
+    "leuchtend", "schillernd", "facettiert", "drahtgitter", "perlmutt", "unsichtbar"};
 
 // Darstellungsoberfläche; nullopt bei unbekanntem Wert.
 std::optional<std::string> oberflaeche_text(const Json& wert)
@@ -664,6 +664,103 @@ void validieren(const Mesh& mesh, bool geschlossen, const std::string& ort)
     }
 }
 
+// Generalized winding number (Van Oosterom/Strackee); NaN if p lies on a vertex.
+L windung(const Mesh& mesh, const V& p)
+{
+    L summe = 0.L;
+    for (const auto& t : mesh.dreiecke) {
+        const V a = minus(vektor(mesh.punkte[t[0]]), p);
+        const V b = minus(vektor(mesh.punkte[t[1]]), p);
+        const V c = minus(vektor(mesh.punkte[t[2]]), p);
+        const L la = norm(a), lb = norm(b), lc = norm(c);
+        if (la == 0.L || lb == 0.L || lc == 0.L) return std::numeric_limits<L>::quiet_NaN();
+        const L zaehler = skalar(a, kreuz(b, c));
+        const L nenner = la*lb*lc + skalar(a, b)*lc + skalar(b, c)*la + skalar(c, a)*lb;
+        summe += 2.L * std::atan2(zaehler, nenner);
+    }
+    return summe / (4.L * 3.14159265358979323846L);
+}
+
+// True if a vertex of some connected component of a lies inside b. Ambiguous
+// points (on or extremely close to b's surface) are skipped; if a component has
+// no unambiguous vertex, nesting is assumed conservatively.
+bool enthalten(const Mesh& a, const Mesh& b)
+{
+    std::vector<std::size_t> eltern(a.punkte.size());
+    std::iota(eltern.begin(), eltern.end(), std::size_t{0});
+    const auto wurzel = [&](std::size_t i) {
+        while (eltern[i] != i) i = eltern[i] = eltern[eltern[i]];
+        return i;
+    };
+    for (const auto& t : a.dreiecke)
+        for (std::size_t i = 1; i < 3; ++i) eltern[wurzel(t[i])] = wurzel(t[0]);
+    std::map<std::size_t, std::vector<std::size_t>> komponenten;
+    for (const auto& t : a.dreiecke) for (const auto i : t) {
+        auto& liste = komponenten[wurzel(i)];
+        if (liste.size() < 16 && std::find(liste.begin(), liste.end(), i) == liste.end())
+            liste.push_back(i);
+    }
+    const auto bbox = box(b);
+    for (const auto& [_, punkte] : komponenten) {
+        bool entschieden = false;
+        for (const auto i : punkte) {
+            const V p = vektor(a.punkte[i]);
+            bool aussen = false;
+            for (std::size_t k = 0; k < 3; ++k)
+                if (p[k] < bbox.unten[k] || p[k] > bbox.oben[k]) aussen = true;
+            if (aussen) { entschieden = true; break; }
+            const L w = windung(b, p);
+            if (!std::isfinite(w) || std::abs(w - std::round(w)) > .1L) continue;
+            if (std::abs(w) > .5L) return true;
+            entschieden = true;
+            break;
+        }
+        if (!entschieden) return true;
+    }
+    return false;
+}
+
+// Two closed volume meshes overlap if their surfaces intersect or one is nested in the other.
+bool volumen_durchdringen(const Mesh& a, const Mesh& b)
+{
+    const auto ba = box(a), bb = box(b);
+    if (!innen_ueberlappt(ba, bb)) return false;
+    Box gemeinsam{};
+    for (std::size_t i = 0; i < 3; ++i) {
+        gemeinsam.unten[i] = std::max(ba.unten[i], bb.unten[i]);
+        gemeinsam.oben[i] = std::min(ba.oben[i], bb.oben[i]);
+    }
+    struct Eintrag { Box b; std::array<V, 3> p; int netz; };
+    std::vector<Eintrag> eintraege;
+    for (int n = 0; n < 2; ++n) {
+        const Mesh& m = n == 0 ? a : b;
+        for (const auto& t : m.dreiecke) {
+            Eintrag e{{}, {vektor(m.punkte[t[0]]), vektor(m.punkte[t[1]]), vektor(m.punkte[t[2]])}, n};
+            e.b = {e.p[0], e.p[0]};
+            for (const auto& punkt : e.p) for (std::size_t i = 0; i < 3; ++i) {
+                e.b.unten[i] = std::min(e.b.unten[i], punkt[i]);
+                e.b.oben[i] = std::max(e.b.oben[i], punkt[i]);
+            }
+            if (ueberlappt(e.b, gemeinsam)) eintraege.push_back(e);
+        }
+    }
+    std::sort(eintraege.begin(), eintraege.end(), [](const Eintrag& x, const Eintrag& y) {
+        return x.b.unten[0] < y.b.unten[0];
+    });
+    std::array<std::vector<std::size_t>, 2> aktiv;
+    for (std::size_t i = 0; i < eintraege.size(); ++i) {
+        const auto& e = eintraege[i];
+        auto& andere = aktiv[1 - e.netz];
+        andere.erase(std::remove_if(andere.begin(), andere.end(), [&](std::size_t j) {
+            return eintraege[j].b.oben[0] < e.b.unten[0];
+        }), andere.end());
+        for (const auto j : andere)
+            if (ueberlappt(e.b, eintraege[j].b) && schnitt(e.p, eintraege[j].p)) return true;
+        aktiv[e.netz].push_back(i);
+    }
+    return enthalten(a, b) || enthalten(b, a);
+}
+
 std::filesystem::path referenz(const Json& wert, const std::filesystem::path& basis,
                               const std::string& ort, int id = 2)
 {
@@ -789,7 +886,6 @@ Modell lade_modell(const std::filesystem::path& datei)
     const auto& gruppen = pflicht(root, "gruppen", ort);
     if (gruppen.typ != Json::Typ::objekt) fehler(2, ort, "gruppen muss ein Objekt sein");
     std::set<std::string> ids;
-    std::vector<std::pair<Box, std::string>> volumenboxen;
     for (const auto& gruppe : gruppen.objekt) {
         const std::string gruppenort = ort + ", Gruppe " + gruppe.first;
         objekt(gruppe.second, {"elemente"}, gruppenort);
@@ -814,7 +910,7 @@ Modell lade_modell(const std::filesystem::path& datei)
                 if (const auto* art = optional(*darstellung, "oberflaeche"); art && !oberflaeche_text(*art))
                     fehler(2, elementort + ".Darstellung.oberflaeche",
                         "Oberflaeche matt, glaenzend, metall, chrom, lack, glas, leuchtend, "
-                        "schillernd, facettiert, drahtgitter oder perlmutt erwartet");
+                        "schillernd, facettiert, drahtgitter, perlmutt oder unsichtbar erwartet");
             }
             if (hydro) {
                 objekt(*hydro, {"masse", "volumen"}, elementort + ".Hydrostatik");
@@ -824,12 +920,12 @@ Modell lade_modell(const std::filesystem::path& datei)
                     const auto pfad = referenz(pflicht(*volumen, "datei", elementort), datei.parent_path(), elementort);
                     e.volumen = obj_lesen(pfad, elementort + ".volumen", fassung);
                     validieren(*e.volumen, true, elementort + ".volumen, Mesh " + pfad.u8string());
-                    const auto b = box(*e.volumen);
-                    for (const auto& andere : volumenboxen) if (innen_ueberlappt(b, andere.first))
-                        fehler(7, elementort,
-                            "Ueberschneidungsfreiheit nicht nachgewiesen (konservative AABB-Pruefung)"
-                            "; Vergleich mit Element " + andere.second);
-                    volumenboxen.emplace_back(b, e.id);
+                    // A-C-00050: nested hulls/air bodies are legal unless they intersect or contain each other.
+                    for (const auto& andere : modell.elemente)
+                        if (andere.volumen && volumen_durchdringen(*e.volumen, *andere.volumen))
+                            fehler(7, elementort,
+                                "Verdraengungsvolumina durchdringen oder enthalten sich"
+                                "; Vergleich mit Element " + andere.id);
                 }
                 if (!e.volumen) e.flutrand_m.clear();
             }

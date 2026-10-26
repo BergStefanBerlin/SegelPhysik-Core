@@ -299,6 +299,43 @@ dann allein auf dem Tank; bei Überlast meldet die Statik `unloesbar`
 mit den gefluteten Elementen. In der Dynamik bleibt die Flutung nach
 dem Auftauchen erhalten; Vollkörper fluten nie.
 
+#### A-C-00050: Exakte Überschneidungsprüfung der Verdrängungsvolumina
+
+Die Überschneidungsfreiheit nach A-C-00010 wird geometrisch geprüft,
+nicht über achsenparallele Hüllquader. Zwei Verdrängungsvolumina sind
+unzulässig, wenn sich ihre Oberflächen schneiden oder ein Volumen ganz
+im anderen liegt (Windungszahl je Zusammenhangskomponente). Hüllquader
+dienen nur als Vorfilter. Gemeinsame Flächen, Kanten und Punktkontakte
+sind erlaubt. Ist eine Lagebestimmung numerisch uneindeutig, wird
+konservativ abgelehnt. Diagnose: CORE-MOD-0007 mit dem Vergleichselement.
+
+**Abnahme:** Disjunkte Körper mit überlappenden Hüllquadern (z. B. ein
+Luftkörper in der Mulde eines U-förmigen Rumpfs) sind gültig;
+Durchdringung und Enthaltensein werden abgelehnt.
+
+**Herkunft:** Nutzerauftrag vom 28.10.2026 (420er-Cockpit als Luftkörper).
+
+#### A-C-00051: Lufträume im Boot verdrängen Wasser
+
+Jeder Luftraum eines Boots trägt als Verdrängungsvolumen zum Auftrieb
+bei. Dies gilt allgemein für alle Modelle:
+
+- Lufttanks und geschlossene Doppelböden sind geschlossene
+  Volumenelemente (Vollkörper oder geschlossene Schale) und fluten nie.
+- Offene Innenräume (Cockpit, offener Rumpf) sind als flutbare Elemente
+  nach A-C-00047 modelliert: geschlossenes Verdrängungsvolumen bis zur
+  Überlaufkante, Masse als offene Schale, deren Rand die Überlaufkante
+  bildet. Läuft der Innenraum voll, entfällt nur sein Auftrieb.
+- Liegt der Innenraum nicht im Volumen des Rumpfs, wird er als eigenes
+  Element modelliert, das den Rumpf nach A-C-00050 nicht durchdringt.
+
+**Abnahme:** Optimist und Folkeboot enthalten den Innenraum im
+Rumpfvolumen; der 420er besitzt einen eigenen Cockpit-Luftkörper und
+schwimmt statisch trocken höher als ohne ihn.
+
+**Herkunft:** Nutzerauftrag vom 28.10.2026 (Lufttanks bleiben immer
+gefüllt; Regel gilt für alle künftigen Yachten).
+
 #### A-C-00015: Reproduzierbarer und kontrollierbarer Lauf
 
 Gleiche Eingaben und gleiche dokumentierte Ausführungskonfiguration
@@ -757,10 +794,11 @@ Freigaben, Schnittstellen und Messgrenzen werden nicht automatisch übernommen.
 | Anforderungen | Bereich | Umsetzungsschritte / tatsächliche Nachweise |
 |---|---|---|
 | A-C-00004 bis A-C-00006 | Umfang, C++-Basis, Wiederverwendung | Headless Bibliothek/CLI implementiert; Altbestand teilweise bewertet |
-| A-C-00007 bis A-C-00010 | Modellprüfung und Masseneigenschaften | Implementiert und Referenztests; konservative AABB-Grenze dokumentiert |
+| A-C-00007 bis A-C-00010 | Modellprüfung und Masseneigenschaften | Implementiert und Referenztests; AABB-Grenze durch A-C-00050 ersetzt |
 | A-C-00011 bis A-C-00012 | Wasserschnitt und gemeinsame Physik | Implementiert und analytisch geprüft |
 | A-C-00013 bis A-C-00015 | Statik, Dynamik, Laufsteuerung | Implementiert; Referenz-, Konvergenz-, Fehler- und Abbruchtests |
 | A-C-00047 | Volllaufen offener Rümpfe | C-0.2, U-C-000031: implementiert; `modell_import`, `hydrostatik_referenzen`, `kraft_momentenbilanz` |
+| A-C-00050, A-C-00051 | Exakte Überschneidungsprüfung, Lufträume | C-0.2, U-C-000035: implementiert; `modell_import`, 420er-CLI |
 | A-C-00016 bis A-C-00017 | Ergebnisse und GUI-Anschlussfähigkeit | Versionierte Aufzeichnungen vorhanden; keine GUI-/Live-Integration |
 | A-C-00028 | Schnittstellenbeschreibung unter Dokumentationen | Implementierten Stand und echte Referenzdaten dokumentiert |
 | A-C-00029 | SI-Einheiten und bedarfsgerechte Genauigkeit | SI und Referenztests; allgemeine fachliche Fehlerbudgets/Abnahme offen |

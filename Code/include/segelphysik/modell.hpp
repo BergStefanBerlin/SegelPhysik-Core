@@ -44,7 +44,8 @@ struct Modell {
 // Paths are relative to the JSON file; Darstellung is never used for physics
 // (its file is not opened). Darstellung.farbe is an optional "#rrggbb" colour,
 // Darstellung.oberflaeche an optional "matt", "glaenzend", "metall", "chrom", "lack", "glas",
-// "leuchtend", "schillernd", "facettiert", "drahtgitter" or "perlmutt". OBJ faces must be triangles; negative indices and
+// "leuchtend", "schillernd", "facettiert", "drahtgitter", "perlmutt" or "unsichtbar" (not drawn,
+// e.g. air bodies). OBJ faces must be triangles; negative indices and
 // v/vt/vn references are supported. Coordinates are model-fixed metres.
 //
 // Mass variants: punktmasse(masse_kg, position_m), vollkoerper

@@ -208,7 +208,7 @@ void farben(const fs::path& quelle, const fs::path& tmp)
         .find("\"oberflaeche\":\"metall\"") != std::string::npos, "oberflaeche fehlt im JSON");
 
     for (const std::string art : {"chrom", "lack", "glas", "leuchtend", "schillernd", "facettiert",
-             "drahtgitter", "perlmutt"}) {
+             "drahtgitter", "perlmutt", "unsichtbar"}) {
         json = original;
         json.replace(json.find(feld), feld.size(), feld + ", \"oberflaeche\": \"" + art + "\"");
         schreiben(datei, json);

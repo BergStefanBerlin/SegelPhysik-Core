@@ -3,7 +3,7 @@
 ## 1. Status und Geltungsbereich
 
 **Stand: 26.10.2026.** Auf Nutzerauftrag erstellt. **Status: in Umsetzung;
-U-C-000019 bis U-C-000034 nachgewiesen (CTest, GUI-Anbindung); Nutzerabnahme M4 offen.** Der Planauftrag ist keine Freigabe für Commit, Push, Tag
+U-C-000019 bis U-C-000035 nachgewiesen (CTest, GUI-Anbindung); Nutzerabnahme M4 offen.** Der Planauftrag ist keine Freigabe für Commit, Push, Tag
 oder Release.
 
 Dieser Plan ist der einzige maßgebliche Plan für den Versionsschritt
@@ -19,7 +19,8 @@ Maßgeblich sind:
 - Entscheidungen: [Kraft_und_Momentenbilanz.json](../Spezifikationen/Entwurfspunkte/Kraft_und_Momentenbilanz.json)
   und [Modellkatalog_Schnittstelle.json](../Spezifikationen/Entwurfspunkte/Modellkatalog_Schnittstelle.json).
 - Weiter gültig: A-C-00016, A-C-00017, A-C-00028, A-C-00031, A-C-00032;
-  als Nachtrag A-C-00047 (Volllaufen offener Rümpfe)
+  als Nachtrag A-C-00047 (Volllaufen offener Rümpfe), A-C-00050
+  (exakte Überschneidungsprüfung) und A-C-00051 (Lufträume)
   ([Hydrostatikkern](../Spezifikationen/Spezifikation_Hydrostatikkern.md))
   sowie A-C-00048 (Darstellungsfarbe) und A-C-00049 (Darstellungsoberfläche,
   [Modellbeschreibung](../Spezifikationen/Spezifikation_Modellbeschreibung.md)).
@@ -62,6 +63,7 @@ Maßgeblich sind:
 | U-C-000032 | Nachtrag: Darstellungsfarbe aus dem Modell | A-C-00048 | U-C-000027 | nachgewiesen |
 | U-C-000033 | Nachtrag: Darstellungsoberfläche aus dem Modell | A-C-00049 | U-C-000032 | nachgewiesen |
 | U-C-000034 | Nachtrag: Bootsmodelle und Schnittprüfung | A-C-00010, A-C-00047 | U-C-000031 | nachgewiesen |
+| U-C-000035 | Nachtrag: Lufträume und exakte Überschneidungsprüfung | A-C-00010, A-C-00050, A-C-00051 | U-C-000034 | nachgewiesen |
 
 ### U-C-000019: Vertrag V2 und Katalogschema festlegen
 
@@ -327,6 +329,38 @@ Optimist `fnv1a64:9c1f7ef4f9924b30`, Folkeboot `fnv1a64:fa6b5bb68db23095`,
 z ≈ -0,19 m, 420er z ≈ -0,22 m (233 kg, 0,233 m³, trocken). GUI-Sichtprüfung
 aller drei Boote.
 
+### U-C-000035: Nachtrag: Lufträume und exakte Überschneidungsprüfung
+
+**Anforderungen:** A-C-00010, A-C-00050, A-C-00051. Nutzerauftrag
+28.10.2026. **Voraussetzungen:** U-C-000034. **Status:** nachgewiesen.
+
+- `modell.cpp`: Die AABB-Ablehnung zwischen Volumenelementen ist durch
+  eine echte Prüfung ersetzt (Dreiecksschnitt mit AABB-Vorfilter und
+  x-Sweep, Enthaltensein per Windungszahl je Zusammenhangskomponente).
+- 420er: eigener Cockpit-Luftkörper (Gruppe `rumpf`, 0,690 m³) zwischen
+  Cockpitboden (+2 mm) und Überlaufkante z = 0,475 m; Masse als offene,
+  praktisch masselose Schale, deren Rand den Flutrand bildet. Lufttanks
+  bleiben geschlossen und fluten nie.
+- 420er: Schwert 0,50 m nach vorn (erst +0,70 m, dann auf Nutzerwunsch
+  0,20 m zurück; x −0,359 bis 0,061 m), Oberkante des
+  Hydrostatik-Schwerts 1 mm unter der Rumpfunterseite.
+- Optimist und Folkeboot erfüllen A-C-00051 bereits (Innenraum im
+  Rumpfvolumen); keine Modelländerung.
+- Darstellung: neuer Oberflächenwert `"unsichtbar"` (A-C-00049); das
+  Cockpit nutzt ihn, damit der Luftkörper nicht gezeichnet wird. Die GUI
+  blendet Körper und Wasserlinie aus, nutzt den Schnitt aber weiter für
+  die trockenen Bereiche.
+
+**Nachweis (28.10.2026):** Test `modell_import`
+(`volumen_ueberschneidung_tests`: disjunkt bei gleichen AABBs, U-Rumpf mit
+Luftkörper, gemeinsame Fläche und Punktkontakt erlaubt; Durchdringung und
+Enthaltensein abgelehnt) grün; Core-CTest 13/13, GUI-CTest 17/17.
+`--pruefen` aller 11 Modelle gültig, 420er `fnv1a64:e2b6a9d49a9e7b1b`
+(Laden ca. 1,1 s). Gegenprobe: um 3 cm abgesenktes Cockpit wird mit
+CORE-MOD-0007 abgelehnt. `--statisch` 420er konvergiert bei
+z ≈ -0,162 m (vorher -0,225 m), nichts geflutet. Die GUI wertet ein
+geflutetes Element für seine ganze Gruppe aus (Wasserdarstellung im Boot).
+
 ## 4. Reihenfolge und Meilensteine
 
 ```mermaid
@@ -342,7 +376,7 @@ flowchart LR
     U24 --> U30[U-C-000030]
     U25 --> U30
     U29 --> U30
-    U25 --> U31[U-C-000031] --> U34[U-C-000034]
+    U25 --> U31[U-C-000031] --> U34[U-C-000034] --> U35[U-C-000035]
     U27 --> U32[U-C-000032] --> U33[U-C-000033]
 ```
 
@@ -375,7 +409,9 @@ Die Stränge M2 und M3 sind unabhängig und können parallel bearbeitet werden.
 | A-C-00047 | U-C-000031, U-C-000034 | Flutungstests, Optimist-CLI, Boots-CLI | nachgewiesen |
 | A-C-00048 | U-C-000032 | Test katalog (`farben`), GUI-Sichtprüfung | nachgewiesen |
 | A-C-00049 | U-C-000033 | Test katalog (`farben`), GUI-Sichtprüfung | nachgewiesen |
-| A-C-00010 (Nachtrag) | U-C-000034 | Regressionsfall `modell_import` | nachgewiesen |
+| A-C-00010 (Nachtrag) | U-C-000034, U-C-000035 | Regressionsfall `modell_import`, Überschneidungstests | nachgewiesen |
+| A-C-00050 | U-C-000035 | `volumen_ueberschneidung_tests`, 420er-Gegenprobe | nachgewiesen |
+| A-C-00051 | U-C-000035 | 420er-CLI (Statik trocken, höher) | nachgewiesen |
 
 ## 6. Offene Punkte
 
@@ -397,3 +433,7 @@ Die Stränge M2 und M3 sind unabhängig und können parallel bearbeitet werden.
 - U-C-000034 (Nachtrag 27.10.2026): Boote kurz benannt, Folkeboot repariert,
   420er neu mit Hydrostatik; Fehlalarm der Schnittprüfung bei gemeinsamen
   Kantenendpunkten behoben.
+- U-C-000035 (Nachtrag 28.10.2026): exakte Volumen-Überschneidungsprüfung
+  statt AABB; 420er mit Cockpit-Luftkörper und um 0,50 m nach vorn
+  versetztem Schwert. Nicht geprüft: Flutverhalten des Cockpits bei
+  starker Krängung in der Dynamik.
