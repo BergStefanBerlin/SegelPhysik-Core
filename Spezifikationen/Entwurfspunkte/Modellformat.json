@@ -1,0 +1,69 @@
+{
+  "status": "entwurf",
+  "thema": "Einheitliche Modellbeschreibung",
+  "beispiele": "../Beispiele_Modellformat/README.md",
+  "spezifikation": "../Spezifikation_Modellbeschreibung.md",
+  "hinweis": "Offene Diskussionspunkte sind keine freigegebenen Anforderungen und kein Umsetzungsauftrag. Bereits finalisierte Teilaspekte verweisen auf die maßgebliche Spezifikation; übrige Punkte bleiben offen.",
+  "punkte": [
+    {
+      "id": "IDEE-C-00001",
+      "status": "teilweise_finalisiert",
+      "thema": "Geometrien und Hydrostatik",
+      "bezug": "../Beispiele_Modellformat/README.md#geometrien-und-hydrostatik",
+      "uebernahme": "A-C-00030 bestaetigt die gemeinsame Importgrundlage. A-C-00010 legt fuer die erste Hydrostatikstufe die Ablehnung ueberlappender Verdraengungsvolumina fest.",
+      "frage": "Offen bleiben konkrete physikalische Netzpruefungen, Toleranzen, Flutung und die Abnahme der dokumentierten Meshing-Annahmen."
+    },
+    {
+      "id": "IDEE-C-00002",
+      "status": "teilweise_finalisiert",
+      "thema": "Massenvarianten",
+      "bezug": "../Beispiele_Modellformat/README.md#masse-und-materialien",
+      "uebernahme": "A-C-00030 bestaetigt die bestehenden drei Massenvarianten als erste Importgrundlage.",
+      "frage": "Offen bleiben genaue Integrationsvertraege, insbesondere Schalen-Mittelflaechen und Segel-Doppelzaehlung. Fehlerhafte Modelle werden gemaess A-C-00031 abgelehnt statt automatisch korrigiert. Der 420er bleibt mangels Massendaten reine Darstellung."
+    },
+    {
+      "id": "IDEE-C-00003",
+      "status": "offen",
+      "thema": "Kraftmodelle",
+      "bezug": "../Beispiele_Modellformat/README.md#gemeinsame-grundstruktur",
+      "frage": "Welche Hydro- und Aerodynamikmodelle stehen zur Auswahl, und welche Geometrien, Parameter, Kennfelder und Gueltigkeitsbereiche sind jeweils erforderlich? Tragflaechenprofile und zugehoerige Meshes bleiben ausdruecklich fuer spaeter offen; jetzt werden keine angelegt."
+    },
+    {
+      "id": "IDEE-C-00004",
+      "status": "teilweise_finalisiert",
+      "thema": "Lage und Beweglichkeit",
+      "bezug": "../Spezifikation_Modellbeschreibung.md",
+      "finalisiert_am": "2026-10-26",
+      "uebernahmen": [
+        {
+          "anforderung": "A-C-00001",
+          "teilaspekt": "Einheitliches rechtshändiges modellfestes Achsensystem: X vorwärts, Y Backbord, Z oben."
+        },
+        {
+          "anforderung": "A-C-00002",
+          "teilaspekt": "Ortsfestes rechtshändiges Weltsystem mit Z nach oben und Ruhewasseroberfläche bei Z = 0."
+        },
+        {
+          "anforderung": "A-C-00003",
+          "teilaspekt": "Fester Konstruktionsursprung unabhängig von Gesamtschwerpunkt und Wasserlinie."
+        }
+      ],
+      "frage": "Offen bleiben die konkrete geometrische Ursprungswahl, geografische Ausrichtung der Weltachsen, Orientierungsdarstellung und lokale Elementbezüge sowie Gelenke, Achsen, Grenzen und Steuerzuordnungen fuer Ruder, Schwert und Rigg."
+    },
+    {
+      "id": "IDEE-C-00005",
+      "status": "offen",
+      "thema": "Materialien und Paketierung",
+      "bezug": "../Beispiele_Modellformat/README.md#ablage",
+      "frage": "Der Materialkatalog bleibt separat erhalten. Die aktuellen Massenvarianten verwenden direkte Bestandsdichten. Wie werden spaeter Materialreferenzen, Paketierung und belastbare Materialdaten aufgenommen?"
+    },
+    {
+      "id": "IDEE-C-00006",
+      "status": "teilweise_finalisiert",
+      "thema": "Gemeinsamer Dateivertrag fuer Core und GUI",
+      "bezug": "../Beispiele_Modellformat/README.md#grenzen-und-weitere-verwendung",
+      "uebernahme": "A-C-00030 bestaetigt den bestehenden Elementaufbau als erste Importgrundlage; A-C-00031 und A-C-00032 regeln eindeutige Fehler und den abfragbaren Katalog.",
+      "frage": "Welche vollstaendigen Feld-, Versions- und Migrationsregeln werden benoetigt? Die speziellen entwurf-Bloecke entfallen spaeter; Herkunfts- und Modellannahmen sind vorher dauerhaft zu dokumentieren."
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+#pragma once
+
+#include <string_view>
+
+namespace segelphysik::intern {
+
+inline constexpr std::string_view fehlerkatalog_json = R"CORE_ERRORS(@FEHLERKATALOG_JSON@)CORE_ERRORS";
+
+}

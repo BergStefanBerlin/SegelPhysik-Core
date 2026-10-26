@@ -1,0 +1,41 @@
+{
+  "status": "entwurf",
+  "thema": "Offene Entscheidungen zum Hydrostatikkern",
+  "spezifikation": "../Spezifikation_Hydrostatikkern.md",
+  "hinweis": "Diese Punkte halten fehlende Festlegungen fest. Sie sind keine zusätzlichen Anforderungen, kein paralleler Plan und kein Implementierungsauftrag.",
+  "punkte": [
+    {
+      "id": "IDEE-C-00007",
+      "status": "finalisiert",
+      "thema": "Überlappende Verdrängungsvolumina",
+      "anforderungsbezug": ["A-C-00010"],
+      "entscheidung": "Erste Ausbaustufe erlaubt nur ueberschneidungsfreie Volumina. Fehlerhafte Modelle werden mit eindeutiger Diagnose abgelehnt und spaeter gesondert korrigiert; keine automatische Vereinigung.",
+      "restpunkt": "Geometrische Pruefverfahren und Toleranzen werden in IDEE-C-00008 konkretisiert."
+    },
+    {
+      "id": "IDEE-C-00008",
+      "status": "offen",
+      "thema": "Numerische Verträge und Materialflächen",
+      "anforderungsbezug": ["A-C-00009", "A-C-00011", "A-C-00012", "A-C-00013", "A-C-00014", "A-C-00019", "A-C-00029"],
+      "festlegung": "A-C-00029 legt SI-Einheiten fest. Längen auf 0,01-m-Niveau und Massen auf 1-kg-Niveau sind vorläufige fachliche Orientierungen, keine Rundungsvorschrift oder endgültigen Toleranzen.",
+      "frage": "Welche absoluten und relativen Toleranzen einschließlich einer sinnvollen Volumengenauigkeit, Grenzfallregeln, Integrationsverfahren und Schrittweiten werden während der Umsetzung gemeinsam freigegeben? Wie werden Schalen-Materialflächen definiert, insbesondere bei verdickten Segelnetzen?"
+    },
+    {
+      "id": "IDEE-C-00009",
+      "status": "offen",
+      "thema": "Quantitative Geschwindigkeitsabnahme",
+      "anforderungsbezug": ["A-C-00025", "A-C-00026"],
+      "arbeitsstand": "Baseline und Optimierungsvergleich mit dokumentierter Hardware, kleinem Quader, acht Quadern und grosser Kugel liegen unter Dokumentationen/Performancebaseline.json und PerformanceOptimiert.json vor.",
+      "frage": "Welche Laufzeitziele und zulaessigen Regressionen gelten verbindlich nach dieser Baseline? Konkrete Abnahmezielwerte sind noch nicht freigegeben."
+    },
+    {
+      "id": "IDEE-C-00010",
+      "status": "teilweise_finalisiert",
+      "thema": "Zustands- und Ergebnisvertrag",
+      "anforderungsbezug": ["A-C-00012", "A-C-00014", "A-C-00016", "A-C-00017", "A-C-00028"],
+      "uebernommen": "A-C-00016 präzisiert die Modellpose mit festem Konstruktionsursprung, Rotation Modell nach Welt, Quaternionreihenfolge xyzw, typisierte Vektorliste im Modellbezug und gemeinsame Zustandszuordnung. A-C-00028 fordert die dokumentierte GUI-Implementierungsgrundlage.",
+      "arbeitsstand": "Feldnamen, Datentypen, Bezugspunkte und tatsaechliche Referenzdaten sind im Ergebnisvertrag unter Dokumentationen/Schnittstelle_Core_GUI.md dokumentiert. JSONL und JSON-Array wurden gemessen und implementiert; JSONL ist vorlaeufiger Bibliotheksstandard bei ueberlappender Messstreuung.",
+      "frage": "Fachliche Gesamtabnahme der technischen Vertragskonkretisierung steht aus. Transport und GUI bleiben nachgelagert."
+    }
+  ]
+}

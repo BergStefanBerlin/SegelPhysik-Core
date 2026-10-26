@@ -1,0 +1,281 @@
+#include "segelphysik/hydrostatik.hpp"
+#include "segelphysik/messung.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <stdexcept>
+
+namespace segelphysik {
+namespace {
+Vektor3 plus(Vektor3 a, const Vektor3& b)
+{
+    for (std::size_t i = 0; i < 3; ++i) a[i] += b[i];
+    return a;
+}
+Vektor3 mal(Vektor3 a, double s)
+{
+    for (double& v : a) v *= s;
+    return a;
+}
+double dot(const Vektor3& a, const Vektor3& b)
+{
+    return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+}
+Vektor3 cross(const Vektor3& a, const Vektor3& b)
+{
+    return {a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]};
+}
+void positiv(double v)
+{
+    if (!std::isfinite(v) || v <= 0.) throw std::invalid_argument("CORE-SIM-0001: Parameter muss endlich positiv sein.");
+}
+Vektor3 loesen(std::array<double,9> a, Vektor3 b)
+{
+    double skala = 0.;
+    for (double x : a) skala = std::max(skala, std::abs(x));
+    for (std::size_t k=0;k<3;++k) {
+        std::size_t pivot=k;
+        for (std::size_t i=k+1;i<3;++i)
+            if (std::abs(a[3*i+k])>std::abs(a[3*pivot+k])) pivot=i;
+        if (std::abs(a[3*pivot+k]) <= 64.*std::numeric_limits<double>::epsilon()*skala)
+            throw std::invalid_argument("CORE-SIM-0002: Matrix ist singulaer.");
+        for (std::size_t j=0;j<3;++j) std::swap(a[3*k+j],a[3*pivot+j]);
+        std::swap(b[k],b[pivot]);
+        for (std::size_t i=k+1;i<3;++i) {
+            const double f=a[3*i+k]/a[3*k+k];
+            for (std::size_t j=k;j<3;++j) a[3*i+j]-=f*a[3*k+j];
+            b[i]-=f*b[k];
+        }
+    }
+    Vektor3 x{};
+    for (int i=2;i>=0;--i) {
+        double v=b[static_cast<std::size_t>(i)];
+        for (int j=i+1;j<3;++j) v-=a[static_cast<std::size_t>(3*i+j)]*x[static_cast<std::size_t>(j)];
+        x[static_cast<std::size_t>(i)]=v/a[static_cast<std::size_t>(4*i)];
+    }
+    return x;
+}
+Pose euler(double z, double roll, double pitch, double yaw, double x, double y)
+{
+    const double cr=std::cos(roll/2),sr=std::sin(roll/2);
+    const double cp=std::cos(pitch/2),sp=std::sin(pitch/2);
+    const double cy=std::cos(yaw/2),sy=std::sin(yaw/2);
+    return {{x,y,z},{sr*cp*cy-cr*sp*sy,cr*sp*cy+sr*cp*sy,
+        cr*cp*sy-sr*sp*cy,cr*cp*cy+sr*sp*sy}};
+}
+QuaternionXyzw produkt(const QuaternionXyzw& a,const QuaternionXyzw& b)
+{
+    return {a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],
+        a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],
+        a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],
+        a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]};
+}
+}
+
+VolumenWerte wasseranteil(const Mesh& mesh, const Pose& pose)
+{
+    SEGEL_MESSUNG("ebenenschnitt");
+    if (mesh.punkte.empty() || mesh.dreiecke.empty())
+        throw std::invalid_argument("CORE-MOD-0006: Leeres Volumenmesh.");
+    const auto n=pose.weltvektor_nach_modell({0.,0.,1.});
+    const double offset=-pose.position_m()[2];
+    double minimum=std::numeric_limits<double>::infinity(),maximum=-minimum;
+    for(const auto& p:mesh.punkte) {
+        const double d=dot(n,p)-offset;
+        minimum=std::min(minimum,d);maximum=std::max(maximum,d);
+    }
+    if(minimum>=0.) return {};
+    const auto apex=plus(mesh.punkte.front(),mal(n,offset-dot(n,mesh.punkte.front())));
+    double volumen=0.,korrektur=0.;
+    Vektor3 moment{};
+    auto add=[&](const Vektor3& pa,const Vektor3& pb,const Vektor3& pc) {
+        const auto a=plus(pa,mal(apex,-1.)),b=plus(pb,mal(apex,-1.)),c=plus(pc,mal(apex,-1.));
+        const double v=dot(a,cross(b,c))/6.;
+        const double y=v-korrektur,t=volumen+y;
+        korrektur=(t-volumen)-y;volumen=t;
+        moment=plus(moment,mal(plus(plus(a,b),c),v/4.));
+    };
+    for (const auto& tri : mesh.dreiecke) {
+        if(maximum<=0.) {
+            add(mesh.punkte.at(tri[0]),mesh.punkte.at(tri[1]),mesh.punkte.at(tri[2]));
+            continue;
+        }
+        std::array<Vektor3,4> clipped{};
+        std::size_t count=0;
+        for (std::size_t i=0;i<3;++i) {
+            const auto& a=mesh.punkte.at(tri[i]);
+            const auto& b=mesh.punkte.at(tri[(i+1)%3]);
+            const double da=dot(n,a)-offset,db=dot(n,b)-offset;
+            if (da<=0.) clipped[count++]=a;
+            if ((da<0. && db>0.) || (da>0. && db<0.))
+                clipped[count++]=plus(a,mal(plus(b,mal(a,-1.)),da/(da-db)));
+        }
+        for (std::size_t i=1;i+1<count;++i) add(clipped[0],clipped[i],clipped[i+1]);
+    }
+    if (!std::isfinite(volumen) || volumen<0.)
+        throw std::runtime_error("CORE-MOD-0006: Negatives oder ungueltiges Schnittvolumen.");
+    if (volumen==0.) return {};
+    return {volumen,plus(apex,mal(moment,1./volumen))};
+}
+
+Kraefte hydrostatik(const Modell& modell,const Pose& pose,double rho,double g)
+{
+    SEGEL_MESSUNG("hydrostatikauswertung");
+    positiv(rho);positiv(g);positiv(modell.masse_kg);
+    Kraefte result;
+    const auto gewicht_richtung=pose.weltvektor_nach_modell({0.,0.,-g});
+    for (const auto& e : modell.elemente) {
+        const auto gewicht=mal(gewicht_richtung,e.masse_kg);
+        result.beitraege.push_back({e.id+":gewicht",e.id,"kraft",e.schwerpunkt_m,gewicht});
+        result.kraft_welt_n[2]-=e.masse_kg*g;
+        result.moment_modell_nm=plus(result.moment_modell_nm,
+            cross(plus(e.schwerpunkt_m,mal(modell.schwerpunkt_m,-1.)),gewicht));
+        if (e.volumen) {
+            const auto wet=wasseranteil(*e.volumen,pose);
+            result.elementvolumina.emplace_back(e.id,wet);
+            result.volumen_m3+=wet.volumen_m3;
+            if (wet.schwerpunkt_m) {
+                const auto f=pose.weltvektor_nach_modell({0.,0.,rho*g*wet.volumen_m3});
+                result.beitraege.push_back({e.id+":auftrieb",e.id,"kraft",*wet.schwerpunkt_m,f});
+                result.kraft_welt_n[2]+=rho*g*wet.volumen_m3;
+                result.moment_modell_nm=plus(result.moment_modell_nm,
+                    cross(plus(*wet.schwerpunkt_m,mal(modell.schwerpunkt_m,-1.)),f));
+            }
+        } else result.elementvolumina.emplace_back(e.id,VolumenWerte{});
+    }
+    result.beitraege.push_back({"gesamt:moment","","moment",modell.schwerpunkt_m,result.moment_modell_nm});
+    return result;
+}
+
+SolverErgebnis gleichgewicht(const Modell& modell,const Zustand& start,
+    double ftol,double mtol,std::size_t budget,const std::atomic_bool* abbruch)
+{
+    SEGEL_MESSUNG("gleichgewichtssuche");
+    positiv(ftol);positiv(mtol);
+    if (!budget) throw std::invalid_argument("CORE-SIM-0001: Iterationsbudget muss positiv sein.");
+    if (abbruch && abbruch->load())
+        return {start,"abgebrochen","Abbruch angefordert",0};
+    const auto q=start.pose.orientierung_xyzw();
+    Vektor3 lage{start.pose.position_m()[2],
+        std::atan2(2*(q[3]*q[0]+q[1]*q[2]),1-2*(q[0]*q[0]+q[1]*q[1])),
+        std::asin(std::clamp(2*(q[3]*q[1]-q[2]*q[0]),-1.,1.))};
+    const double yaw=std::atan2(2*(q[3]*q[2]+q[0]*q[1]),1-2*(q[1]*q[1]+q[2]*q[2]));
+    SolverErgebnis result{start,"nicht_konvergiert","CORE-SIM-0004: Iterationsbudget erschoepft",0};
+    auto pose=[&](const Vektor3& p) {return euler(p[0],p[1],p[2],yaw,start.pose.position_m()[0],start.pose.position_m()[1]);};
+    auto residuum=[&](const Vektor3& p) {
+        const auto k=hydrostatik(modell,pose(p));
+        const auto mw=pose(p).modellvektor_nach_welt(k.moment_modell_nm);
+        return Vektor3{k.kraft_welt_n[2]/ftol,mw[0]/mtol,mw[1]/mtol};
+    };
+    double gesamtvolumen=0.;
+    for(const auto& e:modell.elemente) {
+        if(e.volumen) {
+            double maxz=-std::numeric_limits<double>::infinity();
+            for(const auto& p:e.volumen->punkte) maxz=std::max(maxz,p[2]);
+            gesamtvolumen+=wasseranteil(*e.volumen,Pose{{0,0,-maxz-1.},{0,0,0,1}}).volumen_m3;
+        }
+    }
+    if(gesamtvolumen*1000.*9.81<modell.masse_kg*9.81-ftol) {
+        result.status="unloesbar";result.diagnose="CORE-SIM-0003: Maximaler Auftrieb kleiner als Gewicht";return result;
+    }
+    // Establish a wet starting height even for an initially dry body.
+    double low=lage[0]-1.,high=lage[0]+1.;
+    for (int i=0;i<30 && residuum({low,lage[1],lage[2]})[0]<0.;++i) low-=std::pow(2.,i);
+    if (residuum({low,lage[1],lage[2]})[0]<0.) {
+        result.status="unloesbar";result.diagnose="CORE-SIM-0003: Maximaler Auftrieb kleiner als Gewicht";return result;
+    }
+    for (int i=0;i<30 && residuum({high,lage[1],lage[2]})[0]>0.;++i) high+=std::pow(2.,i);
+    for (int i=0;i<50;++i) {
+        const double mid=(low+high)/2.;
+        if (residuum({mid,lage[1],lage[2]})[0]>0.) low=mid;else high=mid;
+    }
+    lage[0]=(low+high)/2.;
+    for (std::size_t iteration=0;iteration<budget;++iteration) {
+        result.iterationen=iteration+1;result.zustand.pose=pose(lage);
+        if (abbruch && abbruch->load()) {result.status="abgebrochen";result.diagnose="Abbruch angefordert";return result;}
+        const auto r=residuum(lage);
+        const double norm=std::max({std::abs(r[0]),std::abs(r[1]),std::abs(r[2])});
+        if (norm<=1.) {result.status="konvergiert";result.diagnose.clear();return result;}
+        std::array<double,9> jac{};
+        for (std::size_t j=0;j<3;++j) {
+            auto p=lage,m=lage;const double h=1e-5;
+            p[j]+=h;m[j]-=h;const auto rp=residuum(p),rm=residuum(m);
+            for (std::size_t i=0;i<3;++i) jac[3*i+j]=(rp[i]-rm[i])/(2*h);
+        }
+        Vektor3 delta;
+        try {delta=loesen(jac,mal(r,-1.));}
+        catch (const std::invalid_argument& e) {result.diagnose=e.what();return result;}
+        double scale=1.;
+        for (std::size_t j=0;j<3;++j) scale=std::min(scale,(j==0?.5:.2)/std::max(std::abs(delta[j]),1e-300));
+        bool verbessert=false;
+        for (int ls=0;ls<20;++ls) {
+            const auto candidate=plus(lage,mal(delta,scale));
+            const auto v=residuum(candidate);
+            if (std::max({std::abs(v[0]),std::abs(v[1]),std::abs(v[2])})<norm) {
+                lage=candidate;verbessert=true;break;
+            }
+            scale*=.5;
+        }
+        if (!verbessert) {result.diagnose="CORE-SIM-0004: Liniensuche stagniert";return result;}
+    }
+    return result;
+}
+
+Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,double rho,double g)
+{
+    SEGEL_MESSUNG("dynamischer_zeitschritt");
+    positiv(dt);
+    for(double value:s.geschwindigkeit_welt_m_s)
+        if(!std::isfinite(value)) throw std::invalid_argument("CORE-SIM-0001: Geschwindigkeit nicht endlich.");
+    for(double value:s.omega_modell_rad_s)
+        if(!std::isfinite(value)) throw std::invalid_argument("CORE-SIM-0001: Winkelgeschwindigkeit nicht endlich.");
+    if(!std::isfinite(s.zeit_s)) throw std::invalid_argument("CORE-SIM-0001: Simulationszeit nicht endlich.");
+    const auto& I=modell.traegheit_kg_m2;
+    // Positive definiteness is required, not a regularized inverse.
+    if (I[0]<=0. || I[0]*I[4]-I[1]*I[3]<=0. ||
+        I[0]*(I[4]*I[8]-I[5]*I[7])-I[1]*(I[3]*I[8]-I[5]*I[6])+I[2]*(I[3]*I[7]-I[4]*I[6])<=0.)
+        throw std::invalid_argument("CORE-SIM-0002: Dynamiktraegheit nicht positiv definit.");
+    const auto k=hydrostatik(modell,s.pose,rho,g);
+    const auto a=mal(k.kraft_welt_n,1./modell.masse_kg);
+    Vektor3 impuls{};
+    for (std::size_t i=0;i<3;++i)
+        for (std::size_t j=0;j<3;++j) impuls[i]+=I[3*i+j]*s.omega_modell_rad_s[j];
+    const auto alpha=loesen(I,plus(k.moment_modell_nm,mal(cross(s.omega_modell_rad_s,impuls),-1.)));
+    const auto omega_mid=plus(s.omega_modell_rad_s,mal(alpha,dt/2));
+    const double angle=std::sqrt(dot(omega_mid,omega_mid))*dt;
+    QuaternionXyzw dq{0.,0.,0.,1.};
+    if (angle!=0.) {
+        const double factor=std::sin(angle/2)*dt/angle;
+        dq={omega_mid[0]*factor,omega_mid[1]*factor,omega_mid[2]*factor,std::cos(angle/2)};
+    }
+    const auto qnew=produkt(s.pose.orientierung_xyzw(),dq);
+    const auto cg=s.pose.modellpunkt_nach_welt(modell.schwerpunkt_m);
+    const auto midq=produkt(s.pose.orientierung_xyzw(),
+        QuaternionXyzw{omega_mid[0]*dt/4,omega_mid[1]*dt/4,omega_mid[2]*dt/4,1.});
+    const Pose midrotation{{},midq};
+    const auto midcg=plus(plus(cg,mal(s.geschwindigkeit_welt_m_s,dt/2)),mal(a,dt*dt/8));
+    const Pose midpose{plus(midcg,mal(midrotation.modellvektor_nach_welt(modell.schwerpunkt_m),-1.)),midq};
+    const auto midforce=hydrostatik(modell,midpose,rho,g);
+    Vektor3 midimpuls{};
+    for(std::size_t i=0;i<3;++i)
+        for(std::size_t j=0;j<3;++j) midimpuls[i]+=I[3*i+j]*omega_mid[j];
+    const auto midalpha=loesen(I,plus(midforce.moment_modell_nm,
+        mal(cross(omega_mid,midimpuls),-1.)));
+    const auto cgnew=plus(plus(cg,mal(s.geschwindigkeit_welt_m_s,dt)),mal(a,dt*dt/2));
+    const Pose rotation{{},qnew};
+    Zustand result;
+    result.pose=Pose{plus(cgnew,mal(rotation.modellvektor_nach_welt(modell.schwerpunkt_m),-1.)),qnew};
+    result.geschwindigkeit_welt_m_s=plus(s.geschwindigkeit_welt_m_s,
+        mal(midforce.kraft_welt_n,dt/modell.masse_kg));
+    result.omega_modell_rad_s=plus(s.omega_modell_rad_s,mal(midalpha,dt));
+    result.zeit_s=s.zeit_s+dt;result.schritt=s.schritt+1;
+    for(double value:result.geschwindigkeit_welt_m_s)
+        if(!std::isfinite(value)) throw std::overflow_error("CORE-SIM-0001: Geschwindigkeitsueberlauf.");
+    for(double value:result.omega_modell_rad_s)
+        if(!std::isfinite(value)) throw std::overflow_error("CORE-SIM-0001: Rotationsueberlauf.");
+    if(!std::isfinite(result.zeit_s) || result.zeit_s<=s.zeit_s || result.schritt<=s.schritt)
+        throw std::overflow_error("CORE-SIM-0001: Zeit- oder Schrittueberlauf.");
+    return result;
+}
+}

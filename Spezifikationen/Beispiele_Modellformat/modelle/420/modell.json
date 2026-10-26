@@ -1,0 +1,77 @@
+{
+  "schema_version": "0.1-entwurf",
+  "status": "entwurf",
+  "id": "420",
+  "name": "420er (Geometrieentwurf)",
+  "entwurf": {
+    "quelle": "420_obj_modelle_2.zip:420_obj/420_szene.obj",
+    "simulationsfreigabe": false,
+    "hinweis": "Strukturentwurf: Hydrostatik benoetigt Masse; Volumen ist optional. Ohne Volumendefinition gilt exakt 0 Verdraengung. Keine Simulationsfreigabe; entwurf entfaellt spaeter."
+  },
+  "gruppen": {
+    "rumpf": {
+      "elemente": [
+        {
+          "id": "Rumpf",
+          "Darstellung": {
+            "datei": "meshes/gui/rumpf.obj"
+          }
+        }
+      ]
+    },
+    "rigg": {
+      "elemente": [
+        {
+          "id": "Mast",
+          "Darstellung": {
+            "datei": "meshes/gui/mast.obj"
+          }
+        },
+        {
+          "id": "Großbaum",
+          "Darstellung": {
+            "datei": "meshes/gui/grossbaum.obj"
+          }
+        },
+        {
+          "id": "Großsegel",
+          "Darstellung": {
+            "datei": "meshes/gui/grosssegel.obj"
+          }
+        },
+        {
+          "id": "Fock",
+          "Darstellung": {
+            "datei": "meshes/gui/fock.obj"
+          }
+        }
+      ]
+    },
+    "kiel": {
+      "elemente": [
+        {
+          "id": "Schwert",
+          "Darstellung": {
+            "datei": "meshes/gui/schwert.obj"
+          }
+        }
+      ]
+    },
+    "ruder": {
+      "elemente": [
+        {
+          "id": "Ruder",
+          "Darstellung": {
+            "datei": "meshes/gui/ruder.obj"
+          }
+        },
+        {
+          "id": "Ruderstock",
+          "Darstellung": {
+            "datei": "meshes/gui/ruderstock.obj"
+          }
+        }
+      ]
+    }
+  }
+}

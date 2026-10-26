@@ -1,0 +1,118 @@
+{
+  "platform": "Windows-11-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 117 Stepping 2, AuthenticAMD",
+  "build": "MSVC Release x64, /fp:precise, single-threaded",
+  "performance_acceptance": "Baseline only; no approved universal speed budget",
+  "cases": [
+    {
+      "modell_fassung": "fnv1a64:5f5845f2780727df",
+      "wiederholungen": 9,
+      "auswertungen_pro_lauf": 500,
+      "median_s": 0.0003261,
+      "min_s": 0.0002846,
+      "max_s": 0.0005405,
+      "auswertungen_pro_s": 1533272.0024532352,
+      "float_probe_relfehler": 0.001949189230799636,
+      "double_probe_relfehler": 1.8441318983304874e-12,
+      "float_probe_s": 0.000623,
+      "double_probe_s": 0.0006234,
+      "jsonl_1000_zustaende_median_s": 1.33e-05,
+      "json_array_1000_zustaende_median_s": 1.37e-05,
+      "checksum": 18080.01201170808,
+      "case": "small",
+      "full_runs": {
+        "statisch": {
+          "median_s": 0.0010916,
+          "min_s": 0.0010636,
+          "max_s": 0.0012826,
+          "repetitions": 3
+        },
+        "dynamisch": {
+          "median_s": 0.0023575,
+          "min_s": 0.0017022,
+          "max_s": 0.0027133,
+          "repetitions": 3,
+          "simulated_seconds_per_wall_second": 84.83563096500531
+        }
+      }
+    },
+    {
+      "modell_fassung": "fnv1a64:0c0e1b8550efab2f",
+      "wiederholungen": 9,
+      "auswertungen_pro_lauf": 500,
+      "median_s": 0.0024674,
+      "min_s": 0.0022798,
+      "max_s": 0.0028024,
+      "auswertungen_pro_s": 202642.45764772638,
+      "float_probe_relfehler": 0.001949189230799636,
+      "double_probe_relfehler": 1.8441318983304874e-12,
+      "float_probe_s": 0.0006283,
+      "double_probe_s": 0.0006223,
+      "jsonl_1000_zustaende_median_s": 0.0004429,
+      "json_array_1000_zustaende_median_s": 0.0003936,
+      "checksum": 144640.01201173913,
+      "case": "composite",
+      "full_runs": {
+        "statisch": {
+          "median_s": 0.0034425,
+          "min_s": 0.0029528,
+          "max_s": 0.0034752,
+          "repetitions": 3
+        },
+        "dynamisch": {
+          "median_s": 0.0059611,
+          "min_s": 0.0056571,
+          "max_s": 0.0059631,
+          "repetitions": 3,
+          "simulated_seconds_per_wall_second": 33.550854708023685
+        }
+      }
+    },
+    {
+      "modell_fassung": "fnv1a64:0be9e8398b6593ef",
+      "wiederholungen": 9,
+      "auswertungen_pro_lauf": 500,
+      "median_s": 0.1196266,
+      "min_s": 0.1112363,
+      "max_s": 0.1309628,
+      "auswertungen_pro_s": 4179.672413994881,
+      "float_probe_relfehler": 0.001949189230799636,
+      "double_probe_relfehler": 1.8441318983304874e-12,
+      "float_probe_s": 0.0006243,
+      "double_probe_s": 0.0006213,
+      "jsonl_1000_zustaende_median_s": 0.0002511,
+      "json_array_1000_zustaende_median_s": 0.0001529,
+      "checksum": 9457.177347285638,
+      "case": "large",
+      "full_runs": {
+        "statisch": {
+          "median_s": 0.2084848,
+          "min_s": 0.2066283,
+          "max_s": 0.2135424,
+          "repetitions": 3
+        },
+        "dynamisch": {
+          "median_s": 0.213875,
+          "min_s": 0.2078853,
+          "max_s": 0.2192301,
+          "repetitions": 3,
+          "simulated_seconds_per_wall_second": 0.9351256575102279
+        }
+      }
+    }
+  ],
+  "format_full_run": {
+    "json": {
+      "median_s": 0.0346804,
+      "min_s": 0.0337276,
+      "max_s": 0.0445574,
+      "repetitions": 7
+    },
+    "jsonl": {
+      "median_s": 0.033755,
+      "min_s": 0.032857,
+      "max_s": 0.0424927,
+      "repetitions": 7
+    }
+  }
+}

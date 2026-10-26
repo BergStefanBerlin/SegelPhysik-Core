@@ -1,0 +1,1045 @@
+{
+  "pruefdatum": "2026-10-26",
+  "status": "Meshpruefung abgeschlossen; keine Spezifikationsumsetzung oder fachliche Gesamtabnahme",
+  "bezug": "../Spezifikation_Modellbeschreibung.md",
+  "dateien_geprueft": 76,
+  "dateien_geaendert": 34,
+  "geaenderte_dateien": [
+    "modelle/420/meshes/gui/ruder.obj",
+    "modelle/folkeboot/meshes/gui/fock.obj",
+    "modelle/folkeboot/meshes/gui/grossbaum.obj",
+    "modelle/folkeboot/meshes/gui/rumpf.obj",
+    "modelle/folkeboot/meshes/hydrostatik/grossbaum.obj",
+    "modelle/folkeboot/meshes/hydrostatik/rumpf.obj",
+    "modelle/folkeboot/meshes/masse/fock.obj",
+    "modelle/folkeboot/meshes/masse/grossbaum.obj",
+    "modelle/folkeboot/meshes/masse/rumpf.obj",
+    "modelle/optimist/meshes/gui/baum.obj",
+    "modelle/optimist/meshes/gui/gummigelenk.obj",
+    "modelle/optimist/meshes/gui/mast.obj",
+    "modelle/optimist/meshes/gui/pinne.obj",
+    "modelle/optimist/meshes/gui/pinneverlaengerung.obj",
+    "modelle/optimist/meshes/gui/ruder.obj",
+    "modelle/optimist/meshes/gui/rumpf.obj",
+    "modelle/optimist/meshes/gui/schwert.obj",
+    "modelle/optimist/meshes/gui/segel.obj",
+    "modelle/optimist/meshes/gui/spriet.obj",
+    "modelle/optimist/meshes/hydrostatik/baum.obj",
+    "modelle/optimist/meshes/hydrostatik/gummigelenk.obj",
+    "modelle/optimist/meshes/hydrostatik/mast.obj",
+    "modelle/optimist/meshes/hydrostatik/ruder.obj",
+    "modelle/optimist/meshes/hydrostatik/rumpf.obj",
+    "modelle/optimist/meshes/hydrostatik/schwert.obj",
+    "modelle/optimist/meshes/hydrostatik/spriet.obj",
+    "modelle/optimist/meshes/masse/baum.obj",
+    "modelle/optimist/meshes/masse/gummigelenk.obj",
+    "modelle/optimist/meshes/masse/mast.obj",
+    "modelle/optimist/meshes/masse/ruder.obj",
+    "modelle/optimist/meshes/masse/rumpf.obj",
+    "modelle/optimist/meshes/masse/schwert.obj",
+    "modelle/optimist/meshes/masse/segel.obj",
+    "modelle/optimist/meshes/masse/spriet.obj"
+  ],
+  "pruefumfang": [
+    "Alle OBJ-Dateien: endliche Koordinaten, gueltige Indizes und belegter Umfang der Aenderungen.",
+    "Optimist: gemeinsame starre Rotation aller Zwecke um Z, keine Spiegelung oder Verschiebung.",
+    "Alle drei Boote: Ruder liegt auf Heckseite mit kleinerem X als der Mast; Z bleibt Hochachse.",
+    "Geschlossene konsistent orientierte Netze: positives signiertes Volumen nach Korrektur.",
+    "Topologie, Betrag des geschlossenen Volumens und Zweckkopien bleiben erhalten.",
+    "Keine Translation zum Schwerpunkt, zur Rumpfunterkante oder zur Wasserlinie."
+  ],
+  "grenzen": [
+    "Backbordseite ist bei symmetrischen Netzen ohne Seitenmarkierung nicht allein geometrisch beweisbar; Herkunftstransformationen dienen als Beleg.",
+    "Keine Weltbewegung, Wasseroberflaeche oder Ursprungskonstanz unter Beladung implementiert oder getestet.",
+    "Keine Reparatur offener Netze, Selbstschnittpruefung oder physikalische Kalibrierung.",
+    "420-Grossbaum ist in der Quelle auffaellig vertikal platziert; Bauteilpose nicht eigenmaechtig korrigiert."
+  ],
+  "dateien": [
+    {
+      "datei": "modelle/420/meshes/gui/fock.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": false,
+        "kantenumlauf_konsistent": false,
+        "signiertes_volumen_m3": null,
+        "offene_kanten": 68,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "72fc0a41e79e89e00f23db39e9c3ac6e87c4cddc50fae4d14a65ee6f2938e45c"
+    },
+    {
+      "datei": "modelle/420/meshes/gui/grossbaum.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": false,
+        "kantenumlauf_konsistent": false,
+        "signiertes_volumen_m3": null,
+        "offene_kanten": 6,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "b1c652c55ce22781ec1af2649aa97cb3e258046663040fbcf8523777818971c3"
+    },
+    {
+      "datei": "modelle/420/meshes/gui/grosssegel.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": false,
+        "kantenumlauf_konsistent": false,
+        "signiertes_volumen_m3": null,
+        "offene_kanten": 92,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "06b22754a8e1ad58cdcdeea1bb3cac20b09b47933e4d8b04f997b126fe0cbd4c"
+    },
+    {
+      "datei": "modelle/420/meshes/gui/mast.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": false,
+        "kantenumlauf_konsistent": false,
+        "signiertes_volumen_m3": null,
+        "offene_kanten": 6,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "6124ff9a277c4581d7e0e7bdf6a4428d1db208944c77d84d6683a4d4afb438ad"
+    },
+    {
+      "datei": "modelle/420/meshes/gui/ruder.obj",
+      "korrekturen": [
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0032076000000000006,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "b8e494cdf245e2090c429ac354365f471fedca244f49b6a3671937fbd7ad371a"
+    },
+    {
+      "datei": "modelle/420/meshes/gui/ruderstock.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": false,
+        "kantenumlauf_konsistent": false,
+        "signiertes_volumen_m3": null,
+        "offene_kanten": 6,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "5e0af61b1325cd3b2a99c0a243cab8f91129edcd848ad25cb86933028a57e299"
+    },
+    {
+      "datei": "modelle/420/meshes/gui/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": false,
+        "kantenumlauf_konsistent": false,
+        "signiertes_volumen_m3": null,
+        "offene_kanten": 103,
+        "mehrfach_belegte_kanten": 26
+      },
+      "sha256": "31cb5223be689ddbcb9762bd2a02aefc3bbb360a3bd5a43554bd800dd2faf49e"
+    },
+    {
+      "datei": "modelle/420/meshes/gui/schwert.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.007255349999999997,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "8ec787614bc721543093ae1388a9a3656d9b2b87a65c67226f4b4c30ccbf5a6b"
+    },
+    {
+      "datei": "modelle/bleistift/meshes/gui/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 6.651075100799999e-06,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "d3a0e99c3683ce58963733151188fbf99e197eca699e56b7636e40d011d3d823"
+    },
+    {
+      "datei": "modelle/bleistift/meshes/hydrostatik/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 6.651075100799999e-06,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "d3a0e99c3683ce58963733151188fbf99e197eca699e56b7636e40d011d3d823"
+    },
+    {
+      "datei": "modelle/bleistift/meshes/masse/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 6.651075100799999e-06,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "d3a0e99c3683ce58963733151188fbf99e197eca699e56b7636e40d011d3d823"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/gui/fock.obj",
+      "korrekturen": [
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0601776,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "2801732a69f94a43e27f4de7113d8110acf635980da74e1a0969ed62d03a78cc"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/gui/grossbaum.obj",
+      "korrekturen": [
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.014154000000000012,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "6a810d771535a9036e53336df3314ee521fa5e0f76e21d0664516ba036bf8abe"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/gui/grosssegel.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.13501760000000002,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "1fd0e10e44204538e608ab3c87adf727586d7c9cfbfe6eb3783d6d0449288561"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/gui/kiel.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.091496,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "cb014a877628529aaa5287b016c811b99c17421e165035bc06244875e7eb6ffc"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/gui/mast.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.058350355867653594,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "0fe5590c89da00850ac90ad7fa63078788599c8af592a64d6fcebb858142fa7e"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/gui/ruder.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.018742500000000002,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "0d185745c9d13dc75d48383d1f11d17ccf1fe3c3ebf174e0c495cee42f03c8aa"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/gui/rumpf.obj",
+      "korrekturen": [
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 3.7028265710367974,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "4d5c838ba73b86941d5f6069322004653dc9d6f3c383b7d510c2a8510fbce1df"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/hydrostatik/grossbaum.obj",
+      "korrekturen": [
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.014154000000000012,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "6a810d771535a9036e53336df3314ee521fa5e0f76e21d0664516ba036bf8abe"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/hydrostatik/kiel.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.091496,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "cb014a877628529aaa5287b016c811b99c17421e165035bc06244875e7eb6ffc"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/hydrostatik/mast.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.058350355867653594,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "0fe5590c89da00850ac90ad7fa63078788599c8af592a64d6fcebb858142fa7e"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/hydrostatik/ruder.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.018742500000000002,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "0d185745c9d13dc75d48383d1f11d17ccf1fe3c3ebf174e0c495cee42f03c8aa"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/hydrostatik/rumpf.obj",
+      "korrekturen": [
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 3.7028265710367974,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "4d5c838ba73b86941d5f6069322004653dc9d6f3c383b7d510c2a8510fbce1df"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/masse/fock.obj",
+      "korrekturen": [
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0601776,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "2801732a69f94a43e27f4de7113d8110acf635980da74e1a0969ed62d03a78cc"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/masse/grossbaum.obj",
+      "korrekturen": [
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.014154000000000012,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "6a810d771535a9036e53336df3314ee521fa5e0f76e21d0664516ba036bf8abe"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/masse/grosssegel.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.13501760000000002,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "1fd0e10e44204538e608ab3c87adf727586d7c9cfbfe6eb3783d6d0449288561"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/masse/kiel.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.091496,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "cb014a877628529aaa5287b016c811b99c17421e165035bc06244875e7eb6ffc"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/masse/mast.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.058350355867653594,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "0fe5590c89da00850ac90ad7fa63078788599c8af592a64d6fcebb858142fa7e"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/masse/ruder.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.018742500000000002,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "0d185745c9d13dc75d48383d1f11d17ccf1fe3c3ebf174e0c495cee42f03c8aa"
+    },
+    {
+      "datei": "modelle/folkeboot/meshes/masse/rumpf.obj",
+      "korrekturen": [
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 3.7028265710367974,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "4d5c838ba73b86941d5f6069322004653dc9d6f3c383b7d510c2a8510fbce1df"
+    },
+    {
+      "datei": "modelle/kegel/meshes/gui/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 2.093554104636353,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "9ada0d0da58b69ee7ada0c68921386d6b85d80b8d3037a49218b4047213998be"
+    },
+    {
+      "datei": "modelle/kegel/meshes/hydrostatik/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 2.093554104636353,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "9ada0d0da58b69ee7ada0c68921386d6b85d80b8d3037a49218b4047213998be"
+    },
+    {
+      "datei": "modelle/kegel/meshes/masse/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 2.093554104636353,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "9ada0d0da58b69ee7ada0c68921386d6b85d80b8d3037a49218b4047213998be"
+    },
+    {
+      "datei": "modelle/kugel/meshes/gui/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 4.184586431667046,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "69d447898dd264e18760244e4953abdcd268142500389183adbe8a7edda4ea17"
+    },
+    {
+      "datei": "modelle/kugel/meshes/hydrostatik/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 4.184586431667046,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "69d447898dd264e18760244e4953abdcd268142500389183adbe8a7edda4ea17"
+    },
+    {
+      "datei": "modelle/kugel/meshes/masse/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 4.184586431667046,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "69d447898dd264e18760244e4953abdcd268142500389183adbe8a7edda4ea17"
+    },
+    {
+      "datei": "modelle/optimist/meshes/gui/baum.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0063661175676163985,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "1e2fb5ec2eb115b56dc36c446210bb826b829b6c4d7355ec8bea5de07ef1c30a"
+    },
+    {
+      "datei": "modelle/optimist/meshes/gui/gummigelenk.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1",
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 6.649977246846556e-06,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "43e74b0ef1af114f515a47201c4993e066ac0d76491f178e2a7573c30baac15e"
+    },
+    {
+      "datei": "modelle/optimist/meshes/gui/mast.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.00696882275555981,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "5bfabfb1f5092102e8205e6a4794f7b54cf237a49e0f4853246f3065a8f21778"
+    },
+    {
+      "datei": "modelle/optimist/meshes/gui/pinne.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1",
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.00013849089379180932,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "29cb0540df6f58e206b05d5011cba1f97dbae99dc4e4ce2099f1d38067297792"
+    },
+    {
+      "datei": "modelle/optimist/meshes/gui/pinneverlaengerung.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.00010504259417252917,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "a751a628de6f861e9f6bb331b101c7fa94d72498246a49fd2e4371dca3efa0ef"
+    },
+    {
+      "datei": "modelle/optimist/meshes/gui/ruder.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0009073918672373596,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "9ea3f6650a1f96e0ac0a3c2f95cc0ed3b7d63a7252c80647b5fffeb62466ca4a"
+    },
+    {
+      "datei": "modelle/optimist/meshes/gui/rumpf.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.7746222208404742,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "ff57fcfe9fc307f26a698a2e8a0198dfb87305b72765539d445b8ea3ecdf3b36"
+    },
+    {
+      "datei": "modelle/optimist/meshes/gui/schwert.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0063454341055732945,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "77e61247c5b37732394ea393c361d93a4437638a856c6f30e0410755272c14d1"
+    },
+    {
+      "datei": "modelle/optimist/meshes/gui/segel.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1",
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.03351428948862351,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "470d20ab15a661c57a1c1aaf524caf965ccea49a23c4882d1f090f0f730488e5"
+    },
+    {
+      "datei": "modelle/optimist/meshes/gui/spriet.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0029591465755527896,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "7046bc6d57413bf6c3fcecd566d615429d0b6eebecc9f2cd6db8868453c8cc8a"
+    },
+    {
+      "datei": "modelle/optimist/meshes/hydrostatik/baum.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0063661175676163985,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "1e2fb5ec2eb115b56dc36c446210bb826b829b6c4d7355ec8bea5de07ef1c30a"
+    },
+    {
+      "datei": "modelle/optimist/meshes/hydrostatik/gummigelenk.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1",
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 6.649977246846556e-06,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "43e74b0ef1af114f515a47201c4993e066ac0d76491f178e2a7573c30baac15e"
+    },
+    {
+      "datei": "modelle/optimist/meshes/hydrostatik/mast.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.00696882275555981,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "5bfabfb1f5092102e8205e6a4794f7b54cf237a49e0f4853246f3065a8f21778"
+    },
+    {
+      "datei": "modelle/optimist/meshes/hydrostatik/ruder.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0009073918672373596,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "9ea3f6650a1f96e0ac0a3c2f95cc0ed3b7d63a7252c80647b5fffeb62466ca4a"
+    },
+    {
+      "datei": "modelle/optimist/meshes/hydrostatik/rumpf.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.7746222208404742,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "ff57fcfe9fc307f26a698a2e8a0198dfb87305b72765539d445b8ea3ecdf3b36"
+    },
+    {
+      "datei": "modelle/optimist/meshes/hydrostatik/schwert.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0063454341055732945,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "77e61247c5b37732394ea393c361d93a4437638a856c6f30e0410755272c14d1"
+    },
+    {
+      "datei": "modelle/optimist/meshes/hydrostatik/spriet.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0029591465755527896,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "7046bc6d57413bf6c3fcecd566d615429d0b6eebecc9f2cd6db8868453c8cc8a"
+    },
+    {
+      "datei": "modelle/optimist/meshes/masse/baum.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0063661175676163985,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "1e2fb5ec2eb115b56dc36c446210bb826b829b6c4d7355ec8bea5de07ef1c30a"
+    },
+    {
+      "datei": "modelle/optimist/meshes/masse/gummigelenk.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1",
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 6.649977246846556e-06,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "43e74b0ef1af114f515a47201c4993e066ac0d76491f178e2a7573c30baac15e"
+    },
+    {
+      "datei": "modelle/optimist/meshes/masse/mast.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.00696882275555981,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "5bfabfb1f5092102e8205e6a4794f7b54cf237a49e0f4853246f3065a8f21778"
+    },
+    {
+      "datei": "modelle/optimist/meshes/masse/ruder.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0009073918672373596,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "9ea3f6650a1f96e0ac0a3c2f95cc0ed3b7d63a7252c80647b5fffeb62466ca4a"
+    },
+    {
+      "datei": "modelle/optimist/meshes/masse/rumpf.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.7746222208404742,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "ff57fcfe9fc307f26a698a2e8a0198dfb87305b72765539d445b8ea3ecdf3b36"
+    },
+    {
+      "datei": "modelle/optimist/meshes/masse/schwert.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0063454341055732945,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "77e61247c5b37732394ea393c361d93a4437638a856c6f30e0410755272c14d1"
+    },
+    {
+      "datei": "modelle/optimist/meshes/masse/segel.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1",
+        "Flaechenumlauf umgekehrt: geschlossenes Netz zuvor nach innen orientiert"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.03351428948862351,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "470d20ab15a661c57a1c1aaf524caf965ccea49a23c4882d1f090f0f730488e5"
+    },
+    {
+      "datei": "modelle/optimist/meshes/masse/spriet.obj",
+      "korrekturen": [
+        "180 Grad um Z: (x,y,z) -> (-x,-y,z); Determinante +1"
+      ],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.0029591465755527896,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "7046bc6d57413bf6c3fcecd566d615429d0b6eebecc9f2cd6db8868453c8cc8a"
+    },
+    {
+      "datei": "modelle/platte/meshes/gui/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.04,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "27e3ecb2d6eca16212464d01bd52d3830b6eb196aaff7c0fb4030f69bb6cdd35"
+    },
+    {
+      "datei": "modelle/platte/meshes/hydrostatik/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.04,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "27e3ecb2d6eca16212464d01bd52d3830b6eb196aaff7c0fb4030f69bb6cdd35"
+    },
+    {
+      "datei": "modelle/platte/meshes/masse/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.04,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "27e3ecb2d6eca16212464d01bd52d3830b6eb196aaff7c0fb4030f69bb6cdd35"
+    },
+    {
+      "datei": "modelle/pyramide/meshes/gui/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 2.6666666666666665,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "b668b3e146737e1230ef01b57da34900c2975fe7165736cac70b38d74d09d10c"
+    },
+    {
+      "datei": "modelle/pyramide/meshes/hydrostatik/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 2.6666666666666665,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "b668b3e146737e1230ef01b57da34900c2975fe7165736cac70b38d74d09d10c"
+    },
+    {
+      "datei": "modelle/pyramide/meshes/masse/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 2.6666666666666665,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "b668b3e146737e1230ef01b57da34900c2975fe7165736cac70b38d74d09d10c"
+    },
+    {
+      "datei": "modelle/quader/meshes/gui/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 7.999999999999999,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "2c19e93177c75fbfda1cb94c2dd44beff27501922114c407536bcd9967785fd3"
+    },
+    {
+      "datei": "modelle/quader/meshes/hydrostatik/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 7.999999999999999,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "2c19e93177c75fbfda1cb94c2dd44beff27501922114c407536bcd9967785fd3"
+    },
+    {
+      "datei": "modelle/quader/meshes/masse/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 7.999999999999999,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "2c19e93177c75fbfda1cb94c2dd44beff27501922114c407536bcd9967785fd3"
+    },
+    {
+      "datei": "modelle/rolle/meshes/gui/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 1.5701655784774484,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "7ad05846adf360af5b50dad12924f26c04a8438a082ad9540136c5b20ca81bae"
+    },
+    {
+      "datei": "modelle/rolle/meshes/hydrostatik/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 1.5701655784774484,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "7ad05846adf360af5b50dad12924f26c04a8438a082ad9540136c5b20ca81bae"
+    },
+    {
+      "datei": "modelle/rolle/meshes/masse/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 1.5701655784774484,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "7ad05846adf360af5b50dad12924f26c04a8438a082ad9540136c5b20ca81bae"
+    },
+    {
+      "datei": "modelle/unregelmaessig/meshes/gui/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.8023541666666667,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "f52fe12cfba94896ea300eccbed5204b36684daabc6ff10cf6c0adb184f07c7d"
+    },
+    {
+      "datei": "modelle/unregelmaessig/meshes/hydrostatik/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.8023541666666667,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "f52fe12cfba94896ea300eccbed5204b36684daabc6ff10cf6c0adb184f07c7d"
+    },
+    {
+      "datei": "modelle/unregelmaessig/meshes/masse/rumpf.obj",
+      "korrekturen": [],
+      "ergebnis": {
+        "kantenmaessig_geschlossen": true,
+        "kantenumlauf_konsistent": true,
+        "signiertes_volumen_m3": 0.8023541666666667,
+        "offene_kanten": 0,
+        "mehrfach_belegte_kanten": 0
+      },
+      "sha256": "f52fe12cfba94896ea300eccbed5204b36684daabc6ff10cf6c0adb184f07c7d"
+    }
+  ]
+}

@@ -1,0 +1,150 @@
+{
+  "vertragsversion": "1",
+  "umfang": "Core-Laufzeitdiagnosen; Modellpruefgrenzen sind in der Schnittstellenbeschreibung dokumentiert",
+  "fehler": [
+    {
+      "id": "CORE-CLI-0001",
+      "kurztext": "Genau ein CLI-Argument erforderlich.",
+      "pass_kriterium": "Die CLI erhaelt die fuer den gewaehlten Befehl dokumentierte Argumentzahl.",
+      "fail_kriterium": "Argumente fehlen oder sind fuer den gewaehlten Befehl ueberzaehlig.",
+      "handlungsanweisung": "Mit --help die erlaubten Aufrufe anzeigen.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-CLI-0002",
+      "kurztext": "Unbekannter CLI-Befehl.",
+      "pass_kriterium": "Der Befehl ist --help, --build-info, --fehlerdoku, --pruefen, --statisch oder --dynamisch.",
+      "fail_kriterium": "Der Befehl ist keiner der unterstuetzten Befehle.",
+      "handlungsanweisung": "Mit --help die verfuegbaren Befehle anzeigen.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-SIM-0001",
+      "kurztext": "Ungueltige Simulationsparameter oder nicht endliches Ergebnis.",
+      "pass_kriterium": "Parameter sind endlich, Zeitschritt und Budgets positiv; Ergebnis ist endlich und Zeit schreitet fort.",
+      "fail_kriterium": "Eine dieser Bedingungen ist verletzt oder eine bestehende Ausgabe wuerde ueberschrieben.",
+      "handlungsanweisung": "Parameter und Detaildiagnose pruefen, kleinere Zeitschritte oder einen neuen Ausgabepfad verwenden.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-SIM-0002",
+      "kurztext": "Singulaere oder ungeeignete Loesungsmatrix.",
+      "pass_kriterium": "Die dynamische Traegheit ist positiv definit und die benoetigten linearen Systeme sind regulaer.",
+      "fail_kriterium": "Eine Loesungsmatrix ist singulaer oder die Traegheit nicht positiv definit.",
+      "handlungsanweisung": "Massenverteilung und Solverstart pruefen; keine automatische Regularisierung voraussetzen.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-SIM-0003",
+      "kurztext": "Modell ist nicht schwimmfaehig.",
+      "pass_kriterium": "Die maximal moegliche Verdraengung kann die Gesamtmasse tragen.",
+      "fail_kriterium": "Das Gewicht uebersteigt den maximalen hydrostatischen Auftrieb.",
+      "handlungsanweisung": "Gesamtmasse und vorhandene Verdraengungsvolumina pruefen.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-SIM-0004",
+      "kurztext": "Statischer Solver konvergiert nicht.",
+      "pass_kriterium": "Kraft- und Momentenresiduen erreichen getrennt ihre Toleranzen.",
+      "fail_kriterium": "Budgetende oder stagnierende Liniensuche vor Erreichen der Toleranzen.",
+      "handlungsanweisung": "Startlage, Modell und Solverbudget pruefen; Nichtkonvergenz beweist keine physikalische Unloesbarkeit.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-IO-0001",
+      "kurztext": "Ergebnisaufzeichnung fehlgeschlagen.",
+      "pass_kriterium": "Ausgabedatei kann erstellt, geschrieben und geschlossen werden.",
+      "fail_kriterium": "Ein Ausgabevorgang schlaegt fehl.",
+      "handlungsanweisung": "Zielpfad, Rechte und freien Speicher pruefen; eventuell vorhandene Teilausgabe beachten.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-POSE-0001",
+      "kurztext": "Modellposition ist nicht endlich.",
+      "pass_kriterium": "Alle drei Positionskomponenten sind endlich.",
+      "fail_kriterium": "Mindestens eine Positionskomponente ist NaN oder unendlich.",
+      "handlungsanweisung": "Eine endliche Position des festen Modellursprungs in Metern angeben.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-POSE-0002",
+      "kurztext": "Quaternion ist ungueltig.",
+      "pass_kriterium": "Die vier xyzw-Komponenten sind endlich und nicht alle null.",
+      "fail_kriterium": "Mindestens eine Komponente ist nicht endlich oder alle vier Komponenten sind null.",
+      "handlungsanweisung": "Eine gueltige xyzw-Orientierung angeben; die Identitaet ist [0, 0, 0, 1].",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-POSE-0003",
+      "kurztext": "Punkt- oder Vektortransformation nicht endlich.",
+      "pass_kriterium": "Eingaben und alle berechneten Transformationskomponenten sind endlich.",
+      "fail_kriterium": "Ein Eingangswert ist nicht endlich oder eine Transformation laeuft numerisch ueber.",
+      "handlungsanweisung": "Eingabewerte und Bezugssystem pruefen; unrealistisch grosse Koordinaten korrigieren.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-MOD-0001",
+      "kurztext": "Ungueltiges Modell-JSON.",
+      "pass_kriterium": "Das Modelldokument ist syntaktisch gueltiges JSON ohne doppelte Objektschluessel.",
+      "fail_kriterium": "JSON-Syntaxfehler oder doppelte Objektschluessel verhindern eine eindeutige Interpretation.",
+      "handlungsanweisung": "Die gemeldete Dateistelle korrigieren und erneut pruefen.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-MOD-0002",
+      "kurztext": "Nicht unterstuetzte Modellstruktur.",
+      "pass_kriterium": "Schemaversion, Pflichtfelder und Datentypen entsprechen dem dokumentierten Modellvertrag.",
+      "fail_kriterium": "Mindestens eine dieser Bedingungen ist verletzt.",
+      "handlungsanweisung": "Schemaversion und angegebenen Feldpfad mit der Modellbeschreibung abgleichen.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-MOD-0003",
+      "kurztext": "Element-ID fehlt oder ist mehrfach vergeben.",
+      "pass_kriterium": "Jedes Element hat eine nicht leere, modellweit eindeutige ID.",
+      "fail_kriterium": "Eine Element-ID fehlt, ist leer oder kommt mehrfach vor.",
+      "handlungsanweisung": "Den betroffenen Elementen eindeutige IDs geben.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-MOD-0004",
+      "kurztext": "Ungueltige Massenbeschreibung.",
+      "pass_kriterium": "Jedes Hydrostatikelement besitzt genau eine unterstuetzte Massenvariante mit endlichen, physikalisch zulaessigen Parametern.",
+      "fail_kriterium": "Masse fehlt, die Variante ist ungueltig oder ein benoetigter Parameter ist nicht endlich bzw. unzulaessig.",
+      "handlungsanweisung": "Feldpfad und Massenvariante pruefen; Masse, Dichte und gegebenenfalls Wanddicke positiv angeben.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-MOD-0005",
+      "kurztext": "Benoetigte Modelldatei nicht lesbar.",
+      "pass_kriterium": "Jede benoetigte Referenz ist am dokumentierten Pfad lesbar.",
+      "fail_kriterium": "Eine benoetigte Datei fehlt oder kann nicht gelesen werden.",
+      "handlungsanweisung": "Den gemeldeten Pfad, die Paketvollstaendigkeit und Leserechte pruefen.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-MOD-0006",
+      "kurztext": "Mesh fuer seinen Physikzweck ungeeignet.",
+      "pass_kriterium": "Das Mesh besteht die fuer seinen Zweck dokumentierten Daten-, Topologie- und Orientierungspruefungen.",
+      "fail_kriterium": "Mindestens eine dieser Pruefungen scheitert.",
+      "handlungsanweisung": "Die konkrete Detaildiagnose beachten; defekte Indizes, Flaechen, Orientierung oder offene Volumenraender im Modell korrigieren.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-MOD-0007",
+      "kurztext": "Ueberschneidungsfreiheit der Auftriebsvolumina nicht nachgewiesen.",
+      "pass_kriterium": "Die achsenparallelen Modellbegrenzungen der Volumina haben keine positive Innenueberdeckung; Randkontakt ist erlaubt.",
+      "fail_kriterium": "Positive AABB-Innenueberdeckung wird konservativ abgelehnt, auch wenn die eigentlichen Netze disjunkt sein koennten.",
+      "handlungsanweisung": "Die gemeldeten Volumennetze pruefen. Diese Implementierung besitzt keinen exakten Union-/Trennungsnachweis; eine reine AABB-Ablehnung beweist keinen tatsaechlichen Schnitt.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-MOD-0008",
+      "kurztext": "Massen- oder Schalenmodell nicht eindeutig verwendbar.",
+      "pass_kriterium": "Die Materialflaechen entsprechen dem freigegebenen Massenvertrag ohne erkannte Doppelzaehlung.",
+      "fail_kriterium": "Die Masseninterpretation ist nach den dokumentierten Pruefregeln ungeeignet oder nicht eindeutig.",
+      "handlungsanweisung": "Das Modell fachlich korrigieren; keine automatische Umdeutung von Schale zu Vollkoerper voraussetzen.",
+      "pruefstatus": "implementiert"
+    }
+  ]
+}

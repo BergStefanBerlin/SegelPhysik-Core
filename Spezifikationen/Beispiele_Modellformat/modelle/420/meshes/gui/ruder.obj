@@ -1,0 +1,21 @@
+# Coordinate/winding correction; see mesh_koordinatenpruefung.json.
+# DRAFT example, not a validated simulation mesh.
+# Metres; right-handed: +X forward, +Y port, +Z up.
+# Geometry converted from source; see modell.json and README.md.
+v -0.020000000 -0.009000000 0.120000000
+v -0.020000000 0.009000000 0.120000000
+v -0.020000000 -0.009000000 -0.320000000
+v -0.020000000 0.009000000 -0.320000000
+v -0.080000000 -0.009000000 -0.540000000
+v -0.080000000 0.009000000 -0.540000000
+v -0.260000000 -0.009000000 -0.540000000
+v -0.260000000 0.009000000 -0.540000000
+v -0.340000000 -0.009000000 0.120000000
+v -0.340000000 0.009000000 0.120000000
+f 1 3 4 2
+f 3 5 6 4
+f 5 7 8 6
+f 7 9 10 8
+f 9 1 2 10
+f 9 7 5 3 1
+f 2 4 6 8 10

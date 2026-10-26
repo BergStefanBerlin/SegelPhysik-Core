@@ -1,0 +1,77 @@
+{
+  "schema_version": "0.1-entwurf",
+  "status": "entwurf",
+  "beschreibung": "Gemeinsamer Materialkatalog der Beispiele; keine freigegebenen Stoffdaten.",
+  "materialien": {
+    "gfk": {
+      "name": "GfK",
+      "dichte_kg_pro_m3": 1900,
+      "darstellung": {
+        "farbe": "#1f4e79",
+        "farbe_unter_wasser": "#7a8a99",
+        "glanz": 0.35
+      },
+      "herkunft": "Unkalibrierter Beispielwert aus konfigurationen/materialien.json"
+    },
+    "stahl": {
+      "name": "Stahl",
+      "dichte_kg_pro_m3": 7850,
+      "darstellung": {
+        "farbe": "#4a4f55",
+        "farbe_unter_wasser": "#3a3e43",
+        "glanz": 0.75
+      },
+      "herkunft": "Unkalibrierter Beispielwert aus konfigurationen/materialien.json"
+    },
+    "blei": {
+      "name": "Blei",
+      "dichte_kg_pro_m3": 11340,
+      "darstellung": {
+        "farbe": "#23262a",
+        "farbe_unter_wasser": "#17191c",
+        "glanz": 0.55
+      },
+      "herkunft": "Unkalibrierter Beispielwert aus konfigurationen/materialien.json"
+    },
+    "aluminium": {
+      "name": "Aluminium",
+      "dichte_kg_pro_m3": 2700,
+      "darstellung": {
+        "farbe": "#c4c8cd",
+        "farbe_unter_wasser": "#9aa0a8",
+        "glanz": 0.65
+      },
+      "herkunft": "Unkalibrierter Beispielwert aus konfigurationen/materialien.json"
+    },
+    "beispielstoff_500": {
+      "name": "Beispielstoff mit Dichte 500 kg/m3",
+      "dichte_kg_pro_m3": 500,
+      "herkunft": "Direkte Bestandsdichte; keine nachgewiesene Werkstoffidentitaet."
+    },
+    "beispielstoff_600": {
+      "name": "Beispielstoff mit Dichte 600 kg/m3",
+      "dichte_kg_pro_m3": 600,
+      "herkunft": "Direkte Bestandsdichte; keine nachgewiesene Werkstoffidentitaet."
+    },
+    "beispielstoff_700": {
+      "name": "Beispielstoff mit Dichte 700 kg/m3",
+      "dichte_kg_pro_m3": 700,
+      "herkunft": "Direkte Bestandsdichte; keine nachgewiesene Werkstoffidentitaet."
+    },
+    "beispielstoff_950": {
+      "name": "Beispielstoff mit Dichte 950 kg/m3",
+      "dichte_kg_pro_m3": 950,
+      "herkunft": "Direkte Bestandsdichte; keine nachgewiesene Werkstoffidentitaet."
+    },
+    "beispielstoff_1100": {
+      "name": "Beispielstoff mit Dichte 1100 kg/m3",
+      "dichte_kg_pro_m3": 1100,
+      "herkunft": "Direkte Bestandsdichte; keine nachgewiesene Werkstoffidentitaet."
+    },
+    "beispielstoff_1250": {
+      "name": "Beispielstoff mit Dichte 1250 kg/m3",
+      "dichte_kg_pro_m3": 1250,
+      "herkunft": "Direkte Bestandsdichte; keine nachgewiesene Werkstoffidentitaet."
+    }
+  }
+}
