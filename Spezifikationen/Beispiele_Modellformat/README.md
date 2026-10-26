@@ -131,19 +131,67 @@ Ein Element ohne Volumen wirkt also nur ueber seine Masse:
 
 Die Besatzungspositionen aus den Quellen wurden ueber Rumpfreferenz plus
 relativem Versatz in den Modellbezug umgerechnet: Folkeboot
-`[0, 0, 0.38]` m, Optimist `[0, 0, -0.985812]` m. Die
+`[0, 0, 0.38]` m, Optimist `[0, 0, 0.368188]` m (nach der Anhebung, siehe
+unten). Die
 Eigentraegheit einer Punktmasse ist null; ihr Steiner-Anteil wird bei
 einer spaeteren Gesamtkoerperbildung beruecksichtigt.
 
-Die Segel von Folkeboot und Optimist haben ebenfalls Masse, aber keinen
-Volumenblock, entsprechend ihrer bisherigen Kennzeichnung als nicht
-verdraengend. Insgesamt besitzen 25 Elemente Hydrostatik mit Masse,
-davon 20 zusaetzlich Volumen. Die anderen fuenf sind zwei
-Besatzungs-Punktmassen und drei Segel.
+Das Folkeboot-Segel hat Masse, aber keinen Volumenblock, entsprechend
+seiner bisherigen Kennzeichnung als nicht verdraengend. Das
+Optimist-Segel ist auf Nutzerwunsch reine Darstellung. Insgesamt
+besitzen 23 Elemente Hydrostatik mit Masse, davon 16 zusaetzlich
+Volumen. Die anderen sieben sind zwei Besatzungs-Punktmassen, zwei
+Folkeboot-Segel und die drei Optimist-Spieren.
 
-Pinne und Pinnenausleger bleiben auf Nutzerwunsch reine Darstellung,
-ohne Hydrostatik oder Massenbeitrag. Andere Bestandselemente wie
-Gummigelenk oder Spriet wurden nicht zusaetzlich als Zierde eingestuft.
+Pinne, Pinnenausleger und Gummigelenk bleiben auf Nutzerwunsch reine
+Darstellung, ohne Hydrostatik oder Massenbeitrag.
+
+### Ueberarbeitung Optimist
+
+Nach Nutzervorgabe wurde der Optimist so ueberarbeitet:
+
+| Element | Hydrostatik |
+|---|---|
+| Rumpf | Offene Schale ohne Deck (Bordwaende, Bug, Heck, Boden), GFK 1900 kg/m3, Wand 5 mm; geschlossenes Verdraengungsvolumen bis zur Bordwandoberkante |
+| Schwert, Ruder | Holz als Vollkoerper, 600 kg/m3 (angenommene Dichte), mit Volumen |
+| Mast, Grossbaum, Spriet | Aluminium-Rundrohr als Schale, 2700 kg/m3, Wand 1,5 mm, ohne Verdraengung |
+| Grosssegel, Pinne, Pinnenausleger, Gummigelenk | nur Darstellung (keine Masse, kein Volumen) |
+| Besatzung | unveraendert (Punktmasse 50 kg) |
+
+Geometrische Anpassungen:
+
+- Die 110 Deckflaechen wurden aus GUI- und Massennetz des Rumpfs
+  entfernt. Im Volumennetz ersetzt ein neu triangulierter, ebener
+  Deckel auf der Bordwandoberkante das alte Deck; das eingeschlossene
+  Volumen bleibt gleich.
+- Der alte Deckel hatte an zwei fast kollinearen Bordwandecken
+  (x = 0,3151 m, y = +/-0,5178 m) numerisch sich kreuzende Kanten
+  (`CORE-MOD-0006/0008`, bisher von `CORE-MOD-0007` verdeckt). Diese
+  beiden Punkte wurden in allen drei Rumpfnetzen um 2 mm nach aussen
+  gesetzt.
+- Das Schwert-Volumennetz endet an der Rumpfunterkante
+  (z = -0,081812 m) mit einem ebenen Deckel. Der Teil im Schwertkasten
+  verdraengt nicht zusaetzlich; die AABB-Pruefung gegen den Rumpf
+  ist dadurch erfuellt. Das Massennetz bleibt das ganze Schwert.
+
+- Auf Nutzerauftrag wurden alle Optimist-Netze (GUI, Masse, Hydrostatik;
+  25 OBJ-Dateien) und die Besatzung um +1,354 m in z verschoben, damit das
+  Boot schon in der Initialpose z = 0 in seiner Ruhelage schwimmt. Jede
+  OBJ-Datei nennt die Verschiebung im Kopfkommentar.
+
+Der statische Lauf konvergiert trocken bei z ≈ 0 (0,0002 m) mit rund 98,0 kg
+Gesamtmasse (Rumpf 38,9 kg, Schwert 3,8 kg, Ruder 0,5 kg, Spieren
+4,8 kg, Besatzung 50 kg), 0,098 m3 Verdraengung und rund 8 cm Tiefgang
+des Rumpfbodens; der Bordrand liegt rund 0,31 m ueber der Wasserlinie.
+Das bleibt eine unkalibrierte Naeherung.
+
+**Volllaufen (A-C-00047):** Der Rumpf ist eine offene Schale mit
+Verdraengungsvolumen. Taucht ein Punkt seines Bordrands unter Wasser,
+laeuft er dauerhaft voll und traegt nicht mehr; Schwert und Ruder
+(Vollkoerper) tragen weiter. Eine Dynamik ab der Initialpose z = 0 bleibt
+aufrecht und trocken (20 s: z zwischen -0,006 und +0,006 m). Die GUI
+startet einen Lauf beim Wechsel Statik → Dynamik vom angezeigten
+Ruhezustand.
 
 **Der 420er bleibt vorerst ausschliesslich Darstellung.** Es fehlen
 Massendaten; daher wurden nach Nutzerentscheidung alle seine
@@ -151,9 +199,10 @@ Hydrostatikbloecke und Volumenkopien entfernt. Er kann spaeter mit
 belastbaren Massenangaben ergaenzt werden.
 
 Die vorhandenen Bootsnetze sind nicht durch ihre Zuordnung zu
-`volumen` physikalisch freigegeben. Dichtigkeit, Selbstschnitte,
-Flutung und Volumenueberlappungen bleiben vor einer Simulation zu
-pruefen. Insbesondere duerfen ueberlappende Volumina nicht einfach
+`volumen` physikalisch freigegeben. Dichtigkeit, Selbstschnitte
+und Volumenueberlappungen bleiben vor einer Simulation zu
+pruefen; Volllaufen behandelt der Core nur fuer offene Schalen
+(A-C-00047). Insbesondere duerfen ueberlappende Volumina nicht einfach
 addiert werden.
 
 ## Erzeugte Koerper-Meshes
@@ -261,3 +310,7 @@ Der [Pruefnachweis](pruefnachweis.json) dokumentiert 76 bestandene
 Struktur- und Geometriepruefungen sowie Volumina, Abweichungen und
 Dateipruefsummen. Die Sammlung ist weiterhin keine finalisierte
 Spezifikation und kein Umsetzungsplan.
+
+Hinweis: Nach der Optimist-Ueberarbeitung stimmen die Pruefsummen der
+geaenderten Optimist-Netze in beiden Nachweisdateien nicht mehr; die
+Nachweise sind fuer den Optimisten neu zu erzeugen.

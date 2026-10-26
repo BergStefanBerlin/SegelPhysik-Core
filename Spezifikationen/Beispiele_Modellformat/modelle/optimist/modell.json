@@ -20,7 +20,7 @@
               "position_m": [
                 0,
                 0,
-                -0.985812
+                0.368188
               ]
             }
           }
@@ -35,7 +35,7 @@
               "art": "schale",
               "dichte_kg_pro_m3": 1900,
               "datei": "meshes/masse/rumpf.obj",
-              "wanddicke_m": 0.003
+              "wanddicke_m": 0.005
             },
             "volumen": {
               "datei": "meshes/hydrostatik/rumpf.obj"
@@ -53,10 +53,9 @@
           },
           "Hydrostatik": {
             "masse": {
-              "art": "schale",
+              "art": "vollkoerper",
               "dichte_kg_pro_m3": 600,
-              "datei": "meshes/masse/schwert.obj",
-              "wanddicke_m": 0.004
+              "datei": "meshes/masse/schwert.obj"
             },
             "volumen": {
               "datei": "meshes/hydrostatik/schwert.obj"
@@ -74,10 +73,9 @@
           },
           "Hydrostatik": {
             "masse": {
-              "art": "schale",
-              "dichte_kg_pro_m3": 700,
-              "datei": "meshes/masse/ruder.obj",
-              "wanddicke_m": 0.003
+              "art": "vollkoerper",
+              "dichte_kg_pro_m3": 600,
+              "datei": "meshes/masse/ruder.obj"
             },
             "volumen": {
               "datei": "meshes/hydrostatik/ruder.obj"
@@ -100,16 +98,6 @@
           "id": "Gummigelenk",
           "Darstellung": {
             "datei": "meshes/gui/gummigelenk.obj"
-          },
-          "Hydrostatik": {
-            "masse": {
-              "art": "vollkoerper",
-              "dichte_kg_pro_m3": 1100,
-              "datei": "meshes/masse/gummigelenk.obj"
-            },
-            "volumen": {
-              "datei": "meshes/hydrostatik/gummigelenk.obj"
-            }
           }
         }
       ]
@@ -126,10 +114,7 @@
               "art": "schale",
               "dichte_kg_pro_m3": 2700,
               "datei": "meshes/masse/mast.obj",
-              "wanddicke_m": 0.001
-            },
-            "volumen": {
-              "datei": "meshes/hydrostatik/mast.obj"
+              "wanddicke_m": 0.0015
             }
           }
         },
@@ -143,10 +128,7 @@
               "art": "schale",
               "dichte_kg_pro_m3": 2700,
               "datei": "meshes/masse/baum.obj",
-              "wanddicke_m": 0.001
-            },
-            "volumen": {
-              "datei": "meshes/hydrostatik/baum.obj"
+              "wanddicke_m": 0.0015
             }
           }
         },
@@ -160,10 +142,7 @@
               "art": "schale",
               "dichte_kg_pro_m3": 2700,
               "datei": "meshes/masse/spriet.obj",
-              "wanddicke_m": 0.0008
-            },
-            "volumen": {
-              "datei": "meshes/hydrostatik/spriet.obj"
+              "wanddicke_m": 0.0015
             }
           }
         },
@@ -171,14 +150,6 @@
           "id": "Großsegel",
           "Darstellung": {
             "datei": "meshes/gui/segel.obj"
-          },
-          "Hydrostatik": {
-            "masse": {
-              "art": "schale",
-              "dichte_kg_pro_m3": 1250,
-              "datei": "meshes/masse/segel.obj",
-              "wanddicke_m": 8e-05
-            }
           }
         }
       ]
