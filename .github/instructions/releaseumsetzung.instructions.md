@@ -1,5 +1,5 @@
 ---
-description: "Use when preparing or implementing any project version or release: create or update its single specification and single implementation plan, organize requirements, milestones, evidence and acceptance. Arbeitsanweisung fuer die Releaseumsetzung aller Versionsschritte."
+description: "Use when preparing or implementing any project version or release: maintain topic specifications and the single version implementation plan, organize requirements, milestones, evidence and acceptance. Arbeitsanweisung fuer die Releaseumsetzung aller Versionsschritte."
 ---
 # Arbeitsanweisung Releaseumsetzung
 
@@ -14,32 +14,63 @@ Sie gilt ab Inkrafttreten für den aktuell bearbeiteten und alle künftigen
 Versionsschritte. Abgeschlossene historische Versionsschritte werden
 dadurch nicht nachträglich geändert oder umstrukturiert.
 
+Spezifikationen werden je sachlogischem Thema geführt; Umsetzungspläne
+gehören jeweils zu einem Versionsschritt. Die Kennungen ihrer Anforderungen
+und Umsetzungsschritte sind projektbezogen und laufen über Releases hinweg
+fort: In SegelPhysik-Core gelten `A-C-<laufende-nummer>` und
+`U-C-<laufende-nummer>`. Ein neuer Versionsschritt setzt diese Zähler nicht
+zurück. Für GUI gilt entsprechend `A-G-<laufende-nummer>` und
+`U-G-<laufende-nummer>`.
+
 ## Verbindliche Dokumentstruktur
 
-- Pro Versionsschritt gibt es genau **eine maßgebliche Spezifikationsdatei**
-  und genau **eine maßgebliche Datei für den Umsetzungsplan**.
-- Alle Anforderungen und fachlichen Festlegungen des jeweiligen
-  Versionsschritts werden in einer gemeinsamen Spezifikation geführt.
-  Alle Umsetzungsschritte,
-  Abhängigkeiten, Meilensteine und Umsetzungsstände stehen in einem
-  gemeinsamen Umsetzungsplan.
+- Pro sachlogischem Themenpunkt gibt es genau **eine maßgebliche
+  Spezifikationsdatei**. Keine thematisch unabhängigen Anforderungen in
+  einer Sammelspezifikation bündeln. Eine Spezifikation darf mehrere
+  kohärente Anforderungen enthalten, wenn sie denselben fachlichen
+  Gegenstand beschreiben.
+- Für jedes neue, fachlich eigenständige logische Thema eine eigene
+  Spezifikation führen, auch bei versionsübergreifenden Festlegungen.
+  Bereits vorhandene Spezifikationen desselben Themas weiterführen,
+  statt parallele Dateien anzulegen. Die thematische Trennung startet
+  keine neue Nummerierung: Die Kennungen bleiben gemäß
+  [Nummerierungs-Instruction](nummerierung.instructions.md) über alle
+  Spezifikationen des jeweiligen Projekts eindeutig und fortlaufend
+  (`C` für Core, `G` für GUI).
+- Eine Spezifikation kann zunächst als klar markierter Entwurf geführt
+  werden. Offene fachliche Punkte stehen in einer getrennten
+  Entwurfspunkteliste unter `Spezifikationen/Entwurfspunkte/`. Entwürfe
+  und ihre Listen erhalten keine A- oder U-Kennungen; sie sind nicht
+  freigegeben und autorisieren keine Umsetzung.
+- Erst nach ausdrücklicher Nutzerfreigabe zur Finalisierung werden
+  angenommene Entwurfspunkte als Anforderungen in der finalen Spezifikation
+  übernommen und nach der Nummerierungs-Instruction mit neuen A-Kennungen
+  versehen. Die IDEE-zu-A-Zuordnung und der Status aller übrigen Punkte
+  bleiben in der Entwurfspunkteliste nachvollziehbar.
+- Für jeden Versionsschritt gibt es genau **einen maßgeblichen
+  Umsetzungsplan**. Alle Umsetzungsschritte, Abhängigkeiten, Meilensteine
+  und Umsetzungsstände dieses Versionsschritts stehen dort.
 - Themen, Komponenten oder Arbeitspakete sind als Abschnitte, Tabellen und
-  Meilensteine in diesen beiden Dateien zu gliedern. Keine zusätzlichen
-  Teil-, Neben- oder Ersatzspezifikationen und keine parallelen
-  Umsetzungspläne für denselben Versionsschritt anlegen.
-- Vor dem Anlegen oder Ändern prüfen, welche Dateien im Versionsordner
-  bereits existieren. Eindeutige Hauptdateien nicht stillschweigend ersetzen,
-  aufteilen oder umbenennen. Bei unklarer Abgrenzung oder konkurrierenden
-  Kandidaten zuerst den Nutzer fragen.
+  Meilensteine in den jeweiligen Dokumenten zu gliedern. Keine zusätzlichen
+  Teil-, Neben- oder Ersatzspezifikationen für denselben sachlogischen
+  Punkt und keine parallelen Umsetzungspläne für denselben Versionsschritt
+  anlegen.
+- Vor dem Anlegen oder Ändern prüfen, welche Dateien in den passenden
+  Spezifikations- oder Versionsordnern bereits existieren. Eindeutige
+  Hauptdateien nicht stillschweigend ersetzen, aufteilen oder umbenennen.
+  Bei unklarer Abgrenzung oder konkurrierenden Kandidaten zuerst den Nutzer
+  fragen.
 - Unterstützende Nachweise wie Testergebnisse, Messdaten oder große
   maschinenlesbare Inventare dürfen bei Bedarf separat abgelegt werden.
   Sie sind keine zusätzlichen Spezifikationen oder Umsetzungspläne; die
-  verbindlichen Anforderungen und Umsetzungsschritte bleiben in den beiden
-  Hauptdateien und verlinken auf ihre Belege.
+  verbindlichen Anforderungen und Umsetzungsschritte bleiben in den
+  maßgeblichen Spezifikationen und dem Umsetzungsplan und verlinken auf ihre
+  Belege.
 - Beispieldokumente sind nicht automatisch freigegebene Anforderungen oder
   verbindliche Vorlagen. Maßgeblich für den fachlichen Umfang ist
-  ausschließlich die Spezifikation des jeweiligen Versionsschritts; für
-  die Umsetzungsschritte ist es der zugehörige Umsetzungsplan.
+  ausschließlich die finale Spezifikation des jeweiligen sachlogischen
+  Themas; für die Umsetzungsschritte eines Versionsschritts ist es der
+  zugehörige Umsetzungsplan.
   Unterstützende Nachweise belegen Ergebnisse, enthalten aber keine
   eigenständigen zusätzlichen Anforderungen oder parallelen Pläne.
   Übergreifende Projektregeln und die referenzierten Instructions gelten
@@ -52,6 +83,13 @@ dadurch nicht nachträglich geändert oder umstrukturiert.
   [Nummerierungs-Instruction](nummerierung.instructions.md). Sie ist die
   vollständige projektweite Regelung; Nummern nicht neu erfinden,
   wiederverwenden oder eigenständig umnummerieren.
+- Entwurfskennungen `IDEE-C-…` markieren offene Entwurfspunkte, keine
+  Anforderungen. Keine A- oder U-Kennung vorwegnehmen. Im Core erhalten
+  finalisierte Anforderungen `A-C-…` und Umsetzungsschritte `U-C-…`.
+- Die A- und U-Zähler laufen projektweit fort und werden nicht je
+  Versionsschritt neu begonnen. Eine finale Spezifikation enthält die
+  Anforderungen ihres sachlogischen Themas; der versionsbezogene
+  Umsetzungsplan enthält die Umsetzungsschritte für diesen Versionsschritt.
 - Jede aktive Anforderung steht in der einen Spezifikation und erhält ein
   prüfbares Ergebnis oder Abnahmekriterium. Jeder Umsetzungsschritt steht
   im einen Plan und verweist auf die zugehörigen Anforderungskennungen.
@@ -67,28 +105,20 @@ dadurch nicht nachträglich geändert oder umstrukturiert.
   dokumentieren. Umsetzung, Test, Integration und fachliche Abnahme nicht
   gleichsetzen; Status nur mit passenden Belegen ändern.
 
-## Bisherige Arbeitsweise und Referenzen
+## Vorlagen und Quellen
 
-- Für Kennungen und die bisherige Arbeitsweise mit Spezifikation,
-  Umsetzungsschritten, Abhängigkeiten, Meilensteinen und
-  Rückverfolgbarkeit gilt die
+- Für Kennungen und Rückverfolgbarkeit gilt ausschließlich die
   [Nummerierungs-Instruction](nummerierung.instructions.md).
-- Als historisches Beispiel für einen detaillierten Umsetzungsplan kann die
-  [Umsetzungsanleitung der C++-Migration V0.10](../../doc/WegZuV1.0/Revisionslog/zuV0.10/Umsetzungsplan/Umsetzungsanleitung_CPP_Migration_V0.10.md)
-  herangezogen werden. Die zugehörige
-  [V0.10-Spezifikation](../../doc/WegZuV1.0/Revisionslog/zuV0.10/Spezifikationen/Spezifikation_CPP_Migration_V0.10.md)
-  zeigt die damalige Trennung zwischen fachlicher Anforderung und
-  Umsetzungsschritten.
-- Dokumente früherer Versionsschritte sind historische Beispiele, keine
-  zusätzliche Spezifikation oder Planungsdatei für den aktuellen
-  Versionsschritt. Frühere versionsspezifische Freigaben, Ausnahmen,
-  Messgrenzen oder offene Punkte gelten nicht automatisch für spätere
-  Versionsschritte;
-  ihre Übernahme erfordert einen aktuellen fachlichen Grund und, wo nötig,
-  eine ausdrückliche Nutzerentscheidung.
-- Bei Änderungen an Python/C++-Schnittstellen zusätzlich die
-  [Schnittstellenregister-Instruction](schnittstellenregister.instructions.md)
-  beachten und das Register mit belegtem Stand aktualisieren.
+- Ideenpapiere und Architekturentwürfe sind Quellen für die Ausarbeitung,
+  aber nicht automatisch freigegebene Anforderungen. Nur ausdrücklich
+  finalisierte Spezifikationen legen den verbindlichen fachlichen Umfang
+  fest.
+- Historische Dokumente sind Beispiele, keine zusätzliche Spezifikation
+  oder paralleler Umsetzungsplan. Frühere Freigaben, Ausnahmen,
+  Messgrenzen oder offene Punkte gelten nicht automatisch weiter.
+- Schnittstellenregister nur dann pflegen, wenn das jeweilige Projekt ein
+  solches Register eingerichtet hat; dessen projektlokale Regelung ist
+  maßgeblich.
 
 ## Umsetzung und Abschluss
 

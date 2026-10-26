@@ -12,6 +12,9 @@ ausdrücklich beauftragten Git-/Release-Aktionen.
 
 ## Geltungsbereich
 
+- Jeder Release-Ablauf gilt ausschließlich für dieses Repository
+  SegelPhysik-Core. GUI hat einen strikt getrennten Versions- und
+  Release-Verlauf; Aktionen hier lösen keinerlei Release-Aktion dort aus.
 - Entwicklungsaufträge erlauben Code-, Test- und Dokumentationsänderungen
   auf dem aktuell ausgecheckten benannten Branch, einschließlich
   Entwicklungsbranches. Bestehende Projektregeln und fachliche
@@ -27,16 +30,21 @@ ausdrücklich beauftragten Git-/Release-Aktionen.
 
 ## Versionsschema
 
-- Tags heißen `X.Y` (ohne `v`), z. B. `0.3`, `0.4`, `1.0`, `1.1`.
-- Jeder normale Tag erhöht `Y` um 1: `0.3 → 0.4`.
-- Ein Release erhöht `X` um 1 und setzt `Y` auf 0: `0.7 → 1.0`, `1.4 → 2.0`.
+- Core-Releases verwenden Tags `C-X.Y` (ohne `v`), z. B. `C-0.3`,
+  `C-0.4`, `C-1.0`, `C-1.1`. GUI verwendet unabhängig davon `G-X.Y`.
+- Jeder normale Core-Tag erhöht `Y` um 1: `C-0.3 → C-0.4`.
+- Ein Core-Release erhöht `X` um 1 und setzt `Y` auf 0:
+  `C-0.7 → C-1.0`, `C-1.4 → C-2.0`.
 - Aktuellen Stand finden:
-  `git tag --list --sort=-v:refname | Where-Object { $_ -match '^[0-9]+\.[0-9]+$' }`
-  (erster Treffer; berücksichtigt auch mehrstellige Werte wie `0.10`).
-  Ältere Tags mit drei Stellen (`0.1.20`) sind Historie und werden ignoriert.
+  `git tag --list --sort=-v:refname | Where-Object { $_ -match '^C-[0-9]+\.[0-9]+$' }`
+  (erster Treffer; berücksichtigt auch mehrstellige Werte wie `C-0.10`).
+  Unpräfixierte Tags des alten SegelPhysik-Repositories und Tags mit drei
+  Versionsstellen sind Historie und werden ignoriert.
 - Commits tragen keine eigene Versionsnummer.
-- Startpunkt: `0.3` (gesetzt am 15.10.2026 auf den Stand nach `0.1.20`).
-  Alles davor (`0.2`, `F0`, `F1`, `v4.0-…`, Drei-Stellen-Tags) ist Historie.
+- Erster eigenständiger Core-Sicherungsstand ist `C-0.1`.
+  Der frühere Versionsstartpunkt `0.3` des Altprojekts ist kein Core-Tag.
+  Ältere Tags (`0.2`, `F0`, `F1`, `v4.0-…`, Drei-Stellen-Tags) sind
+  Historie.
 
 ## Grundregeln
 
@@ -47,9 +55,14 @@ ausdrücklich beauftragten Git-/Release-Aktionen.
 2. Commit-Nachricht kurz im Stil des Repos, am Ende immer:
    `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`.
    Inhalt der Einträge siehe „Aussagekräftige Einträge“.
-3. Vor jedem Commit Tests ausführen:
-   `.\.venv\Scripts\python.exe -m pytest -q`,
-   mit `QT_QPA_PLATFORM=offscreen`. Schlagen sie fehl: nicht committen.
+3. Vor jedem Commit den nativen C++-Build und CTest ausführen:
+   `cmake -S Code -B build\standard -DBUILD_TESTING=ON`,
+   `cmake --build build\standard --config Release`,
+   `ctest --test-dir build\standard -C Release --output-on-failure`.
+   Bei Änderungen an Messgating zusätzlich den instrumentierten Build
+   mit `SEGELPHYSIK_TEST_INSTRUMENTATION=ON` prüfen.
+   Python, virtuelle Umgebungen und pytest sind kein Core-Testpfad.
+   Schlagen Build oder Tests fehl: nicht committen.
    Bei Entwicklungsaufträgen Fehler im Auftragsumfang untersuchen und beheben.
 4. Nie `--force`, nie `--no-verify`, nie Verlauf umschreiben und nie
    Änderungen verwerfen.
@@ -75,7 +88,7 @@ zu committen, melden und enden. Kein Push und kein Tag.
 2. Den aktuellen Branch mit seinem konfigurierten Upstream vergleichen.
    Ungepushte Commits auf diesem Branch pushen. Fehlt ein Upstream,
    Remote/Zielbranch vor der Veröffentlichung klären.
-3. Nur auf `main` den Tag `X.(Y+1)` auf HEAD setzen (`git tag -a`) und
+3. Nur auf `main` den Tag `C-X.(Y+1)` auf HEAD setzen (`git tag -a`) und
    gezielt pushen, sofern seit dem letzten Tag neue Commits existieren.
    Auf Entwicklungsbranches ohne Tag weiterarbeiten. Kein Release.
 
@@ -89,7 +102,7 @@ mitpushen. Danach melden, was gepusht wurde.
 **„vor großer Änderung“**
 
 Offene freigegebene Änderungen committen und den aktuellen Branch wie bei
-„Tagesende“ pushen. Nur auf `main` den Tag `X.(Y+1)` setzen und gezielt
+„Tagesende“ pushen. Nur auf `main` den Tag `C-X.(Y+1)` setzen und gezielt
 pushen, sofern seit dem letzten Tag neue Commits existieren. Auf
 Entwicklungsbranches genügt die Sicherung per Commit und Branch-Push.
 Danach freigeben.
@@ -101,15 +114,15 @@ Branch den Release-Ablauf abbrechen und melden; keine Teilveröffentlichung
 und kein automatischer Branchwechsel.
 
 1. Offene freigegebene Änderungen committen, Tests ausführen und pushen.
-2. Neuen Tag `(X+1).0` setzen und pushen.
+2. Neuen Core-Tag `C-(X+1).0` setzen und pushen.
 3. Notizen aus
    `git log <letzter Release-Tag>..HEAD --format="- %s (%h)"` erstellen.
-   Letzter Release-Tag = letzter Tag mit `.0`; gibt es keinen, den gesamten
-   Verlauf verwenden.
+   Letzter Release-Tag = letzter Core-Tag passend zu `^C-[0-9]+\.0$`; gibt
+   es keinen, den gesamten Verlauf verwenden.
 4. GitHub-Release anlegen:
    `gh release create <Tag> --title <Tag> --notes-file ...`.
    Ist `gh` nicht installiert, Notizen ausgeben und den Link
-   `https://github.com/BergStefanBerlin/SegelPhysik/releases/new?tag=<Tag>`
+   `https://github.com/BergStefanBerlin/SegelPhysik-Core/releases/new?tag=<Tag>`
    nennen.
 
 ## Aussagekräftige Einträge

@@ -1,20 +1,32 @@
 ---
 description: "Use when assigning or checking requirement IDs, specification numbering, implementation steps, backlog transitions, traceability or CPPI interface IDs. Gilt fuer Kennungen, Spezifikationen und Umsetzungsplaene."
-applyTo: "doc/**/*.md, doc/**/*.json"
+applyTo:
+  - "Spezifikationen/**/*.md"
+  - "Spezifikationen/**/*.json"
+  - "Umsetzungsplaene/**/*.md"
+  - "Umsetzungsplaene/**/*.json"
 ---
 # Projektweite Anforderungs- und Umsetzungsnummerierung
 
-**Status:** Freigegeben am 20.10.2026; projektweit maßgeblich  
-**Geltungsbereich:** Projektweit für Anforderungen, Ideen im Backlog und
-Umsetzungsschritte sowie Python/C++-Interfaces.
+**Status:** Projektregel; projektweite A-/U-Kennungen sowie Entwurfs- und
+IDEE-Regeln am 26.10.2026 ergänzt
+**Geltungsbereich:** Projektweit für Spezifikationsentwürfe,
+Entwurfspunkte, Anforderungen, Backlog-Ideen, Umsetzungsschritte sowie
+Python/C++-Interfaces.
 
 Diese Instruction enthält die vollständige Regelung; eine separate
 Nummerierungs-Anweisung wird nicht parallel gepflegt.
 
 Eine Anforderung (`A-…`) wird ausschließlich in einer Spezifikation geführt.
-Eine Idee (`I-…`) wird ausschließlich im Backlog geführt. Umsetzungsschritte
-(`U-…`) stehen im zugehörigen Umsetzungsplan. Übergänge ändern nicht
-rückwirkend die Kennung eines bestehenden Eintrags.
+Ein Entwurfspunkt (`IDEE-…`) wird ausschließlich in der separaten
+Entwurfspunkteliste des Projekts geführt. Eine Backlog-Idee (`I-…`) wird
+ausschließlich im Backlog geführt. Umsetzungsschritte (`U-…`) stehen im
+zugehörigen Umsetzungsplan. Übergänge ändern nicht rückwirkend die Kennung
+eines bestehenden Eintrags.
+
+Entwürfe und Entwurfspunktelisten sind nicht freigegebene Arbeitsstände.
+Sie erhalten keine A- oder U-Kennungen und begründen keinen
+Umsetzungsauftrag.
 
 ## Grundregeln
 
@@ -27,41 +39,70 @@ rückwirkend die Kennung eines bestehenden Eintrags.
 2. Eine einmal vergebene Kennung wird nie für einen anderen Inhalt
    wiederverwendet. Sie kann zurückgezogen werden; zurückgezogene Kennungen
    bleiben als solche nachvollziehbar.
-3. Anforderungen erhalten eine versionsbezogene Kennung:
+3. Neu vergebene Anforderungen erhalten eine projektbezogene,
+   versionsunabhängige Kennung. In SegelPhysik-Core lautet das Format:
 
    ```text
-   A-V<Version>-<laufende-nummer>
+   A-C-<laufende-nummer>
    ```
 
-   Beispiel: `A-V0.7-00001`. `V0.7` ist nur ein Beispiel für den aktuell
-   bearbeiteten Versionsschritt. Der A-Zähler beginnt für jede Version neu;
-   die Kombination aus Version und Nummer ist eindeutig. Ältere Kennungen
-   dürfen weiterhin als historische Referenz verwendet werden.
-4. Wird eine Anforderung ins Backlog verschoben, wird sie als Idee mit einer
+   Beispiel: `A-C-00001`. Der A-C-Zähler läuft projektweit über alle
+   Versionen fort und wird nicht mit einem neuen Release zurückgesetzt.
+   Ältere Kennungen dürfen weiterhin als historische Referenz verwendet
+   werden. Bereits vergebene versionsbezogene Kennungen bleiben unverändert;
+   eine Umstellung erfolgt nur nach ausdrücklichem Auftrag gemäß Abschnitt
+   1a.
+4. Nicht finale Spezifikationsentwürfe führen ihre offenen fachlichen
+   Punkte nicht als A-Anforderungen, sondern verweisen auf eine separate
+   Entwurfspunkteliste. Für SegelPhysik-Core lautet deren projektweiter,
+   releaseunabhängiger Nummernraum:
+
+   ```text
+   IDEE-C-<laufende-nummer>
+   ```
+
+   Beispiel: `IDEE-C-00001`. Der IDEE-C-Zähler läuft projektweit fort und
+   wird weder beim Finalisieren eines Entwurfs noch mit einem neuen Release
+   zurückgesetzt. Jeder Punkt erhält Status und Verweis auf den zugehörigen
+   Entwurf beziehungsweise Abschnitt. Für GUI gilt entsprechend
+   `IDEE-G-<laufende-nummer>`.
+5. Erst wenn der Nutzer die Spezifikation ausdrücklich finalisieren lässt,
+   werden die angenommenen Entwurfspunkte in der endgültigen Spezifikation
+   als neue `A-C-<laufende-nummer>`-Anforderungen geführt. Die Liste
+   dokumentiert die Zuordnung jeder IDEE-ID zu ihrer neuen A-ID. Nicht
+   übernommene, zurückgestellte oder verworfene Punkte verbleiben mit ihrer
+   IDEE-ID und Abschlussstatus in der Liste. IDEE-IDs werden nie als A-IDs
+   wiederverwendet; die IDEE-ID bleibt als Herkunftsverweis erhalten. Für
+   GUI werden die neuen Anforderungen als `A-G-<laufende-nummer>` vergeben.
+6. Wird eine Anforderung ins Backlog verschoben, wird sie als Idee mit einer
    `I-…`-Kennung geführt. Neue Backlog-Ideen verwenden das Format
    `I-BL-<laufende-nummer>`, zum Beispiel `I-BL-000001`. Da `BL` keine
    Versionsangabe enthält, läuft dieser Zähler projektweit fort und wird
    nicht mit einem neuen Versionsschritt zurückgesetzt.
-5. Eine Backlog-Idee erhält erst dann eine neue Anforderungskennung
-   `A-V<aktuelle-Version>-<laufende-nummer>`, wenn sie in eine aktuelle
-   Spezifikation übernommen wird. Die A-ID wird neu vergeben; die frühere
-   I-ID bleibt als Herkunftsverweis erhalten.
-6. Jeder Umsetzungsschritt erhält eine eindeutige, versionsbezogene Kennung:
+7. Eine Backlog-Idee erhält erst dann eine neue Anforderungskennung
+   `A-C-<laufende-nummer>`, wenn sie in eine aktuelle Spezifikation
+   übernommen wird. Die A-ID wird neu vergeben; die frühere I-ID bleibt als
+   Herkunftsverweis erhalten.
+8. Jeder Umsetzungsschritt erhält eine eindeutige, projektbezogene,
+   versionsunabhängige Kennung:
 
    ```text
-   U-V<Version>-<laufende-nummer>
+   U-C-<laufende-nummer>
    ```
 
-   Beispiel: `U-V0.7-000001`. Der U-Zähler beginnt für jede Version neu.
-7. Jeder Umsetzungsschritt verweist auf mindestens eine passende
-   Anforderungskennung `A-V<Version>-…`. Ein Umsetzungsschritt darf mehrere
-   Anforderungen gemeinsam umsetzen; Anforderungen müssen nicht jeweils in
-   einem eigenen Umsetzungsschritt implementiert werden. Am Ende der
-   Umsetzung müssen alle aktiven Anforderungen der betreffenden Version
-   mindestens einem Umsetzungsschritt zugeordnet und über die geplanten
-   Meilensteine nachgewiesen sein. Umsetzungsschritte sind so zu ordnen,
-   dass ihre Abhängigkeiten eingehalten werden und sie nacheinander
-   erarbeitet und integriert werden können.
+   Beispiel: `U-C-000001`. Der U-C-Zähler läuft projektweit über alle
+   Versionen fort und wird nicht mit einem neuen Release zurückgesetzt.
+9. Jeder neue Umsetzungsschritt verweist auf mindestens eine passende
+   Anforderungskennung, normalerweise `A-C-…`. Bereits vergebene,
+   nicht umgestellte A-Kennungen bleiben gültige Verweise. Ein
+   Umsetzungsschritt darf mehrere Anforderungen gemeinsam umsetzen;
+   Anforderungen müssen nicht jeweils in einem eigenen Umsetzungsschritt
+   implementiert werden. Am Ende der Umsetzung müssen alle aktiven
+   Anforderungen der betreffenden Version mindestens einem
+   Umsetzungsschritt zugeordnet und über die geplanten Meilensteine
+   nachgewiesen sein. Umsetzungsschritte sind so zu ordnen, dass ihre
+   Abhängigkeiten eingehalten werden und sie nacheinander erarbeitet und
+   integriert werden können.
 
 ## Dauerhafte Kennungen für Python/C++-Interfaces
 
@@ -70,10 +111,10 @@ rückwirkend die Kennung eines bestehenden Eintrags.
   mindestens vierstellig mit Nullen aufgefüllt und bei Bedarf verlängert.
 - Der CPPI-Zähler läuft projektweit über alle Versionen und Revisionen
   hinweg fort; er wird nicht zurückgesetzt.
-- Maßgebliche Vergabestelle ist das
-  [Schnittstellenregister Python/C++](../../doc/Dokumentation/Schnittstellenregister_CPP.md).
-  Jeder exportierte Datentyp, jede Funktion und jede qualifizierte
-  Kontextmethode erhält einen eigenen Eintrag, keine Sammel-ID pro Familie.
+- Maßgebliche Vergabestelle ist das projektlokale Schnittstellenregister
+  Python/C++, sofern dieses Projekt eines führt. Jeder exportierte
+  Datentyp, jede Funktion und jede qualifizierte Kontextmethode erhält
+  einen eigenen Eintrag, keine Sammel-ID pro Familie.
 - Konkrete geplante Interfaces erhalten bereits vor der Implementierung
   eine CPPI-ID. Noch nicht konkretisierte Arbeits- oder Abnahmebereiche
   erhalten keine Interface-Kennung.
@@ -94,18 +135,21 @@ rückwirkend die Kennung eines bestehenden Eintrags.
 ```mermaid
 flowchart TD
     I["Idee im Backlog<br/>I-BL-000001"]
-    S["Anforderung in Spezifikation<br/>A-V0.7-00001"]
-    U["Geordnete Umsetzungsschritte<br/>U-V0.7-000001, ...<br/>je U mindestens eine A-ID"]
+    D["Entwurfspunkt<br/>IDEE-C-00001"]
+    S["Anforderung in Spezifikation<br/>A-C-00001"]
+    U["Geordnete Umsetzungsschritte<br/>U-C-000001, ...<br/>je U mindestens eine A-ID"]
     DONE["Umgesetzt und abgenommen"]
-    LOG["doc/Log/Log.md<br/>ID, Version, Kurzbeschreibung"]
-    WITHDRAW["doc/Log/zurückgezogen.md<br/>ID, Text, Begründung"]
+    LOG["Projekt-Abschlussprotokoll<br/>ID, Release-Version, Kurzbeschreibung"]
+    WITHDRAW["Projekt-Rückzugsprotokoll<br/>ID, Text, Begründung"]
 
     I -->|"ausgewählt und spezifiziert;<br/>neue A-ID, I-ID bleibt Herkunft"| S
+    D -->|"bei ausdrücklicher Finalisierung angenommen;<br/>neue A-ID, IDEE-ID bleibt Herkunft"| S
     S -->|"freigegebener Umfang"| U
     U -->|"Tests und Meilensteine bestanden"| DONE
     DONE -->|"Eintrag"| LOG
     S -.->|"verworfen"| WITHDRAW
     I -.->|"verworfen"| WITHDRAW
+    D -.->|"nicht übernommen; ID bleibt in Entwurfspunkteliste"| WITHDRAW
     U -.->|"nach Rückfrage: A zurückziehen"| WITHDRAW
     U -.->|"neue I-ID aus zurückgezogener A-ID"| I
     U -->|"neue Idee entsteht während Umsetzung"| I
@@ -114,26 +158,26 @@ flowchart TD
 ## Kennungs- und Rückverfolgbarkeitsprinzip
 
 ```text
-I-BL-000001
-   │ wird für eine Version ausgewählt
+IDEE-C-00001
+   │ bei ausdrücklicher Finalisierung ausgewählt
    ▼
-A-V0.7-00001 ──────────────┐
-A-V0.7-00002 ──────────────┼── referenziert durch ── U-V0.7-000001
-A-V0.7-00003 ──────────────┘                         │
-                                                     ▼
-                                      Meilenstein mit gruppiertem Nachweis
-                                                     │
-                                                     ▼
-                                 doc/Log/Log.md nach Umsetzung und Abnahme
+A-C-00001 ────────────────┐
+                          ├── referenziert durch U-C-000001
+I-BL-000001 ──────────────┘
+   (separater Backlog-Übergang)
 ```
 
-Die Versionsbestandteile in den Beispielen sind Platzhalterwerte und keine
-Festlegung auf `V0.7`. Der aktuelle Versionsschritt ist pro Vorhaben
-festzustellen. Anforderungen aus älteren Versionen können als fachliche
-Quellen referenziert werden; Umsetzungsschritte der aktuellen Version müssen
-die für ihre aktuelle Umsetzung gültigen Anforderungs-IDs nennen. IDs sind
-durch Typpräfix, Version (sofern im Format vorgesehen) und laufende Nummer
-eindeutig; ein zusätzlicher Namens-Slug wird nicht verwendet.
+Anforderungen stehen in der Spezifikation ihres sachlogischen Themas;
+Umsetzungspläne gehören zu einem bestimmten Versionsschritt und weisen aus,
+welche aktiven Anforderungen dieser Version umgesetzt werden. Neue A- und
+U-Kennungen enthalten keine Versionsangabe: Ihre projektweiten Zähler werden
+über Releases hinweg fortgeführt. Bisherige
+versionsbezogene Kennungen bleiben gültig, bis sie ausdrücklich nach
+Abschnitt 1a umgestellt werden. Umsetzungsschritte nennen die für ihre
+Umsetzung gültigen Anforderungs-IDs. IDs sind durch Typpräfix,
+Projektkennung und laufende Nummer eindeutig; ein zusätzlicher Namens-Slug
+wird nicht verwendet. Historische Kennungen werden bei einer freigegebenen
+Migration nach Abschnitt 1a in einer eindeutigen Zuordnung erfasst.
 
 ## Abgestimmte Prozessregeln
 
@@ -151,7 +195,7 @@ während ihrer Umsetzung ins Backlog verschoben wird:
 - Die Backlog-Idee erhält eine neue `I-BL-…`-Kennung.
 - Beide Kennungen werden miteinander verknüpft (zum Beispiel
   „ersetzt/abgeleitet aus“).
-- Bei späterer Übernahme erhält die Idee eine neue `A-V…`-Kennung; die
+- Bei späterer Übernahme erhält die Idee eine neue `A-C-…`-Kennung; die
   `I-BL-…`-Kennung bleibt als historische Herkunft erhalten.
 
 Damit ist die inhaltliche Verschiebung von A nach I gemeint, nicht eine
@@ -167,8 +211,7 @@ Wenn eine bestehende Spezifikation von einem früheren Nummerierungsschema
 auf das aktuelle Schema umgestellt wird:
 
 - Die Anforderungen werden im aktiven Spezifikationstext ausschließlich
-  mit den neuen, versionsbezogenen `A-V<Version>-<laufende-nummer>`-IDs
-  bezeichnet.
+  mit neuen, projektbezogenen `A-C-<laufende-nummer>`-IDs bezeichnet.
 - Am Ende der Spezifikation wird ein Anhang mit einer eindeutigen Zuordnung
   jeder alten Kennung zu ihrer neuen A-ID ergänzt.
 - Alte Kennungen bleiben als historische Verweise dauerhaft reserviert und
@@ -188,19 +231,23 @@ Versions- oder Revisionsordner die Spezifikation liegt.
 ### 2. Umsetzung und zentrale Protokolle
 
 Nach erfolgreicher Umsetzung und Abnahme wird jede erfüllte Anforderung in
-`doc/Log/Log.md` eingetragen. Der Eintrag enthält mindestens die A-ID, die
-Version und eine kurze Beschreibung. Der Log-Eintrag dokumentiert den
-Abschluss; die Spezifikation bleibt als fachliche Quelle erhalten. Der
-Logeintrag ist ein Abschlussnachweis und verschiebt die Anforderung nicht
-aus ihrer Spezifikation.
+dem projektlokalen Abschlussprotokoll eingetragen, sofern ein solches
+Protokoll eingerichtet ist. Der Eintrag enthält mindestens die A-ID, die
+Release-Version und eine kurze Beschreibung. Der Log-Eintrag dokumentiert
+den Abschluss; die Spezifikation bleibt als fachliche Quelle erhalten.
+Der Logeintrag ist ein Abschlussnachweis und verschiebt die Anforderung
+nicht aus ihrer Spezifikation.
 
 Verworfene oder zurückgezogene Anforderungen und Ideen werden in
-`doc/Log/zurückgezogen.md` eingetragen. Jeder Eintrag enthält mindestens
-die ursprüngliche ID, den Anforderungstext beziehungsweise Ideentext und
-eine kurze Begründung. Bei einem Übergang von A zu I werden beide IDs und
-ihre Beziehung festgehalten: die zurückgezogene A-ID und die neu angelegte
-I-BL-ID. Eine verworfene Anforderung erhält außerdem den beschriebenen
-Archivvermerk in ihrer Spezifikation.
+dem projektlokalen Rückzugsprotokoll festgehalten, sofern dieses
+eingerichtet ist. Ein Eintrag enthält mindestens die ursprüngliche ID, den
+Anforderungstext beziehungsweise Ideentext und eine kurze Begründung. Bei
+einem Übergang von A zu I werden beide IDs und ihre Beziehung festgehalten:
+die zurückgezogene A-ID und die neu angelegte I-BL-ID. Eine verworfene
+Anforderung erhält außerdem den beschriebenen Archivvermerk in ihrer
+Spezifikation. Entwurfspunkte und deren Status werden in der separaten
+Entwurfspunkteliste geführt; nicht übernommene Punkte werden nicht zu
+Anforderungen oder Backlog-Ideen umetikettiert.
 
 IDs der umgesetzten und zurückgezogenen Einträge bleiben dauerhaft reserviert
 und werden niemals wiederverwendet. Die Protokolle sind Ergänzungen zur
@@ -213,12 +260,14 @@ Jede eigenständig prüfbare Anforderung erhält eine ID.
 Zusammengehörige Einzelaspekte dürfen als ein Anforderungspunkt beschrieben
 werden, wenn sie einen kohärenten, gemeinsam abnehmbaren Vertrag bilden.
 
-Der Zähler besteht aus einer laufenden Nummer. Der Typpräfix und – bei A/U –
-die Versionsangabe erklären die Bedeutung der Kennung. Ein zusätzlicher
+Der Zähler besteht aus einer projektweit fortlaufenden Nummer. Typpräfix und
+Projektkennung erklären die Bedeutung der Kennung. Ein zusätzlicher
 Namens-Slug wird nicht verwendet.
 
-- A-Zähler beginnen je Version neu.
-- U-Zähler beginnen je Version neu.
+- A-C-Zähler laufen projektweit über alle Releases fort.
+- U-C-Zähler laufen projektweit über alle Releases fort.
+- IDEE-C-Zähler laufen projektweit für Core fort; IDEE-G-Zähler laufen
+  projektweit für GUI fort.
 - I-BL-Zähler laufen im projektweiten Backlog fort, da `BL` keine Version
   kodiert.
 - Die Nummer wird bei Bedarf verlängert, nie abgeschnitten oder
@@ -227,9 +276,10 @@ Namens-Slug wird nicht verwendet.
 Beispiele für die abgestimmten Formate:
 
 ```text
-A-V0.7-00001
+A-C-00001
+IDEE-C-00001
 I-BL-000001
-U-V0.7-000001
+U-C-000001
 ```
 
 ### 4. Umsetzungsschritte, Reihenfolge und Meilensteine
@@ -242,8 +292,8 @@ Anforderung isoliert einzeln zu implementieren. Schritte bauen auf ihren
 Voraussetzungen auf und werden mit gruppierten, prüfbaren Meilensteinen
 abgenommen.
 
-Jeder Umsetzungsschritt erhält eine eindeutige `U-V…`-ID und verweist auf
-mindestens eine `A-V…`-ID. Die Umsetzungsschritte sollen Abhängigkeiten
+Jeder Umsetzungsschritt erhält eine eindeutige `U-C-…`-ID und verweist auf
+mindestens eine `A-C-…`-ID. Die Umsetzungsschritte sollen Abhängigkeiten
 sichtbar machen und an prüfbaren Meilensteinen enden. Meilensteintests und
 Abnahmekriterien dürfen mehrere zusammengehörige Anforderungen gemeinsam
 verifizieren; eine eigene Test-ID oder ein eigener Umsetzungsschritt pro
@@ -255,7 +305,7 @@ Zur Abnahme jeder Version wird eine Rückverfolgbarkeitsmatrix geführt:
 
 | Aktive Anforderungs-ID | Spezifikation/Abschnitt | Umsetzungsschritt(e) | Test/Abnahmekriterium | Status |
 |---|---|---|---|---|
-| `A-V<Version>-…` | Fundstelle | ein oder mehrere passende `U-V<Version>-…` | zugehöriger Meilenstein-/Testnachweis | offen/erfüllt |
+| `A-C-…` | Fundstelle | ein oder mehrere passende `U-C-…` | zugehöriger Meilenstein-/Testnachweis | offen/erfüllt |
 
 Am Ende müssen alle aktiven Anforderungen der Version in mindestens einem
 Umsetzungsschritt referenziert und durch den betreffenden Meilenstein
@@ -263,13 +313,22 @@ nachgewiesen sein. Eine Anforderung, die nicht mehr Teil der aktuellen
 Version ist, wird nicht stillschweigend ausgelassen: Sie wird zurückgezogen
 und gegebenenfalls als neue Backlog-Idee mit Herkunftsverweis geführt.
 
-### 5. Eindeutigkeit über Versionen
+### 5. Eindeutigkeit über Releases
 
-Die vollständige Kennung ist projektweit eindeutig. A- und U-Zähler dürfen
-zwischen Versionen erneut beginnen, weil die Version Bestandteil der
-Kennung ist. I-BL-Nummern sind projektweit fortlaufend. IDs werden nie neu
+Die vollständige Kennung ist innerhalb ihres jeweiligen Projekts eindeutig.
+A-C-, U-C-, IDEE-C- und I-BL-Zähler laufen jeweils projektweit fort und
+werden bei einem neuen Release nicht zurückgesetzt. IDs werden nie neu
 vergeben, auch nicht nach Löschung oder Archivierung des zugehörigen
-Dokuments.
+Dokuments. Für GUI gelten eigenständige A-G-, U-G- und IDEE-G-Zähler.
+
+Diese Eindeutigkeit gilt über alle sachlogisch getrennten
+Spezifikationsdateien und Themen des jeweiligen Projekts hinweg.
+Eine neue Spezifikation beginnt keinen eigenen A-, U- oder IDEE-Zähler.
+Vor jeder Vergabe deshalb alle aktiven und archivierten Themen prüfen.
+Core verwendet durchgehend die `C`-, GUI die `G`-Projektkennung; die
+vollständigen Kennungen bleiben dadurch auch zwischen beiden Projekten
+unterscheidbar. Bestehende Kennungen werden durch eine thematische
+Aufteilung nicht verändert.
 
 ## Anwendung bei Projektarbeiten
 
@@ -283,19 +342,24 @@ Dokuments.
   A-/U-Verweise und Tests konsistent verknüpfen; fehlende Zuordnungen und
   Nachweise offen nennen.
 - Eine Anforderung während laufender Umsetzung nur nach Zustimmung des
-  Nutzers ins Backlog überführen. Fehlende Angaben nicht erraten. Den Ordner
-  `doc/Backlog/Ideen/` nicht als Informationsquelle verwenden, außer der
-  Nutzer verlangt ausdrücklich konkrete Inhalte daraus.
+  Nutzers ins Backlog überführen. Fehlende Angaben nicht erraten.
+- Backlog-Ideen nicht als verbindlichen Umfang behandeln. Konkrete
+  Backlog-Inhalte nur auf ausdrücklichen Nutzerauftrag auswerten.
 - Abschließend doppelte oder fehlende IDs, Wiederverwendung, Abhängigkeiten
   und Nachweislücken prüfen. Betroffene Dokumente und Kennungen knapp
   benennen; keine unbelegte Vollständigkeit behaupten.
 - Bei Spezifikationsanfragen aktive Punkte nach Kennung tabellarisch
   auflisten, sofern nicht anders gewünscht.
+- Bei Spezifikationsentwürfen keine A- oder U-Kennungen vorwegnehmen.
+  Offene Punkte in der getrennten Entwurfspunkteliste mit der passenden
+  IDEE-Projektkennung führen; eine Überführung in A-Kennungen nur bei
+  ausdrücklicher Finalisierung durchführen und dort die Zuordnung
+  dokumentieren.
 
 ## Freigabe
 
-Der Nutzer hat diese projektweite Regelung einschließlich der am
-20.10.2026 ergänzten CPPI-Regeln ausdrücklich freigegeben. Diese Instruction
-ist die maßgebliche Regel für alle Versionen und Revisionsschritte. Änderungen
-an der Nummerierungsregel selbst benötigen eine spätere ausdrückliche
-Nutzerentscheidung; bestehende Kennungen bleiben unverändert.
+Diese Instruction ist die maßgebliche Nummerierungsregel für das Core-
+Projekt. Änderungen an der Nummerierungsregel selbst benötigen eine spätere
+ausdrückliche Nutzerentscheidung; bestehende Kennungen bleiben unverändert.
+Das GUI-Projekt verwendet dieselbe Regelstruktur mit eigenständigen `G`-
+Kennungen und Zählern.
