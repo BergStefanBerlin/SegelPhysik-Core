@@ -8,7 +8,7 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $binary = (Resolve-Path $BinaryDirectory).Path
 $reportPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Report)
 if (Test-Path -LiteralPath $reportPath) { throw 'Report already exists; refusing overwrite.' }
-$models = Join-Path $root 'Spezifikationen\Beispiele_Modellformat\modelle'
+$models = Join-Path $root '..\Modelle'
 $utf8 = New-Object Text.UTF8Encoding($false)
 $temp = Join-Path ([IO.Path]::GetTempPath()) ('segel-core-bench-' + [guid]::NewGuid())
 [void][IO.Directory]::CreateDirectory($temp)

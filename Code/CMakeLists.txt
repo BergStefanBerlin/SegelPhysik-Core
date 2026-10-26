@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.20)
 project(SegelPhysikCore LANGUAGES CXX)
 
 include(CTest)
+set(SEGELPHYSIK_MODELLE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../Modelle"
+    CACHE PATH "Model folder (sibling of the CORE and GUI checkouts)")
 option(SEGELPHYSIK_TEST_INSTRUMENTATION "Prepare instrumentation for explicit test runs" OFF)
 if(SEGELPHYSIK_TEST_INSTRUMENTATION AND NOT BUILD_TESTING)
     message(FATAL_ERROR "Test instrumentation requires BUILD_TESTING=ON")
@@ -76,7 +78,7 @@ if(BUILD_TESTING)
     target_link_libraries(simulation_tests PRIVATE segelphysik_core)
     list(APPEND core_targets simulation_tests)
     add_test(NAME simulation_gesamtlauf COMMAND simulation_tests
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Spezifikationen/Beispiele_Modellformat/modelle/quader/modell.json")
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json")
     add_executable(core_benchmark tests/benchmark.cpp)
     target_link_libraries(core_benchmark PRIVATE segelphysik_core)
     list(APPEND core_targets core_benchmark)
@@ -84,18 +86,18 @@ if(BUILD_TESTING)
     target_link_libraries(modell_tests PRIVATE segelphysik_core)
     list(APPEND core_targets modell_tests)
     add_test(NAME modell_import COMMAND modell_tests
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Spezifikationen/Beispiele_Modellformat/modelle/quader/modell.json")
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json")
     add_test(NAME core_build_configuration COMMAND core_tests)
     add_executable(bilanz_tests tests/bilanz_tests.cpp)
     target_link_libraries(bilanz_tests PRIVATE segelphysik_core)
     list(APPEND core_targets bilanz_tests)
     add_test(NAME kraft_momentenbilanz COMMAND bilanz_tests
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Spezifikationen/Beispiele_Modellformat/modelle/quader/modell.json")
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json")
     add_executable(katalog_tests tests/katalog_tests.cpp)
     target_link_libraries(katalog_tests PRIVATE segelphysik_core)
     list(APPEND core_targets katalog_tests)
     add_test(NAME modellkatalog_schnittstelle COMMAND katalog_tests
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Spezifikationen/Beispiele_Modellformat/modelle")
+        "${SEGELPHYSIK_MODELLE_DIR}")
     foreach(scenario help build_info error_catalog no_arguments invalid_argument extra_argument)
         add_test(NAME cli_${scenario}
             COMMAND "${CMAKE_COMMAND}"

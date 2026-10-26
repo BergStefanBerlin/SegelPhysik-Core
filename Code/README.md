@@ -50,11 +50,16 @@ Beispiele, vom Repository aus (Ausgabedateien dürfen noch nicht existieren):
 
 ```powershell
 $cli = ".\build\standard\Release\segelphysik_cli.exe"
-$modell = ".\Spezifikationen\Beispiele_Modellformat\modelle\quader\modell.json"
+$modell = "..\Modelle\quader\modell.json"
 & $cli --pruefen $modell
 & $cli --statisch $modell ".\build\statik.json"
 & $cli --dynamisch $modell ".\build\dynamik.jsonl" 1 0.01
 ```
+
+Die Beispielmodelle liegen außerhalb des Repositories im gemeinsamen
+Ordner `Segelphysik\Modelle` neben `CORE` und `GUI`. CMake-Variable
+`SEGELPHYSIK_MODELLE_DIR` (Standard `../../Modelle` relativ zu `Code`)
+legt den Ordner für Tests und GUI fest.
 
 `.jsonl` liefert vollständige Zustände pro Zeile, andere Endungen ein
 inkrementell geschriebenes JSON-Array. Laufstatus und Gesamtdauer

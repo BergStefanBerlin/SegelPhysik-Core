@@ -3,7 +3,7 @@
 ## 1. Status und Geltungsbereich
 
 **Stand: 26.10.2026.** Auf Nutzerauftrag erstellt. **Status: in Umsetzung;
-U-C-000019 bis U-C-000031 nachgewiesen (CTest, GUI-Anbindung); Nutzerabnahme M4 offen.** Der Planauftrag ist keine Freigabe für Commit, Push, Tag
+U-C-000019 bis U-C-000034 nachgewiesen (CTest, GUI-Anbindung); Nutzerabnahme M4 offen.** Der Planauftrag ist keine Freigabe für Commit, Push, Tag
 oder Release.
 
 Dieser Plan ist der einzige maßgebliche Plan für den Versionsschritt
@@ -20,7 +20,9 @@ Maßgeblich sind:
   und [Modellkatalog_Schnittstelle.json](../Spezifikationen/Entwurfspunkte/Modellkatalog_Schnittstelle.json).
 - Weiter gültig: A-C-00016, A-C-00017, A-C-00028, A-C-00031, A-C-00032;
   als Nachtrag A-C-00047 (Volllaufen offener Rümpfe)
-  ([Hydrostatikkern](../Spezifikationen/Spezifikation_Hydrostatikkern.md)).
+  ([Hydrostatikkern](../Spezifikationen/Spezifikation_Hydrostatikkern.md))
+  sowie A-C-00048 (Darstellungsfarbe) und A-C-00049 (Darstellungsoberfläche,
+  [Modellbeschreibung](../Spezifikationen/Spezifikation_Modellbeschreibung.md)).
 
 ## 2. Arbeits- und Nachweisregeln
 
@@ -57,6 +59,9 @@ Maßgeblich sind:
 | U-C-000029 | JSON-Antworten und Vertragstests Katalog | A-C-00046 | U-C-000027, U-C-000028 | nachgewiesen |
 | U-C-000030 | Gesamtnachweis und GUI-Übergabe C-0.2 | A-C-00034 bis A-C-00046 | U-C-000024, U-C-000025, U-C-000029 | nachgewiesen |
 | U-C-000031 | Nachtrag: Volllaufen offener Rümpfe | A-C-00047 | U-C-000025 | nachgewiesen |
+| U-C-000032 | Nachtrag: Darstellungsfarbe aus dem Modell | A-C-00048 | U-C-000027 | nachgewiesen |
+| U-C-000033 | Nachtrag: Darstellungsoberfläche aus dem Modell | A-C-00049 | U-C-000032 | nachgewiesen |
+| U-C-000034 | Nachtrag: Bootsmodelle und Schnittprüfung | A-C-00010, A-C-00047 | U-C-000031 | nachgewiesen |
 
 ### U-C-000019: Vertrag V2 und Katalogschema festlegen
 
@@ -247,6 +252,81 @@ konvergiert jetzt bei z ≈ 0,0002 m; Dynamik 20 s ab Initialpose bleibt
 zwischen z = −0,006 und +0,006 m, nichts geflutet. Der Flutungspfad bleibt
 durch die CTests (`hydrostatik`) nachgewiesen.
 
+### U-C-000032: Nachtrag: Darstellungsfarbe aus dem Modell
+
+**Anforderungen:** A-C-00048 (Nutzerauftrag 26.10.2026, Optimist
+einfärben). **Voraussetzungen:** U-C-000027. **Status:** nachgewiesen.
+
+- Modellimport: optionales Feld `Darstellung.farbe` (`"#rrggbb"`);
+  ungültiger Wert → CORE-MOD-0002.
+- Katalog: `darstellungsgeometrie` füllt `farbe_rgb` (0..1).
+- Optimist: Rumpf `#E3D3B0` (beige), Schwert `#B5834F` und Ruder
+  `#A8733F` (Holz), Pinne, Pinnenausleger, Mast, Baum, Spriet `#C4C8CD`
+  (Alu); Gummigelenk und Segel ohne Farbe.
+
+**Nachweis (26.10.2026):** Test `katalog` (Funktion `farben`) grün,
+Core-CTest 13/13, GUI-CTest 17/17; `--pruefen` Optimist gültig
+(Fassung `fnv1a64:fd71eaa0e394b252`); GUI zeigt die Farben ohne
+GUI-Codeänderung.
+
+### U-C-000033: Nachtrag: Darstellungsoberfläche aus dem Modell
+
+**Anforderungen:** A-C-00049 (Nutzerauftrag 27.10.2026, Materialien für
+die Grafikeffekte). **Voraussetzungen:** U-C-000032. **Status:** nachgewiesen.
+
+- Modellimport: optionales Feld `Darstellung.oberflaeche`
+  (`matt`/`glaenzend`/`metall` sowie Effektwerte `chrom`/`lack`/`glas`/
+  `leuchtend`/`schillernd`/`facettiert`/`drahtgitter`/`perlmutt`);
+  ungültiger Wert → CORE-MOD-0002.
+- Katalog: `darstellungsgeometrie` liefert `oberflaeche` (Text oder `null`).
+- Optimist: Rumpf, Schwert und Ruder `matt`, Pinne,
+  Pinnenausleger, Mast, Baum, Spriet `metall`.
+- Einfache Körper, je ein grelles Effektmaterial: Kugel `chrom` (Gold),
+  Kegel `lack` (Pink), Quader `glas` (Türkis), Pyramide `leuchtend`
+  (Neongrün), Rolle `schillernd` (Violett), Platte `perlmutt` (Mint),
+  Bleistift `drahtgitter` (Magenta), Unregelmäßiger Körper `facettiert`
+  (Orange).
+
+**Nachweis (27.10.2026):** Test `katalog` (Funktion `farben`, Fälle
+`metall`, alle acht Effektwerte und ungültig `regenbogen`) grün,
+Core-CTest 13/13, GUI-CTest 17/17;
+`--pruefen` Optimist gültig (Fassung `fnv1a64:6cd419a1f5593410`, Rumpf auf
+Nutzerwunsch matt), alle acht einfachen Körper gültig; die GUI
+bildet die Werte auf PBR-Materialien ab (GUI U-G-000024).
+
+### U-C-000034: Nachtrag: Bootsmodelle und Schnittprüfung
+
+**Anforderungen:** A-C-00010 (konservative Ablehnungsprüfung), A-C-00047
+(Beispielmodelle mit Flutungsverhalten). Nutzerauftrag 27.10.2026.
+**Voraussetzungen:** U-C-000031. **Status:** nachgewiesen.
+
+- Kurze Namen: `Optimist`, `Folkeboot`, `420er`.
+- Folkeboot repariert (Spieren ohne Volumen, Kiel/Ruder-Volumen an der
+  Rumpfunterkante gekappt).
+- 420er aus der neuen Quelle neu aufgebaut, mit Hydrostatik (Rumpf-Schale
+  2,6 mm, Tanks als Volumen, Holz-Schwert und -Ruder, Alu-Spieren,
+  Besatzung 140 kg) und Opti-Farben. Details:
+  [Beispiele_Modellformat/README.md](../Spezifikationen/Beispiele_Modellformat/README.md).
+- Modelle liegen jetzt gemeinsam unter `Segelphysik/Modelle`
+  (CMake-Variable `SEGELPHYSIK_MODELLE_DIR` in Core und GUI).
+- Rigg 13° nach Backbord gedreht: Großbaum, Großsegel (Opti mit Spriet) um
+  die Mastachse, Fock um Vorstag bzw. Vorliek. Alle drei Boote gültig und
+  statisch konvergiert.
+- Core-Korrektur `schnitt` (`modell.cpp`): Koplanare Kanten mit gemeinsamem
+  Endpunkt werden nicht mehr als Kreuzung gewertet. Bei fast kollinearen,
+  gegenläufigen Kanten lag der Schnittparameter vorher rundungsbedingt bei
+  1 − 2·10⁻¹² und überschritt die Toleranz 10⁻¹² (Fehlalarm
+  CORE-MOD-0008 am 420er-Spiegel). Echte Kreuzungen teilen keinen
+  Endpunkt und werden unverändert erkannt.
+
+**Nachweis (27.10.2026):** Regressionsfall im Test `modell_import`
+(Dreieckspaar vom 420er-Spiegel) grün; bisherige Schnittfälle unverändert
+abgelehnt. Core-CTest 13/13, GUI-CTest 17/17. `--pruefen` gültig:
+Optimist `fnv1a64:9c1f7ef4f9924b30`, Folkeboot `fnv1a64:fa6b5bb68db23095`,
+420er `fnv1a64:07b027e915cf26e0`. `--statisch` konvergiert: Folkeboot
+z ≈ -0,19 m, 420er z ≈ -0,22 m (233 kg, 0,233 m³, trocken). GUI-Sichtprüfung
+aller drei Boote.
+
 ## 4. Reihenfolge und Meilensteine
 
 ```mermaid
@@ -262,7 +342,8 @@ flowchart LR
     U24 --> U30[U-C-000030]
     U25 --> U30
     U29 --> U30
-    U25 --> U31[U-C-000031]
+    U25 --> U31[U-C-000031] --> U34[U-C-000034]
+    U27 --> U32[U-C-000032] --> U33[U-C-000033]
 ```
 
 | Meilenstein | Eintritt | Abnahme |
@@ -291,7 +372,10 @@ Die Stränge M2 und M3 sind unabhängig und können parallel bearbeitet werden.
 | A-C-00044 | U-C-000027 | Geometrievergleich | nachgewiesen |
 | A-C-00045 | U-C-000028 | Fassungstest | nachgewiesen |
 | A-C-00046 | U-C-000019, U-C-000029 | Vertragstests Katalog | nachgewiesen |
-| A-C-00047 | U-C-000031 | Flutungstests, Optimist-CLI | nachgewiesen |
+| A-C-00047 | U-C-000031, U-C-000034 | Flutungstests, Optimist-CLI, Boots-CLI | nachgewiesen |
+| A-C-00048 | U-C-000032 | Test katalog (`farben`), GUI-Sichtprüfung | nachgewiesen |
+| A-C-00049 | U-C-000033 | Test katalog (`farben`), GUI-Sichtprüfung | nachgewiesen |
+| A-C-00010 (Nachtrag) | U-C-000034 | Regressionsfall `modell_import` | nachgewiesen |
 
 ## 6. Offene Punkte
 
@@ -306,3 +390,10 @@ Die Stränge M2 und M3 sind unabhängig und können parallel bearbeitet werden.
   der reparierte Optimist (offene GFK-Schale 5 mm, Spieren 1,5 mm) schwimmt
   statisch trocken und nach der Anhebung (+1,354 m) auch ab Initialpose.
   Teilflutung, Lecks und Lenzen sind nicht umgesetzt.
+- U-C-000032 (Nachtrag 26.10.2026): Darstellungsfarben aus `Darstellung.farbe`;
+  Optimist eingefärbt (beige, Holz, Alu).
+- U-C-000033 (Nachtrag 27.10.2026): Oberflächen aus `Darstellung.oberflaeche`;
+  Optimist mit mattem Rumpf, matten Holzteilen und Metallspieren.
+- U-C-000034 (Nachtrag 27.10.2026): Boote kurz benannt, Folkeboot repariert,
+  420er neu mit Hydrostatik; Fehlalarm der Schnittprüfung bei gemeinsamen
+  Kantenendpunkten behoben.

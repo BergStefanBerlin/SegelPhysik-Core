@@ -129,6 +129,43 @@ Der tatsächlich unterstützte Feld- und Versionsvertrag ist dokumentiert.
 **Herkunft:** Nutzerentscheidung zur ersten Importgrundlage am
 26.10.2026; Teilaspekte von IDEE-C-00001, IDEE-C-00002 und IDEE-C-00006.
 
+### A-C-00048: Optionale Darstellungsfarbe je Element
+
+Ein Element darf in `Darstellung` das optionale Feld `farbe` im Format
+`"#rrggbb"` (hexadezimal, Groß-/Kleinschreibung beliebig) tragen. Der
+Core reicht die Farbe über `darstellungsgeometrie` als `farbe_rgb` mit
+Werten 0..1 weiter (A-C-00044). Ohne Angabe ist `farbe_rgb` `null` und
+die GUI verwendet ihre Standardfarbe. Die Farbe hat keinen Einfluss auf
+die Physik. Ein ungültiger Wert wird nicht still ersetzt: Das Modell ist
+fehlerhaft (CORE-MOD-0002 mit Fundstelle `Darstellung.farbe`).
+
+**Abnahmekriterium:** Ohne Angabe keine Farbe; `#FF8000` ergibt
+(1, 128/255, 0) in Struktur und JSON; ein ungültiger Wert macht das
+Modell fehlerhaft und liefert keine Farbe.
+
+**Herkunft:** Nutzerauftrag vom 26.10.2026 (Optimist einfärben).
+
+### A-C-00049: Optionale Darstellungsoberfläche je Element
+
+Ein Element darf in `Darstellung` das optionale Feld `oberflaeche` mit
+einem der Werte `"matt"`, `"glaenzend"`, `"metall"`, `"chrom"`, `"lack"`,
+`"glas"`, `"leuchtend"`, `"schillernd"`, `"facettiert"`, `"drahtgitter"`
+oder `"perlmutt"` tragen. Der Core
+reicht den Wert unverändert über `darstellungsgeometrie` als
+`oberflaeche` weiter (A-C-00044). Ohne Angabe ist `oberflaeche` `null`
+und die GUI verwendet ihr Standardmaterial. Die Oberfläche hat keinen
+Einfluss auf die Physik. Ein ungültiger Wert wird nicht still ersetzt:
+Das Modell ist fehlerhaft (CORE-MOD-0002 mit Fundstelle
+`Darstellung.oberflaeche`).
+
+**Abnahmekriterium:** Ohne Angabe keine Oberfläche; `"metall"` und jeder
+Effektwert erscheinen in Struktur und JSON; ein ungültiger Wert (z. B.
+`"regenbogen"`) macht das Modell fehlerhaft und liefert keine Oberfläche.
+
+**Herkunft:** Nutzerauftrag vom 27.10.2026 (Grafikeffekte, Materialien);
+Effektwerte ergänzt auf Nutzerauftrag vom 26.10.2026 (einfache Körper
+grell und je mit eigenem Effekt).
+
 ## Quellen und Abgrenzung zur Historie
 
 Die historische Spezifikation vF1 in SegelPhysik3 beschreibt ein
@@ -153,7 +190,8 @@ Spezifikation dieses Themas.
 | A-C-00002 | IDEE-C-00004, Teilaspekt Weltsystem | Freigegeben | C-0.1: Hydrostatikplan U-C-000008 und U-C-000017; Schnitt- und Transformationstests |
 | A-C-00003 | IDEE-C-00004, Teilaspekt Konstruktionsursprung | Freigegeben | C-0.1: Hydrostatikplan U-C-000007 und U-C-000017; Schwerpunkt-, Pose- und Dynamiktests |
 | A-C-00030 | IDEE-C-00001, IDEE-C-00002, IDEE-C-00006, Teilaspekte Importgrundlage | Als Grundlage bestätigt | C-0.1: Import implementiert, Test modell_import; unterstützte Grenzen im GUI-Vertrag dokumentiert |
-
+| A-C-00048 | Nutzerauftrag 26.10.2026 (Farben) | Freigegeben | C-0.2 Nachtrag: Plan C-0.2 U-C-000032; Test katalog (`farben`) |
+| A-C-00049 | Nutzerauftrag 27.10.2026 (Materialien) | Freigegeben | C-0.2 Nachtrag: Plan C-0.2 U-C-000033; Test katalog (`farben`) |
 Die Umsetzung ist inzwischen über den
 [Hydrostatikplan](../Umsetzungsplaene/Umsetzungsplan_Hydrostatikkern.md)
 beauftragt. Die Abnahmekriterien sind noch nicht als bestanden

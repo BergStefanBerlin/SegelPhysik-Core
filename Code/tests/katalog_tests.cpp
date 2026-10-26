@@ -2,8 +2,10 @@
 #include "segelphysik/hydrostatik.hpp"
 
 #include <chrono>
+#include <cmath>
 #include <fstream>
 #include <iostream>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -120,7 +122,7 @@ void details(const fs::path& quelle, const fs::path& tmp)
         geometrie.teile[0].punkte_m.size() == erwartet.first &&
         geometrie.teile[0].dreiecke.size() == erwartet.second, "Darstellungsgeometrie weicht ab");
     nur_felder(darstellungsgeometrie_json(geometrie), {"katalogversion", "modell_id", "modell_fassung", "einheit",
-        "frame", "teile", "element_id", "gruppe", "herkunft", "farbe_rgb", "punkte_m", "dreiecke", "diagnosen",
+        "frame", "teile", "element_id", "gruppe", "herkunft", "farbe_rgb", "oberflaeche", "punkte_m", "dreiecke", "diagnosen",
         "fehler_id", "text", "fundstelle"}, ordner);
     pruefe(darstellungsgeometrie(katalog, "quader", fassung, std::string("Rumpf")).teile.size() == 1,
         "Elementabfrage fehlt");
@@ -152,6 +154,77 @@ void details(const fs::path& quelle, const fs::path& tmp)
     katalog = modellkatalog(ordner);
     const auto ersatz = darstellungsgeometrie(katalog, "quader", katalog.eintrag("quader")->modell_fassung);
     pruefe(ersatz.teile.size() == 1 && ersatz.teile[0].herkunft == "volumen_ersatz", "Volumenersatz fehlt");
+}
+
+void farben(const fs::path& quelle, const fs::path& tmp)
+{
+    const auto ordner = tmp / "farben";
+    fs::create_directories(ordner);
+    fs::copy(quelle / "quader", ordner / "q", fs::copy_options::recursive);
+    const auto datei = ordner / "q" / "modell.json";
+    // Vorlage ohne Darstellungsstil: farbe/oberflaeche der Beispieldatei entfernen.
+    const auto original = std::regex_replace(lesen(datei),
+        std::regex(R"re(,\s*"(farbe|oberflaeche)": "[^"]*")re"), "");
+    schreiben(datei, original);
+    const std::string feld = "\"datei\": \"meshes/gui/rumpf.obj\"";
+    pruefe(original.find(feld) != std::string::npos, "Testvorlage ohne Darstellungsdatei");
+
+    auto katalog = modellkatalog(ordner);
+    pruefe(!darstellungsgeometrie(katalog, "quader", katalog.eintrag("quader")->modell_fassung)
+        .teile[0].farbe_rgb, "Farbe ohne Angabe geliefert");
+
+    auto json = original;
+    json.replace(json.find(feld), feld.size(), feld + ", \"farbe\": \"#FF8000\"");
+    schreiben(datei, json);
+    katalog = modellkatalog(ordner);
+    const auto fassung = katalog.eintrag("quader")->modell_fassung;
+    const auto teil = darstellungsgeometrie(katalog, "quader", fassung).teile[0];
+    pruefe(teil.farbe_rgb && std::abs((*teil.farbe_rgb)[0] - 1.) < 1e-12 &&
+        std::abs((*teil.farbe_rgb)[1] - 128. / 255.) < 1e-12 && (*teil.farbe_rgb)[2] == 0.,
+        "Farbe nicht als RGB 0..1 geliefert");
+    pruefe(darstellungsgeometrie_json(darstellungsgeometrie(katalog, "quader", fassung))
+        .find("\"farbe_rgb\":[1") != std::string::npos, "farbe_rgb fehlt im JSON");
+    pruefe(katalogmodell(katalog, "quader", fassung).masse_kg > 0., "Modell mit Farbe nicht ladbar");
+
+    json = original;
+    json.replace(json.find(feld), feld.size(), feld + ", \"farbe\": \"orange\"");
+    schreiben(datei, json);
+    katalog = modellkatalog(ordner);
+    const auto falsch = katalog.eintrag("quader")->modell_fassung;
+    pruefe(katalog.eintrag("quader")->status == "fehlerhaft", "Ungueltige Farbe nicht erkannt");
+    pruefe(fehler_von([&] { katalogmodell(katalog, "quader", falsch); }).rfind("CORE-MOD-0002", 0) == 0,
+        "Ungueltige Farbe ohne CORE-MOD-0002");
+    pruefe(!darstellungsgeometrie(katalog, "quader", falsch).teile[0].farbe_rgb,
+        "Ungueltige Farbe in Darstellung geliefert");
+
+    json = original;
+    json.replace(json.find(feld), feld.size(), feld + ", \"oberflaeche\": \"metall\"");
+    schreiben(datei, json);
+    katalog = modellkatalog(ordner);
+    const auto metall = katalog.eintrag("quader")->modell_fassung;
+    const auto metallteil = darstellungsgeometrie(katalog, "quader", metall).teile[0];
+    pruefe(metallteil.oberflaeche && *metallteil.oberflaeche == "metall", "Oberflaeche nicht geliefert");
+    pruefe(darstellungsgeometrie_json(darstellungsgeometrie(katalog, "quader", metall))
+        .find("\"oberflaeche\":\"metall\"") != std::string::npos, "oberflaeche fehlt im JSON");
+
+    for (const std::string art : {"chrom", "lack", "glas", "leuchtend", "schillernd", "facettiert",
+             "drahtgitter", "perlmutt"}) {
+        json = original;
+        json.replace(json.find(feld), feld.size(), feld + ", \"oberflaeche\": \"" + art + "\"");
+        schreiben(datei, json);
+        katalog = modellkatalog(ordner);
+        const auto teil_art = darstellungsgeometrie(
+            katalog, "quader", katalog.eintrag("quader")->modell_fassung).teile[0];
+        pruefe(teil_art.oberflaeche && *teil_art.oberflaeche == art, "Effektoberflaeche abgelehnt: " + art);
+    }
+
+    json = original;
+    json.replace(json.find(feld), feld.size(), feld + ", \"oberflaeche\": \"regenbogen\"");
+    schreiben(datei, json);
+    katalog = modellkatalog(ordner);
+    pruefe(katalog.eintrag("quader")->status == "fehlerhaft", "Ungueltige Oberflaeche nicht erkannt");
+    pruefe(!darstellungsgeometrie(katalog, "quader", katalog.eintrag("quader")->modell_fassung)
+        .teile[0].oberflaeche, "Ungueltige Oberflaeche geliefert");
 }
 
 void fehlerfaelle(const fs::path& quelle, const fs::path& tmp)
@@ -206,6 +279,7 @@ int main(int argc, char* argv[])
     try {
         beispielordner(argv[1]);
         details(argv[1], tmp);
+        farben(argv[1], tmp);
         fehlerfaelle(argv[1], tmp);
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';

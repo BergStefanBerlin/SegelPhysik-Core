@@ -283,6 +283,33 @@ std::string text(const Json& wert, const std::string& ort, int id = 2)
     return wert.text;
 }
 
+// Darstellungsfarbe "#rrggbb" als RGB-Anteile 0..1; nullopt bei ungültigem Text.
+std::optional<std::array<double, 3>> farbe_hex(const Json& wert)
+{
+    if (wert.typ != Json::Typ::text || wert.text.size() != 7 || wert.text[0] != '#') return std::nullopt;
+    std::array<double, 3> rgb{};
+    for (std::size_t i = 0; i < 3; ++i) {
+        unsigned kanal = 0;
+        const char* anfang = wert.text.data() + 1 + 2 * i;
+        const auto [ende, ec] = std::from_chars(anfang, anfang + 2, kanal, 16);
+        if (ec != std::errc{} || ende != anfang + 2) return std::nullopt;
+        rgb[i] = kanal / 255.;
+    }
+    return rgb;
+}
+
+constexpr const char* OBERFLAECHEN[] = {"matt", "glaenzend", "metall", "chrom", "lack", "glas",
+    "leuchtend", "schillernd", "facettiert", "drahtgitter", "perlmutt"};
+
+// Darstellungsoberfläche; nullopt bei unbekanntem Wert.
+std::optional<std::string> oberflaeche_text(const Json& wert)
+{
+    if (wert.typ != Json::Typ::text) return std::nullopt;
+    for (const char* art : OBERFLAECHEN)
+        if (wert.text == art) return wert.text;
+    return std::nullopt;
+}
+
 double zahl(const Json& wert, const std::string& ort, bool positiv)
 {
     if (wert.typ != Json::Typ::zahl || !std::isfinite(wert.zahl) || (positiv && wert.zahl <= 0.))
@@ -494,6 +521,9 @@ bool schnitt(const std::array<V, 3>& a, const std::array<V, 3>& b)
                 if (innen(mitte, true)) return true;
                 // Coplanar edges crossing strictly inside both segments.
                 for (std::size_t j = 0; j < 3; ++j) {
+                    // Edges sharing an endpoint cannot cross strictly inside both segments;
+                    // near-collinear pairs would otherwise trip the parameter tolerance.
+                    if (p == t[j] || p == t[(j+1)%3] || q == t[j] || q == t[(j+1)%3]) continue;
                     const V r = minus(q, p), s = minus(t[(j+1)%3], t[j]);
                     const L nenner = skalar(kreuz(r, s), n) / n_laenge;
                     if (std::abs(nenner) <= eps * std::max(norm(r), norm(s))) continue;
@@ -777,8 +807,14 @@ Modell lade_modell(const std::filesystem::path& datei)
             const auto* hydro = optional(element, "Hydrostatik");
             if (!darstellung && !hydro) fehler(2, elementort, "Darstellung und/oder Hydrostatik erforderlich");
             if (darstellung) {
-                objekt(*darstellung, {"datei"}, elementort + ".Darstellung");
+                objekt(*darstellung, {"datei", "farbe", "oberflaeche"}, elementort + ".Darstellung");
                 referenz(pflicht(*darstellung, "datei", elementort), datei.parent_path(), elementort);
+                if (const auto* farbe = optional(*darstellung, "farbe"); farbe && !farbe_hex(*farbe))
+                    fehler(2, elementort + ".Darstellung.farbe", "Farbe als \"#rrggbb\" erwartet");
+                if (const auto* art = optional(*darstellung, "oberflaeche"); art && !oberflaeche_text(*art))
+                    fehler(2, elementort + ".Darstellung.oberflaeche",
+                        "Oberflaeche matt, glaenzend, metall, chrom, lack, glas, leuchtend, "
+                        "schillernd, facettiert, drahtgitter oder perlmutt erwartet");
             }
             if (hydro) {
                 objekt(*hydro, {"masse", "volumen"}, elementort + ".Hydrostatik");
@@ -850,8 +886,14 @@ ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei)
             ElementBeschreibung e;
             e.id = id->text;
             e.gruppe = gruppe.first;
-            if (const auto* darstellung = optional(element, "Darstellung"))
+            if (const auto* darstellung = optional(element, "Darstellung")) {
                 e.darstellung = relativ(*darstellung, "datei", basis);
+                if (darstellung->typ == Json::Typ::objekt) {
+                    if (const auto* farbe = optional(*darstellung, "farbe")) e.farbe_rgb = farbe_hex(*farbe);
+                    if (const auto* art = optional(*darstellung, "oberflaeche"))
+                        e.oberflaeche = oberflaeche_text(*art);
+                }
+            }
             if (const auto* hydro = optional(element, "Hydrostatik"))
                 if (hydro->typ == Json::Typ::objekt)
                     if (const auto* volumen = optional(*hydro, "volumen"))

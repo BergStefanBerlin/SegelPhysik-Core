@@ -303,6 +303,8 @@ Darstellungsgeometrie darstellungsgeometrie(const Modellkatalog& katalog,
         teil.element_id = e.id;
         teil.gruppe = e.gruppe;
         teil.herkunft = e.darstellung ? "darstellung" : "volumen_ersatz";
+        teil.farbe_rgb = e.farbe_rgb;
+        teil.oberflaeche = e.oberflaeche;
         const auto name = relativer_name(*quelle, ordner);
         try {
             obj_darstellung(*quelle, name, teil);
@@ -423,6 +425,7 @@ std::string darstellungsgeometrie_json(const Darstellungsgeometrie& g)
             << ",\"gruppe\":" << json_text(teil.gruppe) << ",\"herkunft\":" << json_text(teil.herkunft)
             << ",\"farbe_rgb\":";
         if (teil.farbe_rgb) zahlen(out, *teil.farbe_rgb); else out << "null";
+        out << ",\"oberflaeche\":" << (teil.oberflaeche ? json_text(*teil.oberflaeche) : std::string("null"));
         out << ",\"punkte_m\":[";
         for (std::size_t i = 0; i < teil.punkte_m.size(); ++i) {
             if (i) out << ',';

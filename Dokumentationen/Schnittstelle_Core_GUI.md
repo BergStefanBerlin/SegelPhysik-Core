@@ -294,7 +294,7 @@ Zustand. Die GUI wählt und überwacht den Ordner; der Core liest ihn.
 | `modellkatalog(ordner)` | Katalog über `ordner/modell.json` und `ordner/*/modell.json`, sortiert nach Ordnername |
 | `katalog_json(kat)` | `katalogversion`, `modelle[]` mit `modell_id`, `name`, `beschreibung`, `modell_fassung`, `status` (`verwendbar`/`fehlerhaft`), `fehleranzahl` |
 | `modellstruktur(kat, id, fassung)` | Gruppen und Elemente (`darstellung`, `hydrostatik_volumen`), `gesamtmasse_kg`, `huellquader_m{min,max}` |
-| `darstellungsgeometrie(kat, id, fassung[, element])` | `teile[]` mit `element_id`, `gruppe`, `herkunft` (`darstellung`/`volumen_ersatz`), `farbe_rgb`, `punkte_m`, `dreiecke`; dazu `diagnosen` |
+| `darstellungsgeometrie(kat, id, fassung[, element])` | `teile[]` mit `element_id`, `gruppe`, `herkunft` (`darstellung`/`volumen_ersatz`), `farbe_rgb`, `oberflaeche`, `punkte_m`, `dreiecke`; dazu `diagnosen` |
 | `modelldiagnose(kat, id, fassung)` | Diagnosen mit `fehler_id`, `text`, `fundstelle` |
 | `katalogmodell(kat, id, fassung)` | Geladenes `Modell` für Prüfung/Simulation |
 | `katalogfehler_json(text)` | Fehlerantwort mit `fehler_id` und `text` |
@@ -308,9 +308,16 @@ bleiben verfügbar. Ohne Darstellungsnetz wird das Hydrostatikvolumen
 als `volumen_ersatz` geliefert. OBJ-Polygone werden für die Darstellung
 fächertrianguliert.
 
-Einschränkungen: Das Modellformat 0.1-entwurf kennt keine Elementnamen,
-Farben oder Beschreibungen; `name` ist daher die ID, `farbe_rgb` und
-`beschreibung` sind `null`. Die Modellfassung enthält bewusst keine
+`farbe_rgb` (Werte 0..1) stammt aus dem optionalen Modellfeld
+`Darstellung.farbe` (`"#rrggbb"`, A-C-00048); ohne Angabe ist es `null`.
+`oberflaeche` (`"matt"`, `"glaenzend"`, `"metall"`, `"chrom"`, `"lack"`,
+`"glas"`, `"leuchtend"`, `"schillernd"`, `"facettiert"`, `"drahtgitter"`,
+`"perlmutt"`) stammt aus dem
+optionalen Modellfeld `Darstellung.oberflaeche` (A-C-00049); ohne Angabe
+ist es `null`.
+
+Einschränkungen: Das Modellformat 0.1-entwurf kennt keine Elementnamen
+oder Beschreibungen; `name` ist daher die ID, `beschreibung` ist `null`. Die Modellfassung enthält bewusst keine
 Darstellungsdateien; die GUI leert ihren Geometriepuffer daher bei
 Dateiänderungen selbst. `fehleranzahl` beruht auf dem ersten
 Importfehler (plus ggf. Duplikat). CLI-Befehle sind nicht implementiert.

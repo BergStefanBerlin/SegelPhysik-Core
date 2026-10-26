@@ -17,6 +17,13 @@ bisherigen Kennungen in der
 
 ## Ablage
 
+Die Modelle liegen seit 27.10.2026 (Nutzerauftrag) nicht mehr in diesem
+Repository, sondern im gemeinsamen Ordner
+[`Segelphysik/Modelle`](../../../Modelle) neben den Checkouts `CORE` und
+`GUI`. Core-Tests und GUI verwenden ihn ueber die CMake-Variable
+`SEGELPHYSIK_MODELLE_DIR`. Die Pfadangaben `modelle/...` in den
+historischen Nachweisdateien beziehen sich auf diesen Ordner.
+
 Jedes der elf Modelle besitzt eine eigene `modell.json`: acht einfache
 Koerper (Bleistift, Kegel, Kugel, Platte, Pyramide, Quader, Rolle,
 unregelmaessiger Koerper), Folkeboot, Optimist und 420er.
@@ -26,7 +33,7 @@ Parametrische Formen oder eine Unterscheidung zwischen Form und Mesh
 gibt es in der Modell-JSON nicht mehr.
 
 ```text
-modelle/
+Modelle/
   folkeboot/
     modell.json
     meshes/
@@ -77,7 +84,13 @@ gibt es nicht.
 ```
 
 `datei` ist der direkte relative Dateipfad, aufgeloest gegen die
-Modell-JSON. `/` ist darin der portable Trenner. `quelle: obj` ist
+Modell-JSON. Optional traegt `Darstellung` eine Farbe `"farbe": "#rrggbb"`
+(nur Anzeige, A-C-00048); ohne Angabe nutzt die GUI ihre Standardfarbe.
+Ebenso optional ist `"oberflaeche": "matt" | "glaenzend" | "metall"` oder
+ein Effektwert `"chrom" | "lack" | "glas" | "leuchtend" | "schillernd" |
+"facettiert" | "drahtgitter" | "perlmutt"`
+(nur Anzeige, A-C-00049); ohne Angabe nutzt die GUI ihr Standardmaterial.
+`/` ist darin der portable Trenner. `quelle: obj` ist
 redundant zur Dateiendung und entfaellt. Ein zentraler Geometriekatalog
 oder eine Formbeschreibung wird nicht benoetigt.
 
@@ -139,9 +152,10 @@ einer spaeteren Gesamtkoerperbildung beruecksichtigt.
 Das Folkeboot-Segel hat Masse, aber keinen Volumenblock, entsprechend
 seiner bisherigen Kennzeichnung als nicht verdraengend. Das
 Optimist-Segel ist auf Nutzerwunsch reine Darstellung. Insgesamt
-besitzen 23 Elemente Hydrostatik mit Masse, davon 16 zusaetzlich
-Volumen. Die anderen sieben sind zwei Besatzungs-Punktmassen, zwei
-Folkeboot-Segel und die drei Optimist-Spieren.
+besitzen 29 Elemente Hydrostatik mit Masse, davon 17 zusaetzlich
+Volumen. Die anderen zwoelf sind drei Besatzungs-Punktmassen, zwei
+Folkeboot-Segel und die sieben Spieren (Folkeboot Mast und Grossbaum,
+Optimist Mast, Grossbaum und Spriet, 420er Mast und Grossbaum).
 
 Pinne, Pinnenausleger und Gummigelenk bleiben auf Nutzerwunsch reine
 Darstellung, ohne Hydrostatik oder Massenbeitrag.
@@ -178,6 +192,12 @@ Geometrische Anpassungen:
   25 OBJ-Dateien) und die Besatzung um +1,354 m in z verschoben, damit das
   Boot schon in der Initialpose z = 0 in seiner Ruhelage schwimmt. Jede
   OBJ-Datei nennt die Verschiebung im Kopfkommentar.
+- Farben (`Darstellung.farbe`, Nutzerauftrag): Rumpf beige `#E3D3B0`,
+  Schwert `#B5834F` und Ruder `#A8733F` (Holz), Pinne, Pinnenausleger,
+  Mast, Grossbaum und Spriet Alu `#C4C8CD`; Segel und Gummigelenk in
+  GUI-Standardfarbe.
+- Oberflaechen (`Darstellung.oberflaeche`, Nutzerauftrag): Rumpf,
+  Schwert und Ruder `matt`, Alu-Teile `metall`.
 
 Der statische Lauf konvergiert trocken bei z ≈ 0 (0,0002 m) mit rund 98,0 kg
 Gesamtmasse (Rumpf 38,9 kg, Schwert 3,8 kg, Ruder 0,5 kg, Spieren
@@ -193,10 +213,65 @@ aufrecht und trocken (20 s: z zwischen -0,006 und +0,006 m). Die GUI
 startet einen Lauf beim Wechsel Statik → Dynamik vom angezeigten
 Ruhezustand.
 
-**Der 420er bleibt vorerst ausschliesslich Darstellung.** Es fehlen
-Massendaten; daher wurden nach Nutzerentscheidung alle seine
-Hydrostatikbloecke und Volumenkopien entfernt. Er kann spaeter mit
-belastbaren Massenangaben ergaenzt werden.
+### Namen
+
+Auf Nutzerauftrag (27.10.2026) heissen die Boote im Katalog kurz
+`Optimist`, `Folkeboot` und `420er` (Feld `name`; vorher mit Zusaetzen
+wie „Naeherungsmodell“, „Naeherung“, „Geometrieentwurf“).
+
+### Reparatur Folkeboot
+
+Das Folkeboot war ungueltig (`CORE-MOD-0007`):
+
+- Mast und Grossbaum (Spieren) haben kein Volumen mehr, nur noch
+  Schalenmasse; ihre Volumen-AABBs ueberschnitten sich.
+- Die Hydrostatik-Netze von Kiel und Ruder ragten in die Rumpf-AABB.
+  Sie wurden an der Rumpfunterkante (z = -0,47 m) eben gekappt
+  (Profilschnitt, neu trianguliert). Masse- und GUI-Netze bleiben
+  vollstaendig.
+
+Der statische Lauf konvergiert bei z ≈ -0,19 m mit rund 1,66 m3
+Verdraengung.
+
+### Neuaufbau 420er
+
+Der 420er wurde auf Nutzerauftrag (27.10.2026) aus
+`Ideen/AusAltenProjekten/420er/420_zusammenbau.obj` (mm, Rumpf:
+Stefgran/Thingiverse 1593594, CC BY-NC-SA, 30-fach auf 4200 mm) neu
+aufgebaut. Die Teile wurden nach den Einzeldateien aus dem Zusammenbau
+getrennt und auf Meter umgerechnet; die Lage im Zusammenbau bleibt
+erhalten (Rumpfunterkante z = 0, Hauptspant x = 0). Nutzerentscheidungen:
+Auftrieb nur aus geschlossenen Tanks, Doppelboden und Vordeck, Rumpf
+etwa 80 kg, Ruder aus dem alten Entwurf, Besatzung 140 kg.
+
+| Element | Hydrostatik |
+|---|---|
+| Rumpf | Schale GFK 1900 kg/m3, Wand 2,6 mm (ergibt 79,3 kg); geschlossener Koerper aus Aussenhaut, Seitentanks, Doppelboden und Vordeck als Volumen. Das Cockpit ist eine offene Mulde und gilt als geflutet; der Rumpf hat keinen Flutrand |
+| Schwert | Holz-Vollkoerper 600 kg/m3 (4,4 kg); Quellnetz defekt, als geschlossenes 18-mm-Profil (konvexe Kontur) neu gebaut; Volumen unterhalb der Rumpfunterkante |
+| Ruder | Holz-Vollkoerper 600 kg/m3 (1,9 kg), Blatt aus dem alten 420er-Entwurf, an den neuen Spiegel versetzt |
+| Mast, Grossbaum | Alu-Schale 2700 kg/m3, Wand 1,5 mm, ohne Volumen (4,4 kg und 2,6 kg) |
+| Grosssegel, Fock, Vorstag, Ruderkopf | nur Darstellung |
+| Besatzung | Punktmasse 140 kg bei [-0,5, 0, 0,45] m |
+
+Netzkorrekturen:
+
+- Rumpf: Die Quelle war nach innen orientiert (umgedreht). An den
+  Deckstufen (x ≈ 0,35 m und 0,64 m, beidseitig) und am Mastloch
+  lagen 207 sich ueberlappende, koplanare Splitterdreiecke. Diese
+  Bereiche wurden in Masse- und Hydrostatiknetz lokal entfernt und mit
+  einer Minimalflaechen-Triangulierung neu geschlossen (Volumen
+  1,1303 → 1,1301 m3). Das GUI-Netz ist die Quelle.
+- Mast: uneinheitlicher Flaechenumlauf, konsistent ausgerichtet.
+- Grossbaum: Quellnetz schneidet sich selbst; ersetzt durch ein
+  geschlossenes Ovalrohr (24 Segmente) mit gleicher Huelle (2,40 m).
+
+Farben wie beim Optimist: Rumpf `#E3D3B0` matt, Schwert `#B5834F`
+und Ruder `#A8733F` matt, Mast, Grossbaum, Vorstag und Ruderkopf
+`#C4C8CD` metall; Segel in GUI-Standardfarbe.
+
+Der statische Lauf konvergiert trocken bei z ≈ -0,22 m (Tiefgang der
+Rumpfunterkante) und rund 2,2 Grad Trimm, mit rund 233 kg Gesamtmasse
+und 0,233 m3 Verdraengung. Das bleibt eine unkalibrierte Naeherung.
 
 Die vorhandenen Bootsnetze sind nicht durch ihre Zuordnung zu
 `volumen` physikalisch freigegeben. Dichtigkeit, Selbstschnitte
@@ -253,9 +328,9 @@ Die Rotation ist rechtshaendig (Determinante +1), keine Spiegelung.
 Ursprung, Hoehen und Bauteilabstaende bleiben erhalten. Die Besatzung
 liegt auf X = Y = 0 und benoetigt daher keine Positionsaenderung.
 
-Beim 420er wurden die acht platzierten Objekte der
-Gesamtszene verwendet, Y gespiegelt und die Flaechenreihenfolge
-umgekehrt. Die festen Quellurspruenge bleiben erhalten.
+Der 420er uebernimmt seit dem Neuaufbau (siehe oben) das Rumpfsystem
+des Zusammenbaus (X Bug, Z oben) mit Skalierung 0,001; eine Spiegelung
+ist nicht noetig.
 Bewegliche Verbindungen werden spaeter besprochen.
 
 ## Meshpruefung gegen die Koordinatenregeln
@@ -281,11 +356,10 @@ Korrektur hinter dem Mast in Richtung kleinerer X-Werte. Bei symmetrischen
 Netzen laesst sich die Backbordseite ohne Markierungen nicht allein aus
 der Form beweisen; dafuer wurden die Herkunftstransformationen verwendet.
 
-Der 420-Grossbaum ist bereits in der Quellszene auffaellig vertikal
-platziert. Das ist eine separate Bauteilpose-Frage, keine belegte
-Abweichung des gesamten Modellachsensystems; sie wurde nicht
-eigenmaechtig korrigiert. Andere offene Netz-/Modellprobleme bleiben
-sichtbar im Pruefnachweis.
+Der 420-Grossbaum der alten Quellszene war auffaellig vertikal
+platziert. Mit dem Neuaufbau (siehe oben) ist das ueberholt; der neue
+Grossbaum liegt horizontal am Lümmelbeschlag. Andere offene
+Netz-/Modellprobleme bleiben sichtbar im Pruefnachweis.
 
 **Diese Arbeiten passen nur die Beispiel-Meshes an. Die Anforderungen
 A-C-00001 bis A-C-00003 gelten dadurch weder als implementiert noch
@@ -301,9 +375,9 @@ Relevante Quellen und Modellannahmen sind vor der Finalisierung
 dauerhaft zu dokumentieren. Es gibt noch keinen Loader, keine
 implementierte Nullvolumenbehandlung und keine Simulationsfreigabe.
 
-Folkeboot und Optimist bleiben unkalibrierte Naeherungen. Die
-420-Geometrien aus `420_obj_modelle_2.zip` sind schematisch und
-insbesondere nicht als geschlossenes Verdraengungsnetz bestaetigt.
+Folkeboot, Optimist und 420er bleiben unkalibrierte Naeherungen. Der
+neue 420er-Rumpf ist ein Hobby-Netz (Thingiverse) und nicht als
+massgerechte Klassengeometrie bestaetigt.
 Das Koerper-Meshing validiert keine realen Bootsgeometrien.
 
 Der [Pruefnachweis](pruefnachweis.json) dokumentiert 76 bestandene
@@ -311,6 +385,7 @@ Struktur- und Geometriepruefungen sowie Volumina, Abweichungen und
 Dateipruefsummen. Die Sammlung ist weiterhin keine finalisierte
 Spezifikation und kein Umsetzungsplan.
 
-Hinweis: Nach der Optimist-Ueberarbeitung stimmen die Pruefsummen der
-geaenderten Optimist-Netze in beiden Nachweisdateien nicht mehr; die
-Nachweise sind fuer den Optimisten neu zu erzeugen.
+Hinweis: Nach der Optimist-Ueberarbeitung, der Folkeboot-Reparatur und
+dem 420er-Neuaufbau stimmen die Pruefsummen dieser Netze in beiden
+Nachweisdateien nicht mehr; die Nachweise sind fuer die drei Boote neu
+zu erzeugen. Massgeblich ist bis dahin `segelphysik_cli --pruefen`.

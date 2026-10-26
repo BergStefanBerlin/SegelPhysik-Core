@@ -42,7 +42,9 @@ struct Modell {
 // volumen. Unknown structural/physics fields are rejected. name, status and
 // entwurf are metadata only, not a physical validation or simulation approval.
 // Paths are relative to the JSON file; Darstellung is never used for physics
-// (its file is not opened). OBJ faces must be triangles; negative indices and
+// (its file is not opened). Darstellung.farbe is an optional "#rrggbb" colour,
+// Darstellung.oberflaeche an optional "matt", "glaenzend", "metall", "chrom", "lack", "glas",
+// "leuchtend", "schillernd", "facettiert", "drahtgitter" or "perlmutt". OBJ faces must be triangles; negative indices and
 // v/vt/vn references are supported. Coordinates are model-fixed metres.
 //
 // Mass variants: punktmasse(masse_kg, position_m), vollkoerper
@@ -82,6 +84,8 @@ struct ElementBeschreibung {
     std::string gruppe;
     std::optional<std::filesystem::path> darstellung;
     std::optional<std::filesystem::path> volumen;
+    std::optional<std::array<double, 3>> farbe_rgb;  // Darstellung.farbe "#rrggbb", 0..1
+    std::optional<std::string> oberflaeche;          // Darstellung.oberflaeche, siehe oben
 };
 struct ModellBeschreibung {
     std::string id;

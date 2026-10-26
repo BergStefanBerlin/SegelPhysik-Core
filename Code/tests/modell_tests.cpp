@@ -340,6 +340,12 @@ void mesh_tests(Dateien& d)
     d.schreiben("mesh.obj", dreieck +
         "v .2 -.2 0\nv .2 .8 0\nv .8 .2 0\nf 4 5 6\n");
     fehler([&] { d.laden(modell(element(schale()))); }, "CORE-MOD-0008");
+    // Coplanar triangles touching only in a vertex with nearly collinear opposite edges
+    // (420er transom) are legal.
+    d.schreiben("mesh.obj",
+        "v -2.00438 0.266472 0.236609\nv -2.00438 0.277575 0.226499\nv -2.00438 0.284857 0.229548\n"
+        "v -2.00438 0.277575 0.221445\nv -2.00438 0.283126 0.221445\nf 1 2 3\nf 4 5 2\n");
+    d.laden(modell(element(schale())));
     d.schreiben("mesh.obj", tetra());
     d.schreiben("andere.obj", tetra(false, .5));
     fehler([&] { d.laden(modell(element(punkt(), "mesh.obj", "a") + "," +
@@ -478,8 +484,7 @@ int main(int argc, char** argv)
         if (argc > 1) beispiel = std::filesystem::u8path(argv[1]);
         else {
             const auto root = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path();
-            const auto kandidat = root / "Spezifikationen" / "Beispiele_Modellformat" /
-                "modelle" / "quader" / "modell.json";
+            const auto kandidat = root.parent_path() / "Modelle" / "quader" / "modell.json";
             if (std::filesystem::exists(kandidat)) beispiel = kandidat;
         }
         beispiel_test(beispiel);

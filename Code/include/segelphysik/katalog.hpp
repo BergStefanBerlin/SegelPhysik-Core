@@ -84,6 +84,7 @@ struct Darstellungsteil {
     std::vector<Vektor3> punkte_m;
     std::vector<std::array<std::size_t, 3>> dreiecke;
     std::optional<std::array<double, 3>> farbe_rgb;
+    std::optional<std::string> oberflaeche;  // Werte siehe modell.hpp (Darstellung.oberflaeche)
 };
 struct Darstellungsgeometrie {
     std::string modell_id;
