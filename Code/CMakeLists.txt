@@ -77,6 +77,12 @@ if(BUILD_TESTING)
     add_executable(simulation_tests tests/simulation_tests.cpp)
     target_link_libraries(simulation_tests PRIVATE segelphysik_core)
     list(APPEND core_targets simulation_tests)
+    add_executable(testantrieb_tests tests/testantrieb_tests.cpp)
+    target_link_libraries(testantrieb_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets testantrieb_tests)
+    add_test(NAME temporaerer_testantrieb COMMAND testantrieb_tests
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json")
     add_test(NAME simulation_gesamtlauf COMMAND simulation_tests
         "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json")
     add_executable(core_benchmark tests/benchmark.cpp)

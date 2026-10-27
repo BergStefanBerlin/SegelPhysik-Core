@@ -150,8 +150,12 @@ Modell fehlerhaft und liefert keine Farbe.
 Ein Element darf in `Darstellung` das optionale Feld `oberflaeche` mit
 einem der Werte `"matt"`, `"glaenzend"`, `"metall"`, `"chrom"`, `"lack"`,
 `"glas"`, `"leuchtend"`, `"schillernd"`, `"facettiert"`, `"drahtgitter"`,
-`"perlmutt"` oder `"unsichtbar"` (Teil wird nicht gezeichnet, z. B.
-Luftkörper nach A-C-00051) tragen. Der Core
+`"perlmutt"`, `"unsichtbar"` (Teil wird nicht gezeichnet, z. B.
+Luftkörper nach A-C-00051), `"stoff"`, `"holz"` oder
+`"metall_gebuerstet"` tragen. Die letzten drei Werte bezeichnen explizit
+Gewebe, Holz und gebürstetes Metall; `"metall"` und alle bisherigen Werte
+behalten ihre Bedeutung. Die Bezeichner sind stabile, kleingeschriebene
+Darstellungsmetadaten, keine physikalischen Materialdefinitionen. Der Core
 reicht den Wert unverändert über `darstellungsgeometrie` als
 `oberflaeche` weiter (A-C-00044). Ohne Angabe ist `oberflaeche` `null`
 und die GUI verwendet ihr Standardmaterial. Die Oberfläche hat keinen
@@ -159,14 +163,29 @@ Einfluss auf die Physik. Ein ungültiger Wert wird nicht still ersetzt:
 Das Modell ist fehlerhaft (CORE-MOD-0002 mit Fundstelle
 `Darstellung.oberflaeche`).
 
-**Abnahmekriterium:** Ohne Angabe keine Oberfläche; `"metall"` und jeder
-Effektwert erscheinen in Struktur und JSON; ein ungültiger Wert (z. B.
-`"regenbogen"`) macht das Modell fehlerhaft und liefert keine Oberfläche.
+Der bestehende optionale Stringtransport genügt; Schema und öffentliche
+Datentypen bleiben unverändert. UV-Koordinaten oder Texturdateien sind nicht
+vorgeschrieben. Die GUI darf eine geeignete prozedurale Projektion aus den
+lokalen Modellkoordinaten ableiten. Die Wahl der Oberfläche darf Masse,
+Schwerpunkt, Trägheit, Volumennetze, verdrängtes Volumen, Kräfte und Momente
+nicht verändern. Die Modellfassung ändert sich bei geänderter JSON-Datei
+weiterhin zur Cache-Invalidierung.
+
+**Abnahmekriterium:** Ohne Angabe keine Oberfläche; jeder zugelassene Wert
+erscheint unverändert nach erneutem Einlesen in Beschreibung, Katalogteil
+und JSON. Gegenüber demselben Modell ohne Oberfläche bleiben Massenwerte,
+Volumennetze und eine Hydrostatikauswertung identisch. Ein ungültiger Wert
+(z. B. `"regenbogen"`) macht das Modell mit CORE-MOD-0002 und passender
+Fundstelle fehlerhaft und liefert keine Oberfläche.
 
 **Herkunft:** Nutzerauftrag vom 27.10.2026 (Grafikeffekte, Materialien);
 Effektwerte ergänzt auf Nutzerauftrag vom 26.10.2026 (einfache Körper
 grell und je mit eigenem Effekt); `"unsichtbar"` ergänzt auf
 Nutzerauftrag vom 28.10.2026 (Luft muss durchsichtig sein).
+Nachtrag vom 27.10.2026 für GUI G-0.5: ausdrücklicher Nutzerauftrag zur
+vollständigen Umsetzung einschließlich persistenter Stoff-, Holz- und
+gebürsteter Metalloberflächen; bestehender Vertrag A-C-00049 wird erweitert,
+keine neue Anforderung oder parallele Spezifikation.
 
 ## Quellen und Abgrenzung zur Historie
 
@@ -193,7 +212,7 @@ Spezifikation dieses Themas.
 | A-C-00003 | IDEE-C-00004, Teilaspekt Konstruktionsursprung | Freigegeben | C-0.1: Hydrostatikplan U-C-000007 und U-C-000017; Schwerpunkt-, Pose- und Dynamiktests |
 | A-C-00030 | IDEE-C-00001, IDEE-C-00002, IDEE-C-00006, Teilaspekte Importgrundlage | Als Grundlage bestätigt | C-0.1: Import implementiert, Test modell_import; unterstützte Grenzen im GUI-Vertrag dokumentiert |
 | A-C-00048 | Nutzerauftrag 26.10.2026 (Farben) | Freigegeben | C-0.2 Nachtrag: Plan C-0.2 U-C-000032; Test katalog (`farben`) |
-| A-C-00049 | Nutzerauftrag 27.10.2026 (Materialien) | Freigegeben | C-0.2 Nachtrag: Plan C-0.2 U-C-000033; Test katalog (`farben`) |
+| A-C-00049 | Nutzerauftrag 27.10.2026 (Materialien) | Freigegeben; technisch nachgewiesen, keine ästhetische Nutzerabnahme | C-0.2 Nachtrag: Plan C-0.2 U-C-000033; G-0.5-Vertragserweiterung am 27.10.2026: vollständiger nativer Release-Build und gesamte gemeinsame CTest-Suite 22/22 in 64,55 s, einschließlich aller CORE-Tests, `modellkatalog_schnittstelle` (alle 15 Namen, CLI-Validierungsfunktion, Physikinvarianz) und drei GPU-Tests; GUI-Modelladapter mit sechs Materialbezeichnern bestanden; Details im Plan |
 Die Umsetzung ist inzwischen über den
 [Hydrostatikplan](../Umsetzungsplaene/Umsetzungsplan_Hydrostatikkern.md)
 beauftragt. Die Abnahmekriterien sind noch nicht als bestanden

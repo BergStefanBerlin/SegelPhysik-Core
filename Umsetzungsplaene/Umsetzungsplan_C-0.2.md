@@ -296,6 +296,53 @@ Core-CTest 13/13, GUI-CTest 17/17;
 Nutzerwunsch matt), alle acht einfachen Körper gültig; die GUI
 bildet die Werte auf PBR-Materialien ab (GUI U-G-000024).
 
+**Vertragserweiterung für GUI G-0.5 (27.10.2026):** Auf ausdrücklichen
+Nutzerauftrag wird derselbe Vertrag A-C-00049 in diesem bestehenden
+Umsetzungsschritt um `stoff`, `holz` und `metall_gebuerstet` ergänzt.
+Keine neue Spezifikation, kein weiterer Core-Versionsplan, keine neue A-/U-
+oder CPPI-Kennung: Der bestehende optionale Stringtransport und sämtliche
+öffentlichen Datentypen/Funktionen bleiben unverändert. Keine UV-Pflicht,
+Physikänderung oder zusätzliche Abhängigkeit.
+
+**Status dieses Nachtrags:** implementiert und technisch nachgewiesen.
+`Code/tests/katalog_tests.cpp`, Funktion `farben`, prüft alle 15
+zugelassenen Namen nach erneutem Einlesen in Beschreibung, Katalog und
+JSON sowie über die auch vom CLI verwendete Modellvalidierung
+`pruefung_json`, die Zurückweisung unbekannter Namen mit CORE-MOD-0002/Fundstelle
+sowie unveränderte Masse, Schwerpunkt, Trägheit, Volumennetze,
+verdrängtes Volumen, Kraft und Moment gegenüber einer sonst identischen
+lokalen Prüffixture ohne Oberfläche. Die Modellfassung muss sich bei der
+Metadatenänderung ändern. Der vorhandene historische Nachweis oben wird
+nicht als Nachweis für die drei neuen Werte gewertet.
+
+**Tatsächlicher Nachweis (27.10.2026, gemeinsamer G-0.5-Build):**
+Der koordinierte native Release-Build des Ziels
+`segelphysik_gui_graphics_render_tests` einschließlich verknüpftem CORE
+war erfolgreich. Der anschließend vom Render-Agent ausgeführte CTest-Lauf
+mit Auswahl `gui_graphics_render|modellkatalog_schnittstelle` bestand
+4/4 Tests: `gui_graphics_render_100` (22,41 s),
+`gui_graphics_render_150` (19,24 s), `gui_graphics_render_200` (21,78 s)
+und der eigenständig ausgewählte CORE-Vertragstest
+`modellkatalog_schnittstelle` (5,11 s); Gesamtzeit 68,56 s.
+Der CORE-Test enthält die oben beschriebenen Prüfungen aller 15 Namen,
+CLI-Validierungsfunktion und Physikinvarianz. Die GPU-Tests prüften zusätzlich
+am tatsächlichen Folkeboot persistente Lack-, Stoff-, Holz- und gebürstete
+Metallmaterialien in der natürlichen Darstellung ohne Vorschau.
+Dies war der erste kombinierte Teilnachweis.
+
+**Abschließender Gesamtnachweis (27.10.2026, Parent-Lauf):** Anschließend
+bestand der vollständige native Release-Build aller Ziele; die gesamte
+gemeinsame CTest-Suite bestand mit **22/22 Tests in 64,55 s**.
+Darin bestanden die CORE-Tests `pose_transformations`,
+`hydrostatik_referenzen`, `simulation_gesamtlauf`, `modell_import`,
+`core_build_configuration`, `kraft_momentenbilanz` und
+`modellkatalog_schnittstelle` sowie sämtliche ausgewählten CLI-/GUI-Tests
+und die drei GPU-Tests. Die GUI-Modelladaptertests bestanden mit sechs
+Materialbezeichnern. Damit ist der Nachtrag einschließlich
+Rückwärtskompatibilität und Physikinvarianz technisch nachgewiesen.
+Die ästhetische Nutzerabnahme und die fachliche Nutzerabnahme des gesamten
+Plans werden dadurch nicht vorweggenommen.
+
 ### U-C-000034: Nachtrag: Bootsmodelle und Schnittprüfung
 
 **Anforderungen:** A-C-00010 (konservative Ablehnungsprüfung), A-C-00047

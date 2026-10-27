@@ -26,6 +26,8 @@ struct Element {
     // without deck). Only kept when the element also has a displacement
     // volume; non-empty means the element can flood (A-C-00047).
     std::vector<Vektor3> flutrand_m;
+    // Imported physical mass geometry, including the location of a point mass.
+    std::vector<Vektor3> massenpunkte_m;
 };
 
 struct Modell {
@@ -44,8 +46,10 @@ struct Modell {
 // Paths are relative to the JSON file; Darstellung is never used for physics
 // (its file is not opened). Darstellung.farbe is an optional "#rrggbb" colour,
 // Darstellung.oberflaeche an optional "matt", "glaenzend", "metall", "chrom", "lack", "glas",
-// "leuchtend", "schillernd", "facettiert", "drahtgitter", "perlmutt" or "unsichtbar" (not drawn,
-// e.g. air bodies). OBJ faces must be triangles; negative indices and
+// "leuchtend", "schillernd", "facettiert", "drahtgitter", "perlmutt", "unsichtbar" (not drawn,
+// e.g. air bodies), "stoff", "holz" or "metall_gebuerstet". Surface names are
+// presentation metadata, not physical materials; no UV coordinates are required.
+// OBJ faces must be triangles; negative indices and
 // v/vt/vn references are supported. Coordinates are model-fixed metres.
 //
 // Mass variants: punktmasse(masse_kg, position_m), vollkoerper

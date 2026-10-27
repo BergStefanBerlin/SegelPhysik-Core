@@ -4,6 +4,7 @@
 #include <atomic>
 #include <optional>
 #include <string_view>
+#include <memory>
 
 namespace segelphysik {
 
@@ -15,7 +16,7 @@ struct VolumenWerte {
 
 // Contract version 2 metadata is stored as enums to keep the per-evaluation
 // cost of the solver hot path unchanged; names appear only when serialised.
-enum class Quelle { schwerkraft, hydrostatik, summe, nicht_zugeordnet };
+enum class Quelle { schwerkraft, hydrostatik, summe, nicht_zugeordnet, testantrieb };
 enum class Rolle { einzelbeitrag, gruppensumme, gesamtsumme };
 enum class Punktart { angriffspunkt, bezugspunkt };
 enum class Datenzustand { gueltig, null, deaktiviert, nicht_berechnet, ungueltig };
@@ -39,6 +40,7 @@ struct Beitrag {
     Datenzustand zustand = Datenzustand::gueltig;
     std::string fehler_id;
     Vektor3 moment_s_nm{};  // moment about the current total centre of mass S
+    bool punkt_bekannt = true;
 };
 
 struct Kraefte {
@@ -64,6 +66,41 @@ Kraefte hydrostatik(const Modell& modell, const Pose& pose,
 std::vector<std::string> flutung(const Modell& modell, const Pose& pose,
                                  std::vector<std::string> bisher);
 
+struct TestantriebKonfiguration {
+    double kraft_n = 200.;
+    double grenze_m_s = 463./90.;
+};
+struct TestantriebEreignis {
+    std::size_t kennung{};
+    bool aktiv{};
+};
+struct TestantriebBegrenzung {
+    bool wirksam{};
+    Vektor3 vorher_welt_m_s{};
+    Vektor3 nachher_welt_m_s{};
+    Vektor3 korrekturimpuls_ns{};
+    double energieaenderung_j{};
+};
+struct TestantriebUebergang {
+    std::size_t von_schritt{};
+    std::size_t nach_schritt{};
+    double startzeit_s{};
+    double dt_s{};
+    std::vector<TestantriebEreignis> ereignisse;
+    TestantriebBegrenzung begrenzung;
+};
+struct TestantriebKontext {
+    TestantriebKonfiguration konfiguration;
+    bool aktiv{};
+    std::optional<Vektor3> zugpunkt_modell_m;
+    std::string geometriequelle = "physische_massen_volumennetze_punktmassen";
+    std::string modell_fassung;
+    std::size_t letzte_ereigniskennung{};
+    std::optional<TestantriebUebergang> uebergang;
+    std::size_t auswertung_schritt{};
+    double auswertung_zeit_s{};
+};
+
 struct Zustand {
     Pose pose{{}, {0., 0., 0., 1.}};
     Vektor3 geschwindigkeit_welt_m_s{};
@@ -71,7 +108,16 @@ struct Zustand {
     double zeit_s{};
     std::size_t schritt{};
     std::vector<std::string> geflutet;
+    std::shared_ptr<const TestantriebKontext> testantrieb;
+    bool testantrieb_erforderlich = false;
 };
+
+// Returned states own an immutable historical context; no global live flag.
+Zustand testantrieb_start(const Modell&, const Zustand&,
+    const TestantriebKonfiguration&, bool aktiv);
+Kraefte kraefte(const Modell&, const Pose&, const TestantriebKontext*,
+    double rho = 1000., double g = 9.81,
+    const std::vector<std::string>& geflutet = {});
 
 struct Gleichgewichtsangaben {
     double krafttoleranz_n{};
@@ -121,5 +167,8 @@ SolverErgebnis gleichgewicht(const Modell& modell, const Zustand& start,
 // Updates the flooding state from the start and end pose of the step.
 Zustand dynamikschritt(const Modell& modell, const Zustand& zustand,
     double dt_s, double rho = 1000., double g = 9.81);
+Zustand dynamikschritt(const Modell& modell, const Zustand& zustand,
+    double dt_s, const std::vector<TestantriebEreignis>& ereignisse,
+    double rho = 1000., double g = 9.81);
 
 }

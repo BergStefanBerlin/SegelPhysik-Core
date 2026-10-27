@@ -1,5 +1,6 @@
 #include "segelphysik/katalog.hpp"
 #include "segelphysik/hydrostatik.hpp"
+#include "segelphysik/simulation.hpp"
 
 #include <chrono>
 #include <cmath>
@@ -168,10 +169,15 @@ void farben(const fs::path& quelle, const fs::path& tmp)
     schreiben(datei, original);
     const std::string feld = "\"datei\": \"meshes/gui/rumpf.obj\"";
     pruefe(original.find(feld) != std::string::npos, "Testvorlage ohne Darstellungsdatei");
+    const auto physik_original = lade_modell(datei);
+    const Pose pruefpose({0., 0., -.2}, {0., 0., 0., 1.});
+    const auto kraefte_original = hydrostatik(physik_original, pruefpose);
 
     auto katalog = modellkatalog(ordner);
     pruefe(!darstellungsgeometrie(katalog, "quader", katalog.eintrag("quader")->modell_fassung)
         .teile[0].farbe_rgb, "Farbe ohne Angabe geliefert");
+    pruefe(!darstellungsgeometrie(katalog, "quader", katalog.eintrag("quader")->modell_fassung)
+        .teile[0].oberflaeche, "Oberflaeche ohne Angabe geliefert");
 
     auto json = original;
     json.replace(json.find(feld), feld.size(), feld + ", \"farbe\": \"#FF8000\"");
@@ -207,15 +213,50 @@ void farben(const fs::path& quelle, const fs::path& tmp)
     pruefe(darstellungsgeometrie_json(darstellungsgeometrie(katalog, "quader", metall))
         .find("\"oberflaeche\":\"metall\"") != std::string::npos, "oberflaeche fehlt im JSON");
 
-    for (const std::string art : {"chrom", "lack", "glas", "leuchtend", "schillernd", "facettiert",
-             "drahtgitter", "perlmutt", "unsichtbar"}) {
+    for (const std::string art : {"matt", "glaenzend", "metall", "chrom", "lack", "glas",
+             "leuchtend", "schillernd", "facettiert", "drahtgitter", "perlmutt", "unsichtbar",
+             "stoff", "holz", "metall_gebuerstet"}) {
         json = original;
         json.replace(json.find(feld), feld.size(), feld + ", \"oberflaeche\": \"" + art + "\"");
         schreiben(datei, json);
         katalog = modellkatalog(ordner);
-        const auto teil_art = darstellungsgeometrie(
-            katalog, "quader", katalog.eintrag("quader")->modell_fassung).teile[0];
+        const auto aktuelle_fassung = katalog.eintrag("quader")->modell_fassung;
+        pruefe(katalog.eintrag("quader")->status == "verwendbar", "Oberflaeche macht Modell fehlerhaft: " + art);
+        const auto geometrie = darstellungsgeometrie(katalog, "quader", aktuelle_fassung);
+        const auto& teil_art = geometrie.teile[0];
         pruefe(teil_art.oberflaeche && *teil_art.oberflaeche == art, "Effektoberflaeche abgelehnt: " + art);
+        pruefe(darstellungsgeometrie_json(geometrie).find("\"oberflaeche\":\"" + art + "\"")
+            != std::string::npos, "Oberflaeche im JSON veraendert: " + art);
+        const auto beschreibung = lies_beschreibung(datei);
+        pruefe(beschreibung.elemente[0].oberflaeche == teil_art.oberflaeche,
+            "Beschreibung und Katalog unterscheiden sich: " + art);
+        bool gueltig = false;
+        const auto validierung = pruefung_json(datei, gueltig);
+        pruefe(gueltig && validierung.find("CORE-MOD-0002") == std::string::npos,
+            "CLI-Modellvalidierung lehnt Oberflaeche ab: " + art);
+
+        const auto physik = katalogmodell(katalog, "quader", aktuelle_fassung);
+        pruefe(physik.fassung != physik_original.fassung, "Materialaenderung nicht in Fassung erfasst: " + art);
+        pruefe(physik.masse_kg == physik_original.masse_kg &&
+            physik.schwerpunkt_m == physik_original.schwerpunkt_m &&
+            physik.traegheit_kg_m2 == physik_original.traegheit_kg_m2 &&
+            physik.elemente.size() == physik_original.elemente.size(),
+            "Oberflaeche veraendert Massenwerte: " + art);
+        for (std::size_t i = 0; i < physik.elemente.size(); ++i) {
+            const auto& e = physik.elemente[i];
+            const auto& vorher = physik_original.elemente[i];
+            pruefe(e.masse_kg == vorher.masse_kg && e.schwerpunkt_m == vorher.schwerpunkt_m &&
+                e.traegheit_kg_m2 == vorher.traegheit_kg_m2 &&
+                e.volumen.has_value() == vorher.volumen.has_value(), "Elementphysik veraendert: " + art);
+            if (e.volumen)
+                pruefe(e.volumen->punkte == vorher.volumen->punkte &&
+                    e.volumen->dreiecke == vorher.volumen->dreiecke, "Volumennetz veraendert: " + art);
+        }
+        const auto kraefte = hydrostatik(physik, pruefpose);
+        pruefe(kraefte.volumen_m3 == kraefte_original.volumen_m3 &&
+            kraefte.kraft_welt_n == kraefte_original.kraft_welt_n &&
+            kraefte.moment_modell_nm == kraefte_original.moment_modell_nm,
+            "Oberflaeche veraendert physikalisches Ergebnis: " + art);
     }
 
     json = original;
@@ -223,6 +264,14 @@ void farben(const fs::path& quelle, const fs::path& tmp)
     schreiben(datei, json);
     katalog = modellkatalog(ordner);
     pruefe(katalog.eintrag("quader")->status == "fehlerhaft", "Ungueltige Oberflaeche nicht erkannt");
+    const auto meldung = fehler_von([&] { lade_modell(datei); });
+    pruefe(meldung.rfind("CORE-MOD-0002", 0) == 0 &&
+        meldung.find("Darstellung.oberflaeche") != std::string::npos,
+        "Ungueltige Oberflaeche ohne CORE-MOD-0002/Fundstelle");
+    bool gueltig = true;
+    const auto validierung = pruefung_json(datei, gueltig);
+    pruefe(!gueltig && validierung.find("CORE-MOD-0002") != std::string::npos,
+        "CLI-Modellvalidierung akzeptiert unbekannte Oberflaeche");
     pruefe(!darstellungsgeometrie(katalog, "quader", katalog.eintrag("quader")->modell_fassung)
         .teile[0].oberflaeche, "Ungueltige Oberflaeche geliefert");
 }
@@ -273,7 +322,7 @@ void fehlerfaelle(const fs::path& quelle, const fs::path& tmp)
 int main(int argc, char* argv[])
 {
     if (argc != 2) return 2;
-    const auto tmp = fs::temp_directory_path() /
+    const auto tmp = fs::current_path() /
         ("segel-katalog-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     int status = 0;
     try {

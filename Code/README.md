@@ -1,11 +1,50 @@
 # SegelPhysik-Core: nativer Build
 
+## Temporärer Testantrieb (C-0.5)
+
+Bibliotheksaufruf: `testantrieb_start(modell,start,konfiguration,aktiv)`,
+danach `dynamikschritt(modell,zustand,dt,ereignisse)`.
+`TestantriebKonfiguration` enthält `kraft_n` (200 N) und `grenze_m_s`
+(exakt 463/90 m/s); `TestantriebEreignis` enthält `kennung` und `aktiv`.
+Ereignisse werden vor dem Schritt eingefroren und nach erfolgreichem Schritt
+im unveränderlichen `Zustand::testantrieb` bestätigt.
+Der gleiche Kontext begleitet gespeicherte Zustände bis zur Serialisierung.
+Testzustände liefern Ergebnisversion 3, kontextfreie Altaufrufe Version 2.
+Die GUI muss Version 3 ausdrücklich unterstützen; es gibt keine neuen
+CLI-Schalter und keine statische Schubregelung.
+
+Horizontaler Bugschub verwendet nur physische Importgeometrie und den echten
+Hebelarm. Der aktive XY-Endgeschwindigkeitsbegrenzer (auch bei 0 N) weist
+Impuls und Energieänderung getrennt aus. Konfiguration-/Kontextfehler,
+fehlende positive Schubgeometrie und singuläre Richtung:
+`CORE-SIM-0001`. Keine Widerstandsphysik oder Kursstabilisierung.
+Vollständiger API-/Feldvertrag:
+[CORE → GUI](../Dokumentationen/Schnittstelle_Core_GUI.md#c-05-temporärer-testantrieb-ergebnisversion-3).
+
+Gezielter Nachweis im Release-Build:
+`ctest --test-dir build\c05 --output-on-failure -R "temporaerer_testantrieb|hydrostatik_referenzen|kraft_momentenbilanz|modell_import"`.
+`temporaerer_testantrieb` erzeugt im Buildordner die reproduzierbare
+`testantrieb-420-referenz.jsonl` einschließlich Ein/Aus-Ereignissen und
+Begrenzung. Technisch getestet, Nutzerabnahme weiterhin offen.
+
 Eigenständige C++17-Bibliothek und CLI ohne Python, pybind11 oder GUI.
 Implementiert sind Modellimport/-prüfung, Massenintegration,
 Wasserebenenschnitt, gemeinsame Hydrostatik, statisches Gleichgewicht,
 Starrkörperdynamik, Aufzeichnung und abfragbarer JSON-Fehlerkatalog.
 Es gelten die ausdrücklich dokumentierten
 [numerischen und geometrischen Grenzen](../Dokumentationen/Umsetzungsnachweise_Hydrostatikkern.md).
+
+## Lizenzstatus
+
+Die gewünschte Lizenzrichtung für den eigenen CORE-Code ist nicht-kommerziell:
+Bildungs-/Vereinsausnahme und kostenlose Weitergabe einschließlich Ableitungen
+mit Quellcode und gleichen Bedingungen. Die
+[Lizenzdokumentation](../Dokumentationen/Lizenzdokumentation.md) beschreibt die
+getrennte CORE-Prüfung. Die
+[vorgeschlagenen Bedingungen](../Dokumentationen/Lizenzbedingungen_Entwurf.md)
+sind ein **nicht in Kraft gesetzter Entwurf**, keine Nutzungserlaubnis und
+keine freie Open-Source-Lizenz. Rechte fremder Komponenten bleiben unverändert;
+eine Verteilungsfreigabe liegt nicht vor.
 
 ## Bauen und prüfen
 

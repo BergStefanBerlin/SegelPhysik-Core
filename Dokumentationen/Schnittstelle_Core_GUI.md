@@ -1,6 +1,139 @@
 # Schnittstellenbeschreibung / Ergebnisvertrag Core → GUI
 
+## C-0.5: Temporärer Testantrieb, Ergebnisversion 3
+
+Technisch implementiert am 27.10.2026 nach ausdrücklichem Auftrag, keine
+Nutzerabnahme oder Veröffentlichung. Maßgeblich sind A-C-00052 bis A-C-00060.
+Die bisherigen V2-Aufrufe bleiben unverändert. Kein neuer CLI-Schalter.
+
+```cpp
+TestantriebKonfiguration c; // kraft_n=200.; grenze_m_s=463./90.
+Zustand s = testantrieb_start(modell, start, c, false);
+s = dynamikschritt(modell, s, dt,
+    std::vector<TestantriebEreignis>{{1, true}, {2, false}, {3, true}});
+auto json = zustand_json(modell, s, "laufend"); // vertragsversion "3"
+```
+
+Alle Typen/Funktionen stehen in `segelphysik/hydrostatik.hpp`, die Ausgabe
+in `simulation.hpp`. Der bestehende Dynamikaufruf ohne Ereignisliste übernimmt
+den im Zustand gespeicherten Testkontext ebenfalls. Ein Zustand ohne
+Testkontext liefert weiterhin V2; `testantrieb_start` liefert auch bei
+inaktivem Flag V3. Konfiguration wird für einen Lauf festgehalten und nicht
+im Modell gespeichert. `Laufoptionen::testantrieb` ist optional;
+`testantrieb_aktiv` setzt das Startflag. `testantrieb_ereignisse` enthält
+Paare `(Quellschritt, TestantriebEreignis)`, geordnet nach Grenze und Kennung.
+Batch und Einzelschritt verwenden denselben Integrator.
+
+`Zustand::testantrieb` ist `shared_ptr<const TestantriebKontext>`.
+Zustandskopien behalten die unveränderliche Historie. `testantrieb_erforderlich`
+markiert Testzustände: Verlust des erforderlichen Zeigers ist ein Fehler.
+Das Feld nicht manuell löschen und Kontexte nicht zwischen Zuständen oder
+Modellfassungen transplantieren. `auswertung_schritt`/`auswertung_zeit_s`
+werden geprüft. Der CORE besitzt keine globale Livevariable.
+
+Der GUI-Worker übernimmt vor dem nächsten Schritt atomar die komplette
+ausstehende Ereignisliste unter seinem Mutex, gibt den Mutex frei und
+übergibt die Liste als festen Wert. Währenddessen ankommende Ereignisse
+bleiben bis zur nächsten Grenze im Worker. `TestantriebEreignis` hat
+`size_t kennung` (streng aufsteigend ab 1) und `bool aktiv`; letztes Ereignis
+bestimmt das Flag für sämtliche Auswertungen des Schritts. Erst der
+erfolgreich zurückgegebene Zustand bestätigt Anwendung unter
+`testantrieb->uebergang->ereignisse`. Übergang: `von_schritt`,
+`nach_schritt`, `startzeit_s`, `dt_s`. Bei Fehler/Abbruch/Laufende keine
+unberechneten Ereignisse bestätigen; alte Zustände bleiben gültig.
+Der CORE implementiert keinen Transport und keine GUI-Threadsteuerung.
+
+### Zusätzlicher JSON-Pflichtblock `testantrieb`
+
+| Feld | Inhalt |
+|---|---|
+| `modus` | `temporaerer_bugtest` |
+| `konfiguration` | `kraft_n`, `grenze_m_s` in SI |
+| `aktiv` | historisches Auswertungsflag; auch Flag des erzeugenden Übergangs |
+| `geometriequelle`, `modell_fassung` | physische Massen-/Volumennetze einschließlich Punktmassen; Inhaltsfingerprint des Imports |
+| `zugpunkt_modell_m` | deduplizierter Max-X-Mittelpunkt; `null`, wenn nicht vorhanden/nicht benötigt |
+| `schwerpunkt_modell_m` | Schwerpunkt des Gesamtmodells in m |
+| `schub_welt_n` | horizontale reale Kraft, inaktiv/Nullkraft `[0,0,0]` |
+| `auswertung_schritt`, `auswertung_zeit_s`, `letzte_ereigniskennung` | gespeicherter Zustands-/Ereignisbezug |
+| `uebergang` | am Start `null`, sonst Objekt mit Grenze, Zeit, `aktiv`, geordneten `ereignisse` und `begrenzung` |
+
+`begrenzung` enthält `wirksam`, `vorher_welt_m_s`, `nachher_welt_m_s`,
+`korrekturimpuls_ns` und `energieaenderung_j`. Ohne Eingriff sind v vor/nach
+identisch und Δp/ΔE null. Dieser künstliche Impuls gehört nicht zur
+kontinuierlichen Kraftsumme. Er verändert weder Pose noch Z- oder
+Winkelgeschwindigkeit des regulären Schritts; aktiv bei 0 N begrenzt weiter.
+Am Start gibt es weder erzeugenden Übergang noch Begrenzung.
+
+Beitrag `testantrieb.bug.kraft`, Quelle/Gruppe `testantrieb`, Rolle
+`einzelbeitrag`, Frame `modell`, leere `element_id` für das Gesamtmodell:
+reale Kraft am Zugpunkt, `moment_s_nm` enthält genau einmal den Hebelarm.
+`gesamt:moment` bleibt eine nicht nochmals summierte Gesamtsumme.
+Inaktiv: `zustand: deaktiviert`; aktiv mit 0 N: bekannter `null`-Beitrag.
+Fehlt bei Nullkraft die Geometrie, ist auch dessen `punkt_m: null`;
+kein erfundener Schwerpunkt-Ersatz. Der erwartete Bilanzumfang umfasst den
+Testbeitrag, nicht den Korrekturimpuls. `bilanzstatus` erklärt ausschließlich
+die kontinuierlichen Beiträge, nicht Impulsfreiheit.
+
+Eingabe-/Kontext-/Richtungsfehler und aktive Statik verwenden den bestehenden
+Katalogeintrag `CORE-SIM-0001` mit konkreter Diagnose, Dynamikträgheit weiter
+`CORE-SIM-0002`. Fehler veröffentlichen keinen halben Schritt.
+Geometrie: tatsächliche Importpunkte aus `Element::massenpunkte_m` und
+Volumennetzen; lexikografisch sortierte Max-X-Kandidaten, euklidische
+Deduplikation mit `max(1e-9 m,1e-9*L)`, arithmetisches Mittel.
+Keine Darstellungs-OBJ-Abhängigkeit, kein Wasserlinienkriterium.
+
+Nachweis: CTest `temporaerer_testantrieb`, bestehende Import-/Hydrostatik-/
+Bilanz-/Simulations-/CLI-Tests; reproduzierbare vierzeilige 420er-Aufzeichnung
+`build\c05\testantrieb-420-referenz.jsonl` entsteht bei Ausführung des
+Testziels. Sie enthält unveränderten Start mit 6 m/s, aktive Begrenzung,
+Ausschalten und erneutes Einschalten. Keine grafische Abnahme.
+
 ## Status und Geltungsbereich
+
+### Exakte V3-Form des Zusatzblocks (Schrittzustand)
+
+Die folgenden Zahlen illustrieren die Feldtypen, keine zusätzliche
+Referenzsimulation. Sämtliche genannten Felder werden ausgegeben:
+
+```json
+{
+  "testantrieb": {
+    "modus": "temporaerer_bugtest",
+    "konfiguration": {"kraft_n": 200, "grenze_m_s": 5.144444444444445},
+    "aktiv": true,
+    "geometriequelle": "physische_massen_volumennetze_punktmassen",
+    "modell_fassung": "Importfingerprint",
+    "zugpunkt_modell_m": [2, 0, 1],
+    "schwerpunkt_modell_m": [0, 0, 0],
+    "schub_welt_n": [200, 0, 0],
+    "auswertung_schritt": 1,
+    "auswertung_zeit_s": 0.01,
+    "letzte_ereigniskennung": 1,
+    "uebergang": {
+      "von_schritt": 0,
+      "nach_schritt": 1,
+      "startzeit_s": 0,
+      "dt_s": 0.01,
+      "aktiv": true,
+      "ereignisse": [{"kennung": 1, "aktiv": true}],
+      "begrenzung": {
+        "wirksam": false,
+        "vorher_welt_m_s": [0.2, 0, -0.0981],
+        "nachher_welt_m_s": [0.2, 0, -0.0981],
+        "korrekturimpuls_ns": [0, 0, 0],
+        "energieaenderung_j": 0
+      }
+    }
+  }
+}
+```
+
+Am Start ist `uebergang: null`; es gibt dort keinen separaten
+`begrenzung`-Block. `zugpunkt_modell_m` darf bei nicht benötigter,
+fehlender Geometrie `null` sein. Ohne Ereignisse: `ereignisse: []`.
+Die Ereigniskennung bleibt über Schritte streng monoton.
+`letzte_ereigniskennung: 0` bedeutet noch kein angewandtes Ereignis.
+V3 bleibt auch mit `aktiv: false` erhalten.
 
 Stand: C-0.2 in Arbeit. Technische Dokumentation zu A-C-00016, A-C-00028,
 A-C-00031 und A-C-00032 der
@@ -312,9 +445,22 @@ fächertrianguliert.
 `Darstellung.farbe` (`"#rrggbb"`, A-C-00048); ohne Angabe ist es `null`.
 `oberflaeche` (`"matt"`, `"glaenzend"`, `"metall"`, `"chrom"`, `"lack"`,
 `"glas"`, `"leuchtend"`, `"schillernd"`, `"facettiert"`, `"drahtgitter"`,
-`"perlmutt"`) stammt aus dem
+`"perlmutt"`, `"unsichtbar"`, `"stoff"`, `"holz"`, `"metall_gebuerstet"`) stammt aus dem
 optionalen Modellfeld `Darstellung.oberflaeche` (A-C-00049); ohne Angabe
 ist es `null`.
+
+Die stabilen Namen `stoff`, `holz` und `metall_gebuerstet` ergänzen die
+bisherigen Werte rückwärtskompatibel für die explizite Materialwahl.
+Beschreibung (`ElementBeschreibung.oberflaeche`), Katalog
+(`Darstellungsteil.oberflaeche`) und JSON transportieren denselben String
+unverändert. Es gibt keine neuen Felder, Datentypen, Funktionen oder
+ABI-Änderungen. Oberflächen sind reine Darstellung; physikalische Materialien
+und Ergebnisse bleiben unverändert. Eine Änderung der JSON-Metadaten ändert
+wie bisher die Modellfassung. UV-Koordinaten und Texturpfade sind nicht
+erforderlich; die GUI darf die vorhandenen lokalen Modellkoordinaten zur
+prozeduralen Projektion nutzen. Unbekannte Namen bleiben CORE-MOD-0002
+mit Fundstelle `Darstellung.oberflaeche`; die tolerante Darstellungsabfrage
+liefert dafür `null`, nicht ein still ersetztes Material.
 
 Einschränkungen: Das Modellformat 0.1-entwurf kennt keine Elementnamen
 oder Beschreibungen; `name` ist daher die ID, `beschreibung` ist `null`. Die Modellfassung enthält bewusst keine

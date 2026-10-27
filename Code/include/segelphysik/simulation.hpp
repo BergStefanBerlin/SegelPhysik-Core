@@ -12,6 +12,10 @@ struct Laufoptionen {
     std::size_t ausgabe_intervall = 1;
     bool jsonl = true;
     const std::atomic_bool* abbruch = nullptr;
+    std::optional<TestantriebKonfiguration> testantrieb;
+    bool testantrieb_aktiv = false;
+    // Scheduled events are applied before the indicated source step.
+    std::vector<std::pair<std::size_t, TestantriebEreignis>> testantrieb_ereignisse;
 };
 struct Laufbericht {
     std::string status;

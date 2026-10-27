@@ -1,0 +1,74 @@
+{
+  "status": "finalisiert",
+  "thema": "Temporärer Testantrieb und schrittbezogene Laufsteuerung",
+  "spezifikation": "../Spezifikation_Temporaerer_Testantrieb.md",
+  "umsetzungsplan": "../../Umsetzungsplaene/Umsetzungsplan_C-0.5.md",
+  "zielversion": "C-0.5; Nutzerzuordnung 27.10.2026; kein Veröffentlichungsauftrag",
+  "hinweis": "Ursprüngliche Finalisierung am 27.10.2026 zunächst ohne Implementierung; nachfolgende ausdrückliche Implementierungsfreigabe am 27.10.2026 um 22:16 für CORE und GUI. Alle sieben Antwortvorschläge angenommen. Frühere Fragen/Vorschläge und Finalisierungsantworten bleiben als Historie unverändert; maßgeblich sind Entscheidung und A-Zuordnung. IDEE-C-00003 bleibt als allgemeine Kraftmodellerweiterung eigenständig. CORE-Zielversion C-0.5; kein Git-Auftrag und keine fachliche Nutzerabnahme.",
+  "planungsstand": "Einziger Plan C-0.5: U-C-000036 bis U-C-000043 technisch umgesetzt und gezielt nachgewiesen; GUI-Übergabe und API-Integration durch GUI-Koordination bestätigt. U-C-000044: technische Nachweismatrix vorhanden, fachliche Nutzerabnahme offen.",
+  "punkte": [
+    {
+      "id": "IDEE-C-00027",
+      "status": "übernommen",
+      "thema": "Temporärer Umfang und Kraftmodell",
+      "bezug": "../Spezifikation_Temporaerer_Testantrieb.md#2-bestätigte-laufparameter-und-geltung",
+      "entscheidung_quelle": "GUI A-G-00038 bis A-G-00040: 200 N, exakt 10 kn, Parameterbereiche, Bugzug unabhängig von Wasserlinie, horizontale Bugkraft ohne Kursregelung, Live-Aktivflag; Zahlen im Lauf gesperrt.",
+      "entscheidung": "Nutzerantwort 27.10.2026: Parameter/Umfang übernommen; aktiven Testantrieb in Statik ablehnen. Durchgehend inaktiver Altpfad unverändert. Echtes Hebelarmmoment ohne Kursregelung.",
+      "uebernommen_als": ["A-C-00052", "A-C-00054"],
+      "vorschlag": "Dynamikfunktion als optionalen Laufkontext führen; aktive Statikkonfiguration mit Diagnose ablehnen. Inaktiver Altpfad unverändert und ohne Bugdatenpflicht."
+    },
+    {
+      "id": "IDEE-C-00028",
+      "status": "übernommen",
+      "thema": "Maßgebliche Buggeometrie und Toleranzen",
+      "bezug": "../Spezifikation_Temporaerer_Testantrieb.md#3-angriffspunkt-kraft-und-moment",
+      "frage": "Soll die vorderste Stelle aus physikalischen Massen-/Volumennetzen und Punktmassen oder aus explizit übergebenen Darstellungsdaten bestimmt werden? Welche Geometriequelle, Duplikat- und Gleichheitstoleranz ist verbindlich?",
+      "entscheidung": "Nutzerantwort 27.10.2026: physikalische Massen-/Volumennetze einschließlich Punktmassen; Darstellungsdateien bleiben unabhängig. Deduplizierte Max-X-Punkte arithmetisch mitteln. Geometrievergleich max(1e-9 m, 1e-9 * L), horizontale Einheitsachsen-Projektion > 1e-10. Positiver Schub bei singulärer Richtung: Diagnose, kein halber Zustand; Nullkraft ohne Normalisierung.",
+      "uebernommen_als": ["A-C-00053", "A-C-00054"],
+      "vorschlag": "Physikalische Netzextrema beim Import erhalten; keine bisher ausgeschlossenen Darstellungsdateien implizit als Physik öffnen. Geometrisch deduplizierte Max-X-Punkte mitteln; Vorschlag max(1e-9 m, 1e-9 * L), Achsenprojektionsgrenze 1e-10. Sichtbare und physische Bugspitze können verschieden sein; Quelle vor Implementierung ausdrücklich entscheiden."
+    },
+    {
+      "id": "IDEE-C-00029",
+      "status": "übernommen",
+      "thema": "Begrenzer, Schrittfolge und Eingriffsnachweis",
+      "bezug": "../Spezifikation_Temporaerer_Testantrieb.md#4-integration-und-künstliche-geschwindigkeitsgrenze",
+      "entscheidung_quelle": "Nur bei aktivem Flag nach Physikschritt horizontalen Wasserrelativbetrag richtungstreu kappen; Z/omega unberührt, bei aus kein Begrenzer. Keine Widerstandsphysik.",
+      "entscheidung": "Nutzerantwort 27.10.2026: Startzustand unverändert, erste Begrenzung nach erstem Schritt, keine rückwirkende Wegkorrektur. Korrekturimpuls und Energieänderung getrennt protokollieren. Grenztoleranz max(1e-10 m/s, 1e-10 * v_max); Kraft-/Momentenvergleich max(1e-8 N bzw. N·m, 1e-9 * Referenzbetrag); keine globale Rundung.",
+      "uebernommen_als": ["A-C-00055", "A-C-00060"],
+      "vorschlag": "Schub in Start-/Mittelauswertungen integrieren; Begrenzer vor Veröffentlichung, Startzustand nicht rückwirkend ändern. Vor/nach-v, Korrekturimpuls und translatorische Energieänderung separat protokollieren. Grenztoleranz max(1e-10 m/s, 1e-10 * v_max) vor Finalisierung bestätigen."
+    },
+    {
+      "id": "IDEE-C-00030",
+      "status": "übernommen",
+      "thema": "Schrittbezogener Steuer- und API-Vertrag",
+      "bezug": "../Spezifikation_Temporaerer_Testantrieb.md#5-live-flag-und-reproduzierbare-steuerereignisse",
+      "frage": "Welche konkrete typsichere Bibliothekserweiterung transportiert eingefrorene Parameter, geordnete Live-Ereignisse, Wirksamkeitsbestätigung und gespeicherten Schritt-/Auswertungskontext?",
+      "entscheidung": "Nutzerantwort 27.10.2026: schrittgenauen Vertrag übernehmen. Ereignisse vor nächstem unbegonnenem Schritt geordnet übernehmen; während Berechnung erst am Folgeschritt, letztes Ereignis an gleicher Grenze gilt, alle bleiben nachvollziehbar. Tatsächlichen Übergang und Zeit bestätigen; Historie unveränderlich. Konkrete C++-Namen nach Projektmustern technisch ausarbeiten.",
+      "uebernommen_als": ["A-C-00056", "A-C-00059"],
+      "vorschlag": "Ein Flag je vollständigem Schritt; Grenzübernahme vor Rechenbeginn, spätere Ereignisse am Folgeschritt; Ereignis-ID, Übergang n→n+1 und Startzeit bestätigen. Keine globalen Flags und keine Qt-/VTK-Abhängigkeit. Batch und direkter Einzelschritt nutzen dieselbe Physik; kein neuer Netzwerktransport."
+    },
+    {
+      "id": "IDEE-C-00031",
+      "status": "übernommen",
+      "thema": "Ergebnisversion, Beiträge und Fehlerkatalog",
+      "bezug": "../Spezifikation_Temporaerer_Testantrieb.md#6-beiträge-bilanz-und-ergebnisvertrag",
+      "frage": "Neue Ergebnisversion oder versionierter optionaler Zusatzblock? Welche exakten Feldnamen, Null-/Pflichtregeln, Gesamtmodellbeitragskennung und Fehler-IDs werden verbindlich?",
+      "entscheidung": "Nutzerantwort 27.10.2026: Version 3 für Testläufe mit Pflichtkontext, alter Aufruf ohne Testkontext bleibt Version 2. GUI erweitert Leser um Version 3 bei fortgesetzter Unterstützung älterer Aufzeichnungen. Endzustandskräfte und erzeugenden Übergang trennen; Korrekturimpuls separat. Konkrete Feldnamen/Fehlerkennungen nach Projektmustern technisch ausarbeiten.",
+      "uebernommen_als": ["A-C-00057", "A-C-00058"],
+      "vorschlag": "Quelle/Gruppe testantrieb und stabiler Kraftbeitrag; Endzustandsauswertung und erzeugenden Übergang trennen, Korrekturimpuls separat. Bestehende Fehlerkatalogsystematik erweitern, keine Kennungen vorweg vergeben. Aktiven Lauf ohne Kontext nicht still als Hydrostatik serialisieren."
+    },
+    {
+      "id": "IDEE-C-00032",
+      "status": "übernommen",
+      "thema": "CORE-Version, CLI-Abgrenzung und Freigabe",
+      "bezug": "../Spezifikation_Temporaerer_Testantrieb.md#9-freigabe-und-lieferstatus",
+      "entscheidung": "Nutzerkorrektur 27.10.2026: aktueller CORE-Arbeitsversionsschritt ist C-0.5. GitHub-Prüfung: veröffentlichte Tags bis C-0.4; bestehende Planhistorie endet bei C-0.2. Neuer einziger Planentwurf C-0.5 auf Nutzerauftrag erstellt, keine Umbenennung historischer Pläne.",
+      "finalisierungsentscheidung": "Nutzerantwort 27.10.2026: zunächst nur Bibliothek für GUI und Batch, keine neuen CLI-Argumente. Spezifikation und Plan C-0.5 mit allen Antworten finalisieren; ausdrücklich noch nicht implementieren. Gezielte Tests erst bei Umsetzung, kein Git-Auftrag.",
+      "implementierungsfreigabe": "Nachfolgender ausdrücklicher Nutzerauftrag 27.10.2026, 22:16: gesamten CORE-Plan C-0.5 implementieren; beide Projekte autorisiert, vorhandene Änderungen bewahren, keine Git-Aktionen.",
+      "umsetzungsstand": "CORE technisch implementiert; strenger MSVC-Build und elf gezielte CTests bestanden, enger Nachweisnachtrag ebenfalls bestanden. GUI-Koordination bestätigt erfolgreiche API-Integration, produktiven Release-Build und acht fokussierte GUI-Tests sowie GPU-Nachweise. Fachliche Nutzerabnahme bleibt offen; maßgebliche Belege im C-0.5-Plan und separat im GUI-Plan.",
+      "uebernommen_als": ["A-C-00059", "A-C-00060"],
+      "frage": "Soll die CLI eigene Testantriebsoptionen erhalten oder zunächst nur die Bibliothek genutzt werden?",
+      "vorschlag": "Nicht aus GUI G-0.5 auf eine CORE-Version schließen. Zunächst Bibliotheksvertrag für GUI und Batch konkretisieren; CLI-Flags nur bei ausdrücklichem Umfang. Erst nach Finalisierung A-C- und nach Planauftrag U-C-Kennungen vergeben; gezielte CORE-Tests statt voller GUI-Suite."
+    }
+  ]
+}

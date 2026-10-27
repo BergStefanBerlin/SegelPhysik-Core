@@ -299,7 +299,8 @@ std::optional<std::array<double, 3>> farbe_hex(const Json& wert)
 }
 
 constexpr const char* OBERFLAECHEN[] = {"matt", "glaenzend", "metall", "chrom", "lack", "glas",
-    "leuchtend", "schillernd", "facettiert", "drahtgitter", "perlmutt", "unsichtbar"};
+    "leuchtend", "schillernd", "facettiert", "drahtgitter", "perlmutt", "unsichtbar",
+    "stoff", "holz", "metall_gebuerstet"};
 
 // Darstellungsoberfläche; nullopt bei unbekanntem Wert.
 std::optional<std::string> oberflaeche_text(const Json& wert)
@@ -810,6 +811,7 @@ void masse_lesen(Element& e, const Json& masse, const std::filesystem::path& bas
         if (position.typ != Json::Typ::liste || position.liste.size() != 3)
             fehler(4, ort, "position_m muss drei Zahlen enthalten");
         for (std::size_t i = 0; i < 3; ++i) e.schwerpunkt_m[i] = zahl(position.liste[i], ort, false);
+        e.massenpunkte_m.push_back(e.schwerpunkt_m);
     } else if (art == "vollkoerper" || art == "schale") {
         const bool solid = art == "vollkoerper";
         if (solid) objekt(masse, {"art", "dichte_kg_pro_m3", "datei"}, ort, 4);
@@ -820,6 +822,7 @@ void masse_lesen(Element& e, const Json& masse, const std::filesystem::path& bas
         const auto mesh = obj_lesen(datei, ort + ".masse", fassung);
         const std::string mesh_ort = ort + ".masse, Mesh " + datei.u8string();
         validieren(mesh, solid, mesh_ort);
+        e.massenpunkte_m = mesh.punkte;
         masseneigenschaften(e, mesh, solid, dichte, mesh_ort);
         if (!solid) {
             std::map<std::pair<std::size_t, std::size_t>, int> kanten;
@@ -910,7 +913,8 @@ Modell lade_modell(const std::filesystem::path& datei)
                 if (const auto* art = optional(*darstellung, "oberflaeche"); art && !oberflaeche_text(*art))
                     fehler(2, elementort + ".Darstellung.oberflaeche",
                         "Oberflaeche matt, glaenzend, metall, chrom, lack, glas, leuchtend, "
-                        "schillernd, facettiert, drahtgitter, perlmutt oder unsichtbar erwartet");
+                        "schillernd, facettiert, drahtgitter, perlmutt, unsichtbar, stoff, holz "
+                        "oder metall_gebuerstet erwartet");
             }
             if (hydro) {
                 objekt(*hydro, {"masse", "volumen"}, elementort + ".Hydrostatik");

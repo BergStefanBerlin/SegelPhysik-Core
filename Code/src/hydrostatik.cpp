@@ -188,6 +188,7 @@ std::vector<std::string> flutung(const Modell& modell,const Pose& pose,std::vect
 const char* name(Quelle wert)
 {
     switch (wert) {
+    case Quelle::testantrieb: return "testantrieb";
     case Quelle::schwerkraft: return "schwerkraft";
     case Quelle::hydrostatik: return "hydrostatik";
     case Quelle::summe: return "summe";
@@ -221,6 +222,9 @@ Bilanz bilanz(const Modell& modell,std::vector<Beitrag>& beitraege)
 {
     Bilanz result;
     result.gesamt.gruppe="gesamt";
+    if(std::any_of(beitraege.begin(),beitraege.end(),
+        [](const Beitrag& b){return b.quelle==Quelle::testantrieb;}))
+        result.erwartete_beitraege.push_back("testantrieb.bug.kraft");
     for (const auto& e : modell.elemente) {
         result.erwartete_beitraege.push_back(e.id+":gewicht");
         if (e.volumen) result.erwartete_beitraege.push_back(e.id+":auftrieb");
@@ -339,6 +343,9 @@ SolverErgebnis gleichgewicht_suche(const Modell& modell,const Zustand& start,
 SolverErgebnis gleichgewicht(const Modell& modell,const Zustand& start,
     double ftol,double mtol,std::size_t budget,const std::atomic_bool* abbruch)
 {
+    if((start.testantrieb_erforderlich&&!start.testantrieb) ||
+        (start.testantrieb&&start.testantrieb->aktiv))
+        throw std::invalid_argument("CORE-SIM-0001: Aktiver Testantrieb in Statik oder fehlender Kontext.");
     // The start pose is only an initial guess and does not flood anything.
     auto geflutet=start.geflutet;
     std::sort(geflutet.begin(),geflutet.end());
@@ -371,10 +378,121 @@ SolverErgebnis gleichgewicht(const Modell& modell,const Zustand& start,
     return result;
 }
 
+namespace {
+void testparameter(const TestantriebKonfiguration& c)
+{
+    if(!std::isfinite(c.kraft_n)||c.kraft_n<0.||c.kraft_n>100000.||
+        !std::isfinite(c.grenze_m_s)||c.grenze_m_s<.01||c.grenze_m_s>20.)
+        throw std::invalid_argument("CORE-SIM-0001: Ungueltige Testantriebsparameter.");
+}
+std::optional<Vektor3> bugpunkt(const Modell& m)
+{
+    std::vector<Vektor3> punkte;
+    for(const auto& e:m.elemente) {
+        punkte.insert(punkte.end(),e.massenpunkte_m.begin(),e.massenpunkte_m.end());
+        if(e.volumen) punkte.insert(punkte.end(),e.volumen->punkte.begin(),e.volumen->punkte.end());
+    }
+    if(punkte.empty()) return std::nullopt;
+    auto lo=punkte.front(),hi=lo;
+    for(const auto& p:punkte) for(std::size_t i=0;i<3;++i) {
+        if(!std::isfinite(p[i])) throw std::invalid_argument("CORE-SIM-0001: Buggeometrie nicht endlich.");
+        lo[i]=std::min(lo[i],p[i]);hi[i]=std::max(hi[i],p[i]);
+    }
+    const double eps=std::max(1e-9,1e-9*std::max({hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2]}));
+    std::sort(punkte.begin(),punkte.end());
+    std::vector<Vektor3> vorne;
+    for(const auto& p:punkte) {
+        if(hi[0]-p[0]>eps) continue;
+        if(std::none_of(vorne.begin(),vorne.end(),[&](const Vektor3& q) {
+            return std::hypot(p[0]-q[0],p[1]-q[1],p[2]-q[2])<=eps;
+        })) vorne.push_back(p);
+    }
+    Vektor3 mittel{};
+    for(const auto& p:vorne) mittel=plus(mittel,mal(p,1./static_cast<double>(vorne.size())));
+    return mittel;
+}
+void kontextpruefung(const Modell& m,const Zustand& s)
+{
+    if(s.testantrieb_erforderlich&&!s.testantrieb)
+        throw std::invalid_argument("CORE-SIM-0001: Erforderlicher Testkontext fehlt.");
+    if(s.testantrieb && (s.testantrieb->modell_fassung!=m.fassung ||
+        s.testantrieb->auswertung_schritt!=s.schritt || s.testantrieb->auswertung_zeit_s!=s.zeit_s))
+        throw std::invalid_argument("CORE-SIM-0001: Testkontext passt nicht zum Zustand oder Modell.");
+}
+}
+
+Zustand testantrieb_start(const Modell& m,const Zustand& s,
+    const TestantriebKonfiguration& c,bool aktiv)
+{
+    testparameter(c);
+    if(s.testantrieb || s.testantrieb_erforderlich || !std::isfinite(s.zeit_s))
+        throw std::invalid_argument("CORE-SIM-0001: Teststart benoetigt kontextfreien endlichen Zustand.");
+    auto k=std::make_shared<TestantriebKontext>();
+    k->konfiguration=c;k->aktiv=aktiv;k->modell_fassung=m.fassung;
+    k->zugpunkt_modell_m=bugpunkt(m);
+    k->auswertung_schritt=s.schritt;k->auswertung_zeit_s=s.zeit_s;
+    // Validate active geometry/direction before publishing the initial state.
+    kraefte(m,s.pose,k.get(),1000.,9.81,s.geflutet);
+    auto result=s;result.testantrieb=k;result.testantrieb_erforderlich=true;
+    return result;
+}
+
+Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
+    double rho,double g,const std::vector<std::string>& geflutet)
+{
+    auto k=hydrostatik(m,p,rho,g,geflutet);
+    if(!c) return k;
+    testparameter(c->konfiguration);
+    if(c->modell_fassung!=m.fassung)
+        throw std::invalid_argument("CORE-SIM-0001: Falsche Testgeometriefassung.");
+    Beitrag b;b.id="testantrieb.bug.kraft";b.art="kraft";
+    b.quelle=Quelle::testantrieb;b.gruppe="testantrieb";
+    b.zustand=c->aktiv?Datenzustand::null:Datenzustand::deaktiviert;
+    b.punkt_bekannt=c->zugpunkt_modell_m.has_value();
+    if(c->zugpunkt_modell_m) b.punkt_m=*c->zugpunkt_modell_m;
+    if(c->aktiv && c->konfiguration.kraft_n>0.) {
+        if(!c->zugpunkt_modell_m)
+            throw std::invalid_argument("CORE-SIM-0001: Physische Buggeometrie fehlt.");
+        const auto bow=p.modellvektor_nach_welt({1.,0.,0.});
+        const double norm=std::hypot(bow[0],bow[1]);
+        if(norm<=1e-10)
+            throw std::invalid_argument("CORE-SIM-0001: Horizontale Bugprojektion singulaer.");
+        const Vektor3 f{c->konfiguration.kraft_n*bow[0]/norm,c->konfiguration.kraft_n*bow[1]/norm,0.};
+        b.vektor=p.weltvektor_nach_modell(f);
+        b.moment_s_nm=moment_um(b.punkt_m,m.schwerpunkt_m,b.vektor);
+        b.zustand=Datenzustand::gueltig;
+        k.kraft_welt_n=plus(k.kraft_welt_n,f);
+        k.moment_modell_nm=plus(k.moment_modell_nm,b.moment_s_nm);
+    }
+    for(auto& sum:k.beitraege) if(sum.rolle==Rolle::gesamtsumme) {
+        sum.vektor=k.moment_modell_nm;sum.moment_s_nm=k.moment_modell_nm;
+    }
+    k.beitraege.push_back(b);
+    return k;
+}
+
 Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,double rho,double g)
+{
+    return dynamikschritt(modell,s,dt,std::vector<TestantriebEreignis>{},rho,g);
+}
+Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
+    const std::vector<TestantriebEreignis>& ereignisse,double rho,double g)
 {
     SEGEL_MESSUNG("dynamischer_zeitschritt");
     positiv(dt);
+    kontextpruefung(modell,s);
+    if(!s.testantrieb&&!ereignisse.empty())
+        throw std::invalid_argument("CORE-SIM-0001: Ereignisse ohne Testkontext.");
+    std::shared_ptr<TestantriebKontext> context;
+    if(s.testantrieb) {
+        context=std::make_shared<TestantriebKontext>(*s.testantrieb);
+        for(const auto& e:ereignisse) {
+            if(e.kennung<=context->letzte_ereigniskennung)
+                throw std::invalid_argument("CORE-SIM-0001: Ereigniskennungen nicht streng aufsteigend.");
+            context->letzte_ereigniskennung=e.kennung;context->aktiv=e.aktiv;
+        }
+        context->uebergang=TestantriebUebergang{s.schritt,s.schritt+1,s.zeit_s,dt,ereignisse,{}};
+    }
     for(double value:s.geschwindigkeit_welt_m_s)
         if(!std::isfinite(value)) throw std::invalid_argument("CORE-SIM-0001: Geschwindigkeit nicht endlich.");
     for(double value:s.omega_modell_rad_s)
@@ -386,7 +504,7 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,double rh
         I[0]*(I[4]*I[8]-I[5]*I[7])-I[1]*(I[3]*I[8]-I[5]*I[6])+I[2]*(I[3]*I[7]-I[4]*I[6])<=0.)
         throw std::invalid_argument("CORE-SIM-0002: Dynamiktraegheit nicht positiv definit.");
     const auto geflutet=flutung(modell,s.pose,s.geflutet);
-    const auto k=hydrostatik(modell,s.pose,rho,g,geflutet);
+    const auto k=kraefte(modell,s.pose,context.get(),rho,g,geflutet);
     const auto a=mal(k.kraft_welt_n,1./modell.masse_kg);
     Vektor3 impuls{};
     for (std::size_t i=0;i<3;++i)
@@ -406,7 +524,7 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,double rh
     const Pose midrotation{{},midq};
     const auto midcg=plus(plus(cg,mal(s.geschwindigkeit_welt_m_s,dt/2)),mal(a,dt*dt/8));
     const Pose midpose{plus(midcg,mal(midrotation.modellvektor_nach_welt(modell.schwerpunkt_m),-1.)),midq};
-    const auto midforce=hydrostatik(modell,midpose,rho,g,geflutet);
+    const auto midforce=kraefte(modell,midpose,context.get(),rho,g,geflutet);
     Vektor3 midimpuls{};
     for(std::size_t i=0;i<3;++i)
         for(std::size_t j=0;j<3;++j) midimpuls[i]+=I[3*i+j]*omega_mid[j];
@@ -421,6 +539,33 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,double rh
     result.omega_modell_rad_s=plus(s.omega_modell_rad_s,mal(midalpha,dt));
     result.zeit_s=s.zeit_s+dt;result.schritt=s.schritt+1;
     result.geflutet=flutung(modell,result.pose,geflutet);
+    if(context) {
+        auto& b=context->uebergang->begrenzung;
+        b.vorher_welt_m_s=result.geschwindigkeit_welt_m_s;
+        const double speed=std::hypot(b.vorher_welt_m_s[0],b.vorher_welt_m_s[1]);
+        if(context->aktiv && speed>context->konfiguration.grenze_m_s) {
+            b.wirksam=true;
+            const double scale=context->konfiguration.grenze_m_s/speed;
+            result.geschwindigkeit_welt_m_s[0]*=scale;
+            result.geschwindigkeit_welt_m_s[1]*=scale;
+        }
+        b.nachher_welt_m_s=result.geschwindigkeit_welt_m_s;
+        if(b.wirksam) {
+            b.korrekturimpuls_ns=mal(plus(b.nachher_welt_m_s,mal(b.vorher_welt_m_s,-1.)),modell.masse_kg);
+            // Only XY changes; avoid cancellation of a large unchanged Z energy.
+            b.energieaenderung_j=.5*modell.masse_kg*
+                ((b.nachher_welt_m_s[0]*b.nachher_welt_m_s[0]+b.nachher_welt_m_s[1]*b.nachher_welt_m_s[1])-
+                 (b.vorher_welt_m_s[0]*b.vorher_welt_m_s[0]+b.vorher_welt_m_s[1]*b.vorher_welt_m_s[1]));
+        }
+        if(!std::isfinite(b.energieaenderung_j))
+            throw std::overflow_error("CORE-SIM-0001: Begrenzerenergie nicht endlich.");
+        for(double value:b.korrekturimpuls_ns) if(!std::isfinite(value))
+            throw std::overflow_error("CORE-SIM-0001: Korrekturimpuls nicht endlich.");
+        context->auswertung_schritt=result.schritt;context->auswertung_zeit_s=result.zeit_s;
+        result.testantrieb=context;result.testantrieb_erforderlich=true;
+        if(context->aktiv&&context->konfiguration.kraft_n>0.)
+            kraefte(modell,result.pose,context.get(),rho,g,result.geflutet);
+    }
     for(double value:result.geschwindigkeit_welt_m_s)
         if(!std::isfinite(value)) throw std::overflow_error("CORE-SIM-0001: Geschwindigkeitsueberlauf.");
     for(double value:result.omega_modell_rad_s)
