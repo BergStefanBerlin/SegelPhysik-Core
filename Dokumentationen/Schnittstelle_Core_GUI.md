@@ -505,3 +505,161 @@ Umsetzungshinweisen. Sie sind keine aktiven Core-Anforderungen.
 Dieser Ergebnisvertrag bleibt als Beschreibung der tatsächlich
 verfügbaren Core-Schnittstellen bestehen; GUI-/Web-Adapter sind
 weiterhin nicht implementiert.
+
+## 7. Hydrodynamische Kraft- und Momentenbeiträge
+
+**Status: ITTC-Rumpfreibung und dynamischer Core-Vertrag implementiert für
+C-0.6; Restwiderstand und Kielpolaren nicht implementiert/nicht abgenommen.**
+Maßgeblich:
+[CORE-Spezifikation Hydrodynamik](../Spezifikationen/Spezifikation_Hydrodynamik.md).
+Entscheidungsherkunft und technische Restpunkte:
+[Entwurfspunkte Hydrodynamik](../Spezifikationen/Entwurfspunkte/Hydrodynamik.json).
+Der dazugehörige
+[Umsetzungsplan C-0.6](../Umsetzungsplaene/Umsetzungsplan_Hydrodynamik.md)
+dokumentiert Schrittstatus und Nachweise. Die neuen Einzelbeiträge erweitern
+Ergebnisversion 2 additiv; bestehende Pflichtfelder und deren Bedeutung
+bleiben unverändert.
+Die dauerhaften C++-Kennungen sind im
+[Schnittstellenregister CORE](Schnittstellenregister_Core.md) festgehalten.
+
+### 7.1 Core-Aufruf und Bewegungsintegration
+
+Die öffentliche C++-Schnittstelle liegt in `segelphysik/hydrostatik.hpp`;
+die Laufoption in `segelphysik/simulation.hpp`. `Laufoptionen::hydrodynamik`
+kann `HydrodynamikKonfiguration` mit `rho_kg_m3`, `nu_m2_s` und
+`fluidgeschwindigkeit_welt_m_s` übergeben. Ohne explizite Konfiguration
+aktiviert ein dynamischer Lauf bei vorhandener Rumpfrolle das dokumentierte
+Standardwasserprofil (1000 kg/m³, 1e-6 m²/s, ruhendes Fluid); die tatsächlich
+verwendeten Werte und die Modellfassung werden im Ergebnis serialisiert.
+Ungültige explizite Parameter werden nicht ersetzt.
+
+Für direkte Zustandsläufe bindet `hydrodynamik_start` die typisierte
+Konfiguration an die Modellfassung. Der unveränderliche Kontext bleibt über
+Zustandskopien und Integratorstufen erhalten. `kraefte` liefert die
+Einzelbeiträge; vorhandene Aufrufe ohne Hydrodynamik bleiben kompatibel.
+Der GUI-Core-Adapter initialisiert diesen Kontext für Live-Läufe bei
+Modellen mit Rumpfrolle ebenfalls mit dem Standardwasserprofil. So stimmen
+Live- und Batch-Läufe im Hydrodynamik-Kontext überein; GUI-Darstellung und
+Kraftanzeige bleiben unverändert.
+
+Der Integrator muss den Kraftbaustein für jede erforderliche Integratorstufe
+mit der Pose und Geschwindigkeit dieser Stufe aufrufen. Er darf die
+hydrodynamische Kraft nicht nachträglich nur auf die ausgegebene Pose
+addieren. Der Core führt die Beiträge genau einmal mit den vorhandenen
+physikalischen Kräften zusammen. Die GUI verändert weder Kräfte noch
+Geschwindigkeiten.
+
+Der erste vorgesehene Integrationsumfang ist die dynamische
+Starrkörperbewegung. Die erste Relativgeschwindigkeit nutzt die Translation
+am Gesamtschwerpunkt; lokale Rotationsanteile sind eine spätere Optimierung.
+Die bestehende hydrostatische Statik und der Testantrieb-Vertrag V3 bleiben
+davon getrennt. Dauerhafte Hydrodynamik- und Profilangaben liegen im
+bestehenden `modell.json`-Vertrag und werden in der vorhandenen
+Modellbeschreibungsspezifikation geführt. Laufbezogene Fluiddaten werden in
+einem typisierten Core-Kontext transportiert. Der bestehende Simulationsstart
+bleibt zunächst unverändert; die GUI benötigt dafür keine neuen
+Hydrodynamik-Eingaben.
+
+### 7.2 Einzelbeitrag
+
+Die Hydrodynamik verwendet den bestehenden Beitragsvertrag aus
+Ergebnisversion 2; bestehende Pflichtfelder und deren Bedeutung bleiben
+unverändert. Für jeden berechneten Effekt ist folgender additive Beitrag
+vorgesehen:
+
+| Feld | Hydrodynamik-Sollinhalt |
+|---|---|
+| `id` | deterministische, stabile ID, z. B. `Rumpf:hydrodynamik:reibung` |
+| `element_id` | zugeordnetes physikalisches Modellelement |
+| `art`, `einheit` | `kraft`, `N`; eigenständige Momentenbeiträge `moment`, `N·m` |
+| `quelle` | `hydrodynamik` |
+| `gruppe` | `hydrodynamik`; differenzierte Untergruppen sind späterer GUI-Ausbau |
+| `rolle` | `einzelbeitrag`; Summen bleiben in den vorhandenen Summenfeldern |
+| `punktart` | `angriffspunkt` für reale Kraftangriffsstelle |
+| `frame` | `modell` |
+| `punkt_m` | Angriffspunkt in Metern im Modellframe |
+| `vektor` | tatsächliche Kraft in Newton im Modellframe, ohne Darstellungsskalierung |
+| `moment_s_nm` | Beitrag um den aktuellen Gesamtschwerpunkt, genau einmal übertragen |
+| `zustand`, `fehler_id` | bestehende Status- und Fehlerregeln des Ergebnisvertrags |
+
+Für einen Kraftbeitrag mit Angriffspunkt A und Kraft F gilt derselbe
+Bezugswechsel wie im aktuellen Core-Vertrag:
+
+```text
+M_i,S = (A - S) × F + M_i,A
+```
+
+Kraft, Angriffspunkt und Moment bilden einen konsistenten Wrench. Der
+Integratorsumme und der Ergebnisbeitrag müssen aus derselben Auswertung
+stammen. Einzelbeiträge werden in Summen nur einmal berücksichtigt;
+Gruppen- oder Gesamtsummen sind keine weiteren Kraftsummanden.
+
+### 7.3 Datenzustände und Bilanz
+
+Eine berechnete Kraft von exakt null ist ein bekannter Nullbeitrag und wird
+nicht weggelassen. Nicht konfigurierte Physik ist nicht dasselbe wie ein
+berechneter Nullbeitrag. Ein erwarteter, aber fehlender oder ungültiger
+hydrodynamischer Beitrag darf nicht still als null behandelt werden. Der
+Bilanzumfang muss aus dem tatsächlich aktivierten Rechenumfang hervorgehen;
+Teilsummen bleiben als solche markiert.
+
+Die Quelle `hydrodynamik` und Gruppe `hydrodynamik` sind implementiert. Sie
+werden additiv in die bestehenden Kraft-/Momentensummen aufgenommen und
+ändern die Bedeutung vorhandener Beitrags-IDs nicht. Neue Quellen-/
+Gruppenwerte allein erfordern keine neue Ergebnisvertragsversion; eine neue Version ist nur bei
+inkompatibler Änderung an Pflichtfeldern oder deren Bedeutung notwendig.
+V3 bleibt ausschließlich an den bereits spezifizierten
+Testantriebskontext gebunden.
+
+### 7.4 Schemaform eines Kraftbeitrags (Zahlenillustration)
+
+Das folgende Objekt zeigt die tatsächlich verwendete Feldform; die Zahlen
+sind keine Messwerte und nicht die Ausgabe eines Referenzmodells:
+
+```json
+{
+  "id": "Rumpf:hydrodynamik:reibung",
+  "element_id": "Rumpf",
+  "art": "kraft",
+  "einheit": "N",
+  "frame": "modell",
+  "quelle": "hydrodynamik",
+  "gruppe": "hydrodynamik",
+  "rolle": "einzelbeitrag",
+  "punktart": "angriffspunkt",
+  "zustand": "gueltig",
+  "fehler_id": null,
+  "punkt_m": [0.0, 0.0, 2.0],
+  "vektor": [-120.0, 0.0, 0.0],
+  "moment_s_nm": [0.0, -240.0, 0.0]
+}
+```
+
+Die Zahlen dienen ausschließlich der Illustration des Schemas und nehmen
+einen Schwerpunkt am Modellursprung an. Angriffspunkt, Richtung, Betrag und
+Moment müssen aus der tatsächlichen Core-Berechnung stammen. Die Punktwerte
+sind keine Vorgabe für einen Referenzrumpf.
+
+### 7.5 GUI-Kompatibilität und spätere Darstellung
+
+Die bestehende Bewegungsanzeige kann weiterhin Pose und Geschwindigkeit aus
+dem üblichen dynamischen Core-Ergebnis verwenden; die neue Kraftphysik bleibt
+im Core. Die aktuelle GUI-Kraftanzeige liest generische Vektoreinträge und
+ordnet unbekannte Quellen der Kategorie „weitere Quelle“ zu. Neue
+hydrodynamische Beiträge können daher ohne spezielle GUI-Änderung generisch
+angezeigt werden. Neue Farben, Filter, Gruppenbedienung und
+Hydrodynamik-spezifische Beschriftung sind nicht Teil der ersten Core-Stufe.
+Dieses vorhandene generische Anzeigeverhalten bleibt unverändert und ist
+keine fachliche Abnahme der Hydrodynamik.
+
+Die spätere GUI kann dieselben Core-Felder `quelle`, `gruppe`, `id`,
+`element_id`, `punkt_m`, `vektor`, `moment_s_nm`, `frame` und `zustand`
+nutzen, um eine eigene Darstellung aufzubauen; sie führt keine eigene
+hydrodynamische Berechnung ein. Eine spätere Änderung, welche die generische
+Anzeige unterdrückt oder speziell steuert, gehört in eine separate
+GUI-Spezifikation.
+
+Der Core-Test prüft die dynamische JSON-Ausgabe und die generische
+Beitragsform. GUI-Dateien wurden nicht geändert; die generische GUI-Integration
+ist damit vertragsseitig vorbereitet, aber nicht als GUI-Build oder
+End-to-End-Integration getestet.

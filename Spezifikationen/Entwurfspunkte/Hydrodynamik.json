@@ -1,0 +1,113 @@
+{
+  "status": "finalisiert",
+  "thema": "Schrittweise CORE-Hydrodynamik",
+  "spezifikation": "../Spezifikation_Hydrodynamik.md",
+  "umsetzungsplan": "../../Umsetzungsplaene/Umsetzungsplan_Hydrodynamik.md",
+  "umsetzungsstand": "C-0.6: Rollenimport, ITTC-Rumpfreibung, Core-Dynamikintegration und additive Ergebnisbeiträge technisch umgesetzt. Rumpf-Restwiderstand und Kielpolaren wegen fehlender modellbezogener Referenzdaten blockiert; fachliche Bewegungsabnahme und Ruder/Interaktionen daher offen. Details und Tests siehe Umsetzungsplan.",
+  "hinweis": "Die Spezifikation wurde am 27.10.2026 auf ausdrücklichen Implementierungsauftrag für C-0.6 finalisiert. IDEE-Kennungen bleiben als Herkunft erhalten und sind den freigegebenen A-C-Anforderungen zugeordnet. Optimist und 420er sind die verfügbaren Jollen-Referenzen, das Folkeboot die Kielboot-Referenz. Keine bessere Geometrie wird vorausgesetzt. Ruder bleibt relativ zum Rumpf fest; spezielle GUI-Kraftdarstellungen folgen später.",
+  "quellen": [
+    "../../../Ideen/hydrodynamik_boot.pdf",
+    "../../../Ideen/Berechnung_Hydrodynamik_2_2.md"
+  ],
+  "punkte": [
+    {
+      "id": "IDEE-C-00033",
+      "status": "finalisiert",
+      "thema": "Bauteilrollen und Geometriedaten",
+      "bezug": "../Spezifikation_Hydrodynamik.md#schritt-0-verträge-und-eingangsgrößen-klären",
+      "entscheidung": "Dauerhafte Hydrodynamik- und Profilangaben liegen im bestehenden modell.json-Vertrag und werden in die vorhandene Modellbeschreibungsspezifikation integriert. Physische Meshes dürfen Werte wie LWL oder benetzte Fläche nur liefern, wenn die Ableitung für das jeweilige Modell nachweislich zuverlässig ist; zuverlässig ableitbare Werte werden nicht redundant gespeichert. Anzeigegeometrie und Dateinamen sind keine Physikquelle. Optimist, 420er und Folkeboot sind die verfügbaren Referenzmodelle; bessere Geometrie wird nicht vorausgesetzt.",
+      "anforderungen": ["A-C-00061", "A-C-00062"],
+      "restpunkt": "Rollen und physische Rumpfmeshes sind in Optimist, 420er und Folkeboot importiert und im Core getestet. Meshbounds und Gesamtoberflächen sind dokumentiert, aber keine benetzte Fläche oder Messdaten. Alle drei Modelle bleiben Entwürfe ohne Simulationsfreigabe."
+    },
+    {
+      "id": "IDEE-C-00034",
+      "status": "finalisiert",
+      "thema": "Wasserrelativgeschwindigkeit und Frames",
+      "bezug": "../Spezifikation_Hydrodynamik.md#72-eingaben-und-zustandsbezug",
+      "entscheidung": "In der ersten Stufe wird die Relativgeschwindigkeit am Gesamtschwerpunkt aus der Translation des Körpers und einer expliziten Fluidgeschwindigkeit gebildet. Die Integratorstufen verwenden jeweils ihren eigenen Zustand. Vektoren und Punkte folgen dem bestehenden Welt-/Modellframe-Vertrag. Lokale Geschwindigkeitsanteile aus Rotation sowie zeitlich veränderliche Strömung sind spätere Erweiterungen.",
+      "anforderungen": ["A-C-00063"],
+      "restpunkt": "Typisierter Laufkontext, Modellfassungsbindung, Relativgeschwindigkeit, Frames und Diagnose sind implementiert und getestet. Rotationsbedingte lokale Geschwindigkeit bleibt zurückgestellt."
+    },
+    {
+      "id": "IDEE-C-00035",
+      "status": "finalisiert",
+      "thema": "Erster Rumpfwiderstandsbaustein",
+      "bezug": "../Spezifikation_Hydrodynamik.md#schritt-1-isolierter-rumpf-reibungsbeitrag",
+      "entscheidung": "Erster Rechenbaustein ist der isolierte ITTC-1957-Reibungsanteil ohne Formfaktor und ohne Wellen-/Restwiderstand. Vorläufiger Arbeitsbereich ist 10^6 <= Re <= 10^9. Bei positiver Geschwindigkeit außerhalb des Bereichs wird der dynamische Schritt mit konkreter Diagnose abgelehnt; es wird nicht extrapoliert. Bei V=0 wird Cf nicht ausgewertet und ein gültiger Nullbeitrag geliefert.",
+      "anforderungen": ["A-C-00064"],
+      "restpunkt": "Formel, analytische Referenz, Nullfluss, Re-Grenzen, Vorzeichen und ungültige Parameter sind getestet. Positive Fahrt unter Re=1e6 wird derzeit abgelehnt und verhindert kleine Anfahrgeschwindigkeiten."
+    },
+    {
+      "id": "IDEE-C-00036",
+      "status": "finalisiert",
+      "thema": "Rumpf-Rest- und Wellenwiderstand",
+      "bezug": "../Spezifikation_Hydrodynamik.md#schritt-2-rumpf-rest--und-wellenwiderstand",
+      "entscheidung": "Nach dem isolierten ITTC-Schritt wird bevorzugt eine belegte DSYHS-basierte Yachtmethode eingesetzt, wenn ihre Anwendbarkeit für Optimist, 420er beziehungsweise Folkeboot nachgewiesen ist. Andernfalls ist ein anderer validierter Ansatz zu wählen. Der unkalibrierte Cr=c_rest*Fr^4-Ansatz ist kein Vorhersagemodell.",
+      "anforderungen": ["A-C-00065"],
+      "restpunkt": "Blockiert: Es liegt kein verifizierter Schleppdatensatz für genau diese drei Modelle vor; die Anwendbarkeit der DSYHS-Regression auf deren Geometrien und Parameterbereiche wurde nicht nachgewiesen. Keine Koeffizienten extrapoliert."
+    },
+    {
+      "id": "IDEE-C-00037",
+      "status": "finalisiert",
+      "thema": "Kielmodell und feststehendes Ruder",
+      "bezug": "../Spezifikation_Hydrodynamik.md#schritt-3-seitenkräfte-und-widerstand-an-festen-anhängen",
+      "entscheidung": "Für die Kiel-Seitenkraft beginnt die Umsetzung mit einem nachvollziehbaren Kennwertmodell. Als dokumentierte Alternative kann ein im modell.json-Vertrag angegebenes 2D-Profil über die gesamte Spannweite beziehungsweise Höhe als gleichförmig angenommen werden; diese Alternative benötigt eine passende Polare und Ablösegrenzen. Das Ruder bleibt fest und seine Kräfte kommen erst nach dem Kiel in eine eigene Stufe.",
+      "anforderungen": ["A-C-00066"],
+      "restpunkt": "Blockiert: Für Schwert/Kiel und Ruder liegen keine geprüften Polaren und Ablösegrenzen für die konkreten Meshmodelle vor. Seitenkraft, Ruderwirkung und Streckungskorrektur wurden nicht erfunden."
+    },
+    {
+      "id": "IDEE-C-00038",
+      "status": "finalisiert",
+      "thema": "Kraftbilanz und Ergebnisvertragskompatibilität",
+      "bezug": "../Spezifikation_Hydrodynamik.md#schritt-4-beiträge-momente-und-solverintegration",
+      "entscheidung": "Bestehende Beitragsfelder, Angriffspunkte, Frames und Momentenfelder werden additiv genutzt; vorhandene Pflichtfelder und Bedeutungen bleiben unverändert. Neue Quellen-/Gruppenwerte allein erfordern keine neue Ergebnisversion. Eine Versionserhöhung ist nur bei einer inkompatiblen Änderung an Pflichtfeldern oder deren Bedeutung notwendig. V3 für den Testantrieb bleibt separat.",
+      "anforderungen": ["A-C-00067"],
+      "restpunkt": "Core serialisiert die additive Gruppe hydrodynamik unter Ergebnisversion 2; analytischer Core-Test besteht. GUI-Dateien blieben unverändert; ein GUI-Build und Ende-zu-Ende-Lauf wurden nicht ausgeführt."
+    },
+    {
+      "id": "IDEE-C-00039",
+      "status": "finalisiert",
+      "thema": "Interaktionen und Ausbaugrenzen",
+      "bezug": "../Spezifikation_Hydrodynamik.md#vorgeschlagene-schrittweise-reihenfolge",
+      "entscheidung": "Bauteile werden zuerst isoliert gerechnet und geprüft. Interaktionen wie Nachlauf, Abwind, Spiegeleffekt, Krängung und Junction werden einzeln eingeführt und belegt; unbelegte pauschale Zuschläge sind ausgeschlossen.",
+      "anforderungen": ["A-C-00068"],
+      "restpunkt": "Keine Interaktion aktiviert. Einzelmodelle sind noch nicht fachlich validiert; Nachlauf, Abwind, Spiegeleffekt, Krängungs- und Junction-Zuschläge bleiben offen."
+    },
+    {
+      "id": "IDEE-C-00040",
+      "status": "finalisiert",
+      "thema": "Referenzen und fachliche Toleranzen",
+      "bezug": "../Spezifikation_Hydrodynamik.md#prüf-und-abnahmeprinzipien-für-die-spätere-finalisierung",
+      "entscheidung": "Jede Stufe benötigt analytische oder unabhängige Referenzen und eigene Toleranzen. Optimist und 420er werden als Jollen, Folkeboot als Kielboot getrennt bewertet; bessere Referenzgeometrie wird nicht vorausgesetzt. Der ITTC-Test allein belegt nur Integration. Die fachliche Bewegungsabnahme beginnt erst mit validiertem Rumpf-Restwiderstand und Kiel-Seitenkraft.",
+      "anforderungen": ["A-C-00062", "A-C-00069"],
+      "restpunkt": "Blockiert: unabhängige Widerstands- und Seitenkraftreferenzen fehlen; ITTC-Core-Tests erlauben keine Toleranzbehauptung für die Yachtbewegung."
+    },
+    {
+      "id": "IDEE-C-00041",
+      "status": "finalisiert",
+      "thema": "Dynamik, Statik und Simulationsstart",
+      "bezug": "../Spezifikation_Hydrodynamik.md#71-berechnungs--und-integrationsgrenze",
+      "entscheidung": "Nutzerentscheidung 27.10.2026: Zunächst soll die Yacht durch die Core-Simulation richtig bewegt werden. Die Hydrodynamik wird dynamisch in die bestehende Starrkörperintegration eingespeist; die hydrostatische Statik und der Simulationsstart bleiben zunächst unverändert.",
+      "anforderungen": ["A-C-00070"],
+      "restpunkt": "Dynamische Core-Integration implementiert. Stationäre Strömung, VPP und hydrodynamische Gleichgewichtssuche bleiben wie spezifiziert ausgeschlossen."
+    },
+    {
+      "id": "IDEE-C-00042",
+      "status": "finalisiert",
+      "thema": "Generische GUI-Kraftanzeige während der Core-Stufe",
+      "bezug": "../Spezifikation_Hydrodynamik.md#75-ergebnisserialisierung-versionierung-und-gui-verwendung",
+      "entscheidung": "Nutzerentscheidung 27.10.2026: Die erste Stufe konzentriert sich auf Core-Bewegung und vorbereitete Kraft-/Momentenschnittstelle. Es gibt keine neuen speziellen GUI-Kraftgruppen oder Darstellungen; die bestehende generische Anzeige bleibt unverändert.",
+      "anforderungen": ["A-C-00071"],
+      "restpunkt": "Keine GUI-Dateien geändert. Die bestehende generische Vektoranzeige kann die neue Quelle als weitere Quelle lesen; GUI-Build und Ende-zu-Ende-Integration bleiben ungeprüft."
+    },
+    {
+      "id": "IDEE-C-00043",
+      "status": "finalisiert",
+      "thema": "Öffentlicher C++-Eingabe- und Rückgabetyp",
+      "bezug": "../Spezifikation_Hydrodynamik.md#72-eingaben-und-zustandsbezug",
+      "entscheidung": "Dauerhafte Hydrodynamik- und Profilangaben werden im bestehenden modell.json-Vertrag geführt; zuverlässig aus physischen Meshes ableitbare Geometriewerte werden nicht dupliziert. Ein intern typisierter Core-Kontext transportiert Lauf-/Fluiddaten. Der bestehende Simulationsstart bleibt zunächst unverändert. Modellvertragsänderungen werden in die vorhandene Modellbeschreibungsspezifikation aufgenommen.",
+      "anforderungen": ["A-C-00061", "A-C-00072"],
+      "restpunkt": "Typen, API, Laufkontext, Fehlerfälle und Serialisierung sind umgesetzt und in Schnittstellendokumentation sowie CPPI-Register beschrieben."
+    }
+  ]
+}

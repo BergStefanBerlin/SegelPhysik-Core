@@ -179,6 +179,24 @@ void json_tests(Dateien& d)
            "CORE-MOD-0002");
     fehler([&] { d.laden(modell(R"({"id":"e","Hydrostatik":{}})")); }, "CORE-MOD-0004", "Element e");
     fehler([&] { d.laden(modell(R"({"id":"e","Hydrostatik":null})")); }, "CORE-MOD-0002");
+    d.schreiben("mesh.obj", wuerfel);
+    const std::string hydrorumpf = R"({"id":"Rumpf","Hydrostatik":{"masse":)" +
+        punkt() + R"(,"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"rumpf"}})";
+    auto rolle = d.laden(modell(hydrorumpf));
+    pruefe(rolle.elemente.front().hydrodynamik_rolle == segelphysik::HydrodynamikRolle::rumpf,
+        "Hydrodynamikrolle nicht importiert");
+    const auto alte_fassung = rolle.fassung;
+    const std::string hydrokiel = R"({"id":"Rumpf","Hydrostatik":{"masse":)" +
+        punkt() + R"(,"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"kiel"}})";
+    rolle = d.laden(modell(hydrokiel));
+    pruefe(rolle.elemente.front().hydrodynamik_rolle == segelphysik::HydrodynamikRolle::kiel &&
+        rolle.fassung != alte_fassung, "Hydrodynamikrolle fehlt in der Modellfassung");
+    fehler([&] { d.laden(modell(R"({"id":"e","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":1,"position_m":[0,0,0]}},"Hydrodynamik":{"rolle":"rumpf"}})")); },
+        "CORE-MOD-0003", "Hydrodynamik");
+    fehler([&] { d.laden(modell(R"({"id":"e","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":1,"position_m":[0,0,0]},"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"fluegel"}})")); },
+        "CORE-MOD-0003", "Hydrodynamik.rolle");
+    fehler([&] { d.laden(modell(R"({"id":"e","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":1,"position_m":[0,0,0]},"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"rumpf","extra":true}})")); },
+        "CORE-MOD-0002", "Hydrodynamik");
     fehler([&] { d.laden(modell(R"({"id":"e","Darstellung":{"datei":"/absolut.obj"}})")); }, "CORE-MOD-0002");
     fehler([&] { d.laden(modell(R"({"id":"e","Darstellung":{"datei":"a\u0000.obj"}})")); }, "CORE-MOD-0002");
     fehler([&] { segelphysik::lade_modell(d.ordner / "fehlt.json"); }, "CORE-MOD-0005", "fehlt.json");

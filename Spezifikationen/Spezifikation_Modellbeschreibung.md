@@ -187,6 +187,36 @@ vollständigen Umsetzung einschließlich persistenter Stoff-, Holz- und
 gebürsteter Metalloberflächen; bestehender Vertrag A-C-00049 wird erweitert,
 keine neue Anforderung oder parallele Spezifikation.
 
+### A-C-00061: Explizite Hydrodynamikrolle eines Modellelements
+
+Ein Modellelement darf ein optionales Geschwisterfeld `Hydrodynamik` neben
+`Darstellung` und `Hydrostatik` tragen. Es ist ein Objekt mit dem Pflichtfeld
+`rolle`, dessen zulässige Werte `rumpf`, `kiel` und `ruder` sind. Das Feld
+kennzeichnet ausschließlich die physikalische Funktion des Elements für die
+Core-Hydrodynamik; es ersetzt keine Masse oder Verdrängungsdefinition.
+
+Die Rolle bezieht sich auf das physische `Hydrostatik.volumen.datei`-Mesh.
+Ein Element mit Hydrodynamikrolle benötigt deshalb ein solches Mesh. Die
+`Darstellung`-Geometrie und der Dateiname liefern keine Hydrodynamikrolle.
+Ein Modellelement darf höchstens eine Rolle tragen; unbekannte Rollen und
+unbekannte Schlüssel werden mit konkreter Modellfundstelle abgelehnt. Modelle
+ohne dieses Feld behalten unverändertes bisheriges Verhalten.
+
+Die Rolle wird in der importierten Modellfassung berücksichtigt. Der
+Hydrodynamikrechner leitet daraus weder Profilkennwerte noch empirische
+Widerstandskoeffizienten ab. Solche Rechenparameter bedürfen eigener
+validierter Verträge und dürfen nicht aus der bloßen Rollenangabe erfunden
+werden.
+
+**Abnahmekriterium:** Import akzeptiert die drei Rollen nur bei vorhandenem
+physischem Volumenmesh, weist sie dem richtigen Element zu und bindet die
+Modelldatei in die Modellfassung ein. Fehlendes Mesh, ungültige Rolle oder
+zusätzliche unbekannte Schlüssel werden mit Fundstelle abgelehnt. Modelle
+ohne `Hydrodynamik` importieren weiterhin wie zuvor.
+
+**Herkunft:** Finalisierung und Implementierungsauftrag Hydrodynamik,
+27.10.2026; Entwurfspunkt IDEE-C-00033.
+
 ## Quellen und Abgrenzung zur Historie
 
 Die historische Spezifikation vF1 in SegelPhysik3 beschreibt ein
@@ -213,6 +243,7 @@ Spezifikation dieses Themas.
 | A-C-00030 | IDEE-C-00001, IDEE-C-00002, IDEE-C-00006, Teilaspekte Importgrundlage | Als Grundlage bestätigt | C-0.1: Import implementiert, Test modell_import; unterstützte Grenzen im GUI-Vertrag dokumentiert |
 | A-C-00048 | Nutzerauftrag 26.10.2026 (Farben) | Freigegeben | C-0.2 Nachtrag: Plan C-0.2 U-C-000032; Test katalog (`farben`) |
 | A-C-00049 | Nutzerauftrag 27.10.2026 (Materialien) | Freigegeben; technisch nachgewiesen, keine ästhetische Nutzerabnahme | C-0.2 Nachtrag: Plan C-0.2 U-C-000033; G-0.5-Vertragserweiterung am 27.10.2026: vollständiger nativer Release-Build und gesamte gemeinsame CTest-Suite 22/22 in 64,55 s, einschließlich aller CORE-Tests, `modellkatalog_schnittstelle` (alle 15 Namen, CLI-Validierungsfunktion, Physikinvarianz) und drei GPU-Tests; GUI-Modelladapter mit sechs Materialbezeichnern bestanden; Details im Plan |
+| A-C-00061 | IDEE-C-00033 | Freigegeben für C-0.6; Core-/Modellvertrag | C-0.6: U-C-000045 und U-C-000046; Modellimport- und Geometrietests |
 Die Umsetzung ist inzwischen über den
 [Hydrostatikplan](../Umsetzungsplaene/Umsetzungsplan_Hydrostatikkern.md)
 beauftragt. Die Abnahmekriterien sind noch nicht als bestanden

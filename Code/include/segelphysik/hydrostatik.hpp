@@ -16,7 +16,7 @@ struct VolumenWerte {
 
 // Contract version 2 metadata is stored as enums to keep the per-evaluation
 // cost of the solver hot path unchanged; names appear only when serialised.
-enum class Quelle { schwerkraft, hydrostatik, summe, nicht_zugeordnet, testantrieb };
+enum class Quelle { schwerkraft, hydrostatik, hydrodynamik, summe, nicht_zugeordnet, testantrieb };
 enum class Rolle { einzelbeitrag, gruppensumme, gesamtsumme };
 enum class Punktart { angriffspunkt, bezugspunkt };
 enum class Datenzustand { gueltig, null, deaktiviert, nicht_berechnet, ungueltig };
@@ -49,6 +49,18 @@ struct Kraefte {
     double volumen_m3{};
     std::vector<Beitrag> beitraege;
     std::vector<std::pair<std::string, VolumenWerte>> elementvolumina;
+};
+
+struct HydrodynamikKonfiguration {
+    double rho_kg_m3 = 1000.;
+    double nu_m2_s = 1e-6;
+    Vektor3 fluidgeschwindigkeit_welt_m_s{};
+};
+struct HydrodynamikKontext {
+    HydrodynamikKonfiguration konfiguration;
+    std::string modell_fassung;
+    std::size_t auswertung_schritt{};
+    double auswertung_zeit_s{};
 };
 
 VolumenWerte wasseranteil(const Mesh& mesh, const Pose& pose);
@@ -110,14 +122,20 @@ struct Zustand {
     std::vector<std::string> geflutet;
     std::shared_ptr<const TestantriebKontext> testantrieb;
     bool testantrieb_erforderlich = false;
+    std::shared_ptr<const HydrodynamikKontext> hydrodynamik;
+    bool hydrodynamik_erforderlich = false;
 };
 
 // Returned states own an immutable historical context; no global live flag.
 Zustand testantrieb_start(const Modell&, const Zustand&,
     const TestantriebKonfiguration&, bool aktiv);
+Zustand hydrodynamik_start(const Modell&, const Zustand&,
+    const HydrodynamikKonfiguration&);
 Kraefte kraefte(const Modell&, const Pose&, const TestantriebKontext*,
     double rho = 1000., double g = 9.81,
-    const std::vector<std::string>& geflutet = {});
+    const std::vector<std::string>& geflutet = {},
+    const HydrodynamikKontext* hydrodynamik = nullptr,
+    const Vektor3& geschwindigkeit_welt_m_s = {});
 
 struct Gleichgewichtsangaben {
     double krafttoleranz_n{};
@@ -155,7 +173,8 @@ struct Bilanz {
 // group/total sums from the individual contributions with zustand gueltig/null.
 // The expected scope is weight per element plus buoyancy per element with a
 // displacement volume.
-Bilanz bilanz(const Modell& modell, std::vector<Beitrag>& beitraege);
+Bilanz bilanz(const Modell& modell, std::vector<Beitrag>& beitraege,
+    bool hydrodynamik_aktiv = false);
 
 // Static equilibrium (A-C-00047): first solved with the flooding state of
 // start; if a floodable rim is below water in the result, that element is

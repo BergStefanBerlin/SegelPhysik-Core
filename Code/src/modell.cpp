@@ -897,13 +897,14 @@ Modell lade_modell(const std::filesystem::path& datei)
         for (std::size_t index = 0; index < elemente.liste.size(); ++index) {
             const auto& element = elemente.liste[index];
             const std::string stelle = gruppenort + ", elemente[" + std::to_string(index) + "]";
-            objekt(element, {"id", "Darstellung", "Hydrostatik"}, stelle);
+            objekt(element, {"id", "Darstellung", "Hydrostatik", "Hydrodynamik"}, stelle);
             Element e;
             e.id = text(pflicht(element, "id", stelle, 3), stelle + ".id", 3);
             const std::string elementort = stelle + ", Element " + e.id;
             if (!ids.insert(e.id).second) fehler(3, elementort, "Element-ID mehrfach vergeben");
             const auto* darstellung = optional(element, "Darstellung");
             const auto* hydro = optional(element, "Hydrostatik");
+            const auto* hydrodynamik = optional(element, "Hydrodynamik");
             if (!darstellung && !hydro) fehler(2, elementort, "Darstellung und/oder Hydrostatik erforderlich");
             if (darstellung) {
                 objekt(*darstellung, {"datei", "farbe", "oberflaeche"}, elementort + ".Darstellung");
@@ -932,6 +933,19 @@ Modell lade_modell(const std::filesystem::path& datei)
                                 "; Vergleich mit Element " + andere.id);
                 }
                 if (!e.volumen) e.flutrand_m.clear();
+            }
+            if (hydrodynamik) {
+                objekt(*hydrodynamik, {"rolle"}, elementort + ".Hydrodynamik");
+                const auto rolle = text(pflicht(*hydrodynamik, "rolle", elementort, 3),
+                    elementort + ".Hydrodynamik.rolle", 3);
+                if (rolle == "rumpf") e.hydrodynamik_rolle = HydrodynamikRolle::rumpf;
+                else if (rolle == "kiel") e.hydrodynamik_rolle = HydrodynamikRolle::kiel;
+                else if (rolle == "ruder") e.hydrodynamik_rolle = HydrodynamikRolle::ruder;
+                else fehler(3, elementort + ".Hydrodynamik.rolle",
+                    "Erwartet: rumpf, kiel oder ruder");
+                if (!e.volumen)
+                    fehler(3, elementort + ".Hydrodynamik",
+                        "Rolle benoetigt ein physisches Hydrostatik.volumen-Mesh");
             }
             modell.elemente.push_back(std::move(e));
         }

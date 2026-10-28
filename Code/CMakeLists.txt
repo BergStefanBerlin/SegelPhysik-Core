@@ -74,6 +74,14 @@ if(BUILD_TESTING)
     target_link_libraries(physik_tests PRIVATE segelphysik_core)
     list(APPEND core_targets physik_tests)
     add_test(NAME hydrostatik_referenzen COMMAND physik_tests)
+    add_executable(hydrodynamik_tests tests/hydrodynamik_tests.cpp)
+    target_link_libraries(hydrodynamik_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets hydrodynamik_tests)
+    add_test(NAME hydrodynamik_referenzen COMMAND hydrodynamik_tests)
+    add_test(NAME hydrodynamik_referenzmodelle COMMAND hydrodynamik_tests
+        "${SEGELPHYSIK_MODELLE_DIR}/optimist/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/folkeboot/modell.json")
     add_executable(simulation_tests tests/simulation_tests.cpp)
     target_link_libraries(simulation_tests PRIVATE segelphysik_core)
     list(APPEND core_targets simulation_tests)

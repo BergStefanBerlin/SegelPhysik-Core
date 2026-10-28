@@ -27,6 +27,14 @@
       "pruefstatus": "implementiert"
     },
     {
+      "id": "CORE-HYD-0001",
+      "kurztext": "Hydrodynamikbeitrag fehlt oder ist ausserhalb seines Rechenbereichs.",
+      "pass_kriterium": "Rumpfrolle und Mesh sind vorhanden; Fluidparameter und Zustandskontext sind gueltig; Re liegt im implementierten Bereich.",
+      "fail_kriterium": "Rumpfmesh/Wasserlinie fehlt, Fluidwerte sind ungueltig, der Kontext passt nicht oder Re liegt ausserhalb 1e6 bis 1e9; ausserhalb des Bereichs wird der Beitrag nicht berechnet und die Bilanz bleibt unvollstaendig.",
+      "handlungsanweisung": "Modellrolle, physisches Mesh, Zustand und Fluidwerte pruefen; bei ungueltigem Re-Bereich keine Reibung ausweisen und die unvollstaendige Bilanz beachten.",
+      "pruefstatus": "implementiert"
+    },
+    {
       "id": "CORE-SIM-0002",
       "kurztext": "Singulaere oder ungeeignete Loesungsmatrix.",
       "pass_kriterium": "Die dynamische Traegheit ist positiv definit und die benoetigten linearen Systeme sind regulaer.",

@@ -1,4 +1,5 @@
 #include "segelphysik/simulation.hpp"
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -64,8 +65,15 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
     if(s.testantrieb && (s.testantrieb->modell_fassung!=m.fassung ||
         s.testantrieb->auswertung_schritt!=s.schritt || s.testantrieb->auswertung_zeit_s!=s.zeit_s))
         throw std::invalid_argument("CORE-SIM-0001: Historischer Testkontext passt nicht zum Zustand.");
-    auto k=kraefte(m,s.pose,s.testantrieb.get(),1000.,9.81,s.geflutet);
-    const auto b2=bilanz(m,k.beitraege);
+    if(s.hydrodynamik_erforderlich&&!s.hydrodynamik)
+        throw std::invalid_argument("CORE-HYD-0001: Erforderlicher Hydrodynamikkontext fehlt.");
+    if(s.hydrodynamik && (s.hydrodynamik->modell_fassung!=m.fassung ||
+        s.hydrodynamik->auswertung_schritt!=s.schritt ||
+        s.hydrodynamik->auswertung_zeit_s!=s.zeit_s))
+        throw std::invalid_argument("CORE-HYD-0001: Historischer Hydrodynamikkontext passt nicht zum Zustand.");
+    auto k=kraefte(m,s.pose,s.testantrieb.get(),1000.,9.81,s.geflutet,
+        s.hydrodynamik.get(),s.geschwindigkeit_welt_m_s);
+    const auto b2=bilanz(m,k.beitraege,static_cast<bool>(s.hydrodynamik));
     std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(17);
     out<<"{\"vertragsversion\":"<<text(s.testantrieb?"3":"2")<<",\"modell_id\":"<<text(m.id)
        <<",\"modell_fassung\":"<<text(m.fassung)
@@ -172,6 +180,15 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
         }
         out<<'}';
     }
+    if(s.hydrodynamik) {
+        const auto& c=s.hydrodynamik->konfiguration;
+        out<<",\"hydrodynamik\":{\"rho_kg_m3\":"<<c.rho_kg_m3
+           <<",\"nu_m2_s\":"<<c.nu_m2_s<<",\"fluidgeschwindigkeit_welt_m_s\":";
+        array(out,c.fluidgeschwindigkeit_welt_m_s);
+        out<<",\"modell_fassung\":"<<text(s.hydrodynamik->modell_fassung)
+           <<",\"auswertung_schritt\":"<<s.hydrodynamik->auswertung_schritt
+           <<",\"auswertung_zeit_s\":"<<s.hydrodynamik->auswertung_zeit_s<<'}';
+    }
     out<<'}';return out.str();
 }
 
@@ -195,6 +212,18 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
         const auto m=lade_modell(path);
         Zustand s=o.start;
         if(o.testantrieb) s=testantrieb_start(m,s,*o.testantrieb,o.testantrieb_aktiv);
+        if(o.hydrodynamik && !o.dynamisch)
+            throw std::invalid_argument("CORE-HYD-0001: Hydrodynamik ist nur fuer dynamische Laeufe verfuegbar.");
+        const bool rumpfvorhanden=std::any_of(m.elemente.begin(),m.elemente.end(),
+            [](const Element& e) {return e.hydrodynamik_rolle==HydrodynamikRolle::rumpf;});
+        if(o.hydrodynamik) s=hydrodynamik_start(m,s,*o.hydrodynamik);
+        else if(o.dynamisch && rumpfvorhanden && !s.hydrodynamik &&
+            !s.hydrodynamik_erforderlich) {
+            HydrodynamikKonfiguration standardwasser;
+            s=hydrodynamik_start(m,s,standardwasser);
+        }
+        if(!o.dynamisch && (s.hydrodynamik || s.hydrodynamik_erforderlich))
+            throw std::invalid_argument("CORE-HYD-0001: Hydrodynamikkontext in statischem Lauf.");
         if((!o.testantrieb&&!s.testantrieb) &&
             (o.testantrieb_aktiv||!o.testantrieb_ereignisse.empty()))
             throw std::invalid_argument("CORE-SIM-0001: Teststeuerung ohne Konfiguration.");
@@ -237,6 +266,10 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
                 if(next.testantrieb) {
                     auto context=std::make_shared<TestantriebKontext>(*next.testantrieb);
                     context->auswertung_zeit_s=ziel;next.testantrieb=context;
+                }
+                if(next.hydrodynamik) {
+                    auto context=std::make_shared<HydrodynamikKontext>(*next.hydrodynamik);
+                    context->auswertung_zeit_s=ziel;next.hydrodynamik=context;
                 }
                 s=next;
                 if(s.schritt%o.ausgabe_intervall==0 && s.zeit_s<end) schreiben(s,"laufend");

@@ -14,6 +14,7 @@ struct Laufoptionen {
     const std::atomic_bool* abbruch = nullptr;
     std::optional<TestantriebKonfiguration> testantrieb;
     bool testantrieb_aktiv = false;
+    std::optional<HydrodynamikKonfiguration> hydrodynamik;
     // Scheduled events are applied before the indicated source step.
     std::vector<std::pair<std::size_t, TestantriebEreignis>> testantrieb_ereignisse;
 };

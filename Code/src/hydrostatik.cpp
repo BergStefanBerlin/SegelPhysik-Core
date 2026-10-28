@@ -5,6 +5,8 @@
 #include <cmath>
 #include <iterator>
 #include <limits>
+#include <locale>
+#include <sstream>
 #include <stdexcept>
 
 namespace segelphysik {
@@ -71,6 +73,129 @@ QuaternionXyzw produkt(const QuaternionXyzw& a,const QuaternionXyzw& b)
         a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],
         a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],
         a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]};
+}
+struct Nassgeometrie {
+    double flaeche_m2{};
+    double wasserlinienlaenge_m{};
+    Vektor3 schwerpunkt_m{};
+    double minimum_z_m = std::numeric_limits<double>::infinity();
+    double maximum_z_m = -std::numeric_limits<double>::infinity();
+};
+Nassgeometrie nassgeometrie(const Mesh& mesh, const Pose& pose)
+{
+    Nassgeometrie result;
+    const auto laengsachse = pose.modellvektor_nach_welt({1., 0., 0.});
+    const double horizontal = std::hypot(laengsachse[0], laengsachse[1]);
+    if (!std::isfinite(horizontal) || horizontal <= 1e-10)
+        throw std::invalid_argument("CORE-HYD-0001: Modelllaengsachse hat keine horizontale Projektion.");
+    const Vektor3 axis{laengsachse[0] / horizontal, laengsachse[1] / horizontal, 0.};
+    double gewichteter_x_min = std::numeric_limits<double>::infinity();
+    double gewichteter_x_max = -std::numeric_limits<double>::infinity();
+    Vektor3 flaechenmoment{};
+    auto wasserlinie = [&](const Vektor3& point) {
+        const auto world = pose.modellpunkt_nach_welt(point);
+        const double along = world[0] * axis[0] + world[1] * axis[1];
+        gewichteter_x_min = std::min(gewichteter_x_min, along);
+        gewichteter_x_max = std::max(gewichteter_x_max, along);
+    };
+    for (const auto& triangle : mesh.dreiecke) {
+        std::array<Vektor3, 3> vertices{
+            mesh.punkte.at(triangle[0]), mesh.punkte.at(triangle[1]), mesh.punkte.at(triangle[2])};
+        std::array<double, 3> depth{};
+        for (std::size_t i = 0; i < vertices.size(); ++i) {
+            depth[i] = pose.modellpunkt_nach_welt(vertices[i])[2];
+            result.minimum_z_m = std::min(result.minimum_z_m, depth[i]);
+            result.maximum_z_m = std::max(result.maximum_z_m, depth[i]);
+            if (depth[i] == 0.) wasserlinie(vertices[i]);
+        }
+        if (std::none_of(depth.begin(), depth.end(), [](double value) { return value < 0.; }))
+            continue;
+        std::array<Vektor3, 4> clipped{};
+        std::size_t count = 0;
+        for (std::size_t i = 0; i < vertices.size(); ++i) {
+            const std::size_t previous = (i + vertices.size() - 1) % vertices.size();
+            const double da = depth[previous];
+            const double db = depth[i];
+            if ((da < 0. && db > 0.) || (da > 0. && db < 0.)) {
+                const double t = da / (da - db);
+                const auto point = plus(vertices[previous],
+                    mal(plus(vertices[i], mal(vertices[previous], -1.)), t));
+                clipped[count++] = point;
+                wasserlinie(point);
+            }
+            if (db <= 0.) clipped[count++] = vertices[i];
+        }
+        for (std::size_t i = 1; i + 1 < count; ++i) {
+            const auto ab = plus(clipped[i], mal(clipped[0], -1.));
+            const auto ac = plus(clipped[i + 1], mal(clipped[0], -1.));
+            const double area = .5 * std::sqrt(dot(cross(ab, ac), cross(ab, ac)));
+            if (!std::isfinite(area))
+                throw std::overflow_error("CORE-HYD-0001: Benetzte Meshflaeche nicht endlich.");
+            const auto centroid = mal(plus(plus(clipped[0], clipped[i]), clipped[i + 1]), 1. / 3.);
+            result.flaeche_m2 += area;
+            flaechenmoment = plus(flaechenmoment, mal(centroid, area));
+        }
+    }
+    if (result.flaeche_m2 > 0.)
+        result.schwerpunkt_m = mal(flaechenmoment, 1. / result.flaeche_m2);
+    if (std::isfinite(gewichteter_x_min) && std::isfinite(gewichteter_x_max))
+        result.wasserlinienlaenge_m = gewichteter_x_max - gewichteter_x_min;
+    return result;
+}
+bool endlich(const Vektor3& v)
+{
+    return std::all_of(v.begin(), v.end(), [](double value) { return std::isfinite(value); });
+}
+Beitrag rumpfreibung(const Element& element, const Modell& modell, const Pose& pose,
+    const HydrodynamikKonfiguration& config, const Vektor3& bootgeschwindigkeit,
+    Vektor3& kraft_welt)
+{
+    if (!element.volumen)
+        throw std::invalid_argument("CORE-HYD-0001: Rumpfrolle ohne physisches Volumenmesh: " + element.id);
+    const Vektor3 relativ{
+        config.fluidgeschwindigkeit_welt_m_s[0] - bootgeschwindigkeit[0],
+        config.fluidgeschwindigkeit_welt_m_s[1] - bootgeschwindigkeit[1],
+        config.fluidgeschwindigkeit_welt_m_s[2] - bootgeschwindigkeit[2]};
+    const double speed = std::sqrt(dot(relativ, relativ));
+    if (!std::isfinite(speed))
+        throw std::overflow_error("CORE-HYD-0001: Relativgeschwindigkeit nicht endlich.");
+    Beitrag b;
+    b.id = element.id + ":hydrodynamik:reibung";
+    b.element_id = element.id;
+    b.art = "kraft";
+    b.quelle = Quelle::hydrodynamik;
+    b.gruppe = "hydrodynamik";
+    b.punkt_m = element.schwerpunkt_m;
+    b.punktart = Punktart::angriffspunkt;
+    if (speed == 0.) {
+        b.zustand = Datenzustand::null;
+        return b;
+    }
+    const auto wett = nassgeometrie(*element.volumen, pose);
+    if (wett.flaeche_m2 == 0. && wett.minimum_z_m >= 0.) {
+        b.zustand = Datenzustand::null;
+        return b;
+    }
+    if (!std::isfinite(wett.flaeche_m2) || wett.flaeche_m2 <= 0. ||
+        !std::isfinite(wett.wasserlinienlaenge_m) || wett.wasserlinienlaenge_m <= 0.)
+        throw std::invalid_argument("CORE-HYD-0001: Benetzte Rumpfflaeche oder Wasserlinienlaenge ungueltig: " +
+            element.id);
+    const double re = speed * wett.wasserlinienlaenge_m / config.nu_m2_s;
+    if (!std::isfinite(re) || re < 1e6 || re > 1e9) {
+        b.zustand = Datenzustand::nicht_berechnet;
+        b.fehler_id = "CORE-HYD-0001";
+        return b;
+    }
+    const double cf = .075 / std::pow(std::log10(re) - 2., 2.);
+    const double magnitude = .5 * config.rho_kg_m3 * speed * speed * wett.flaeche_m2 * cf;
+    if (!std::isfinite(magnitude))
+        throw std::overflow_error("CORE-HYD-0001: ITTC-Reibungskraft nicht endlich.");
+    kraft_welt = mal(relativ, magnitude / speed);
+    b.punkt_m = wett.schwerpunkt_m;
+    b.vektor = pose.weltvektor_nach_modell(kraft_welt);
+    b.moment_s_nm = moment_um(b.punkt_m, modell.schwerpunkt_m, b.vektor);
+    b.zustand = Datenzustand::gueltig;
+    return b;
 }
 }
 
@@ -191,6 +316,7 @@ const char* name(Quelle wert)
     case Quelle::testantrieb: return "testantrieb";
     case Quelle::schwerkraft: return "schwerkraft";
     case Quelle::hydrostatik: return "hydrostatik";
+    case Quelle::hydrodynamik: return "hydrodynamik";
     case Quelle::summe: return "summe";
     default: return "nicht_zugeordnet";
     }
@@ -218,7 +344,7 @@ const char* name(Datenzustand wert)
     }
 }
 
-Bilanz bilanz(const Modell& modell,std::vector<Beitrag>& beitraege)
+Bilanz bilanz(const Modell& modell,std::vector<Beitrag>& beitraege,bool hydrodynamik_aktiv)
 {
     Bilanz result;
     result.gesamt.gruppe="gesamt";
@@ -228,6 +354,8 @@ Bilanz bilanz(const Modell& modell,std::vector<Beitrag>& beitraege)
     for (const auto& e : modell.elemente) {
         result.erwartete_beitraege.push_back(e.id+":gewicht");
         if (e.volumen) result.erwartete_beitraege.push_back(e.id+":auftrieb");
+        if (hydrodynamik_aktiv && e.hydrodynamik_rolle == HydrodynamikRolle::rumpf)
+            result.erwartete_beitraege.push_back(e.id+":hydrodynamik:reibung");
     }
     auto endlich=[](const Vektor3& v) {return std::isfinite(v[0])&&std::isfinite(v[1])&&std::isfinite(v[2]);};
     for (auto& b : beitraege) {
@@ -385,6 +513,15 @@ void testparameter(const TestantriebKonfiguration& c)
         !std::isfinite(c.grenze_m_s)||c.grenze_m_s<.01||c.grenze_m_s>20.)
         throw std::invalid_argument("CORE-SIM-0001: Ungueltige Testantriebsparameter.");
 }
+void hydrodynamikparameter(const HydrodynamikKonfiguration& c)
+{
+    if (!std::isfinite(c.rho_kg_m3) || c.rho_kg_m3 <= 0.)
+        throw std::invalid_argument("CORE-HYD-0001: rho_kg_m3 muss endlich und positiv sein.");
+    if (!std::isfinite(c.nu_m2_s) || c.nu_m2_s <= 0.)
+        throw std::invalid_argument("CORE-HYD-0001: nu_m2_s muss endlich und positiv sein.");
+    if (!endlich(c.fluidgeschwindigkeit_welt_m_s))
+        throw std::invalid_argument("CORE-HYD-0001: Fluidgeschwindigkeit muss endlich sein.");
+}
 std::optional<Vektor3> bugpunkt(const Modell& m)
 {
     std::vector<Vektor3> punkte;
@@ -418,6 +555,12 @@ void kontextpruefung(const Modell& m,const Zustand& s)
     if(s.testantrieb && (s.testantrieb->modell_fassung!=m.fassung ||
         s.testantrieb->auswertung_schritt!=s.schritt || s.testantrieb->auswertung_zeit_s!=s.zeit_s))
         throw std::invalid_argument("CORE-SIM-0001: Testkontext passt nicht zum Zustand oder Modell.");
+    if(s.hydrodynamik_erforderlich&&!s.hydrodynamik)
+        throw std::invalid_argument("CORE-HYD-0001: Erforderlicher Hydrodynamikkontext fehlt.");
+    if(s.hydrodynamik && (s.hydrodynamik->modell_fassung!=m.fassung ||
+        s.hydrodynamik->auswertung_schritt!=s.schritt ||
+        s.hydrodynamik->auswertung_zeit_s!=s.zeit_s))
+        throw std::invalid_argument("CORE-HYD-0001: Hydrodynamikkontext passt nicht zum Zustand oder Modell.");
 }
 }
 
@@ -437,37 +580,78 @@ Zustand testantrieb_start(const Modell& m,const Zustand& s,
     return result;
 }
 
+Zustand hydrodynamik_start(const Modell& m,const Zustand& s,
+    const HydrodynamikKonfiguration& config)
+{
+    hydrodynamikparameter(config);
+    kontextpruefung(m,s);
+    if(s.hydrodynamik || s.hydrodynamik_erforderlich || !std::isfinite(s.zeit_s))
+        throw std::invalid_argument("CORE-HYD-0001: Hydrodynamikstart benoetigt einen gueltigen Zustand ohne Hydrokontext.");
+    if(std::none_of(m.elemente.begin(),m.elemente.end(),[](const Element& e) {
+        return e.hydrodynamik_rolle == HydrodynamikRolle::rumpf;
+    }))
+        throw std::invalid_argument("CORE-HYD-0001: Modell enthaelt kein Hydrodynamik-Rumpfelement.");
+    auto context=std::make_shared<HydrodynamikKontext>();
+    context->konfiguration=config;
+    context->modell_fassung=m.fassung;
+    context->auswertung_schritt=s.schritt;
+    context->auswertung_zeit_s=s.zeit_s;
+    kraefte(m,s.pose,s.testantrieb.get(),1000.,9.81,s.geflutet,context.get(),
+        s.geschwindigkeit_welt_m_s);
+    auto result=s;
+    result.hydrodynamik=context;
+    result.hydrodynamik_erforderlich=true;
+    return result;
+}
+
 Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
-    double rho,double g,const std::vector<std::string>& geflutet)
+    double rho,double g,const std::vector<std::string>& geflutet,
+    const HydrodynamikKontext* hydro,const Vektor3& geschwindigkeit)
 {
     auto k=hydrostatik(m,p,rho,g,geflutet);
-    if(!c) return k;
-    testparameter(c->konfiguration);
-    if(c->modell_fassung!=m.fassung)
-        throw std::invalid_argument("CORE-SIM-0001: Falsche Testgeometriefassung.");
-    Beitrag b;b.id="testantrieb.bug.kraft";b.art="kraft";
-    b.quelle=Quelle::testantrieb;b.gruppe="testantrieb";
-    b.zustand=c->aktiv?Datenzustand::null:Datenzustand::deaktiviert;
-    b.punkt_bekannt=c->zugpunkt_modell_m.has_value();
-    if(c->zugpunkt_modell_m) b.punkt_m=*c->zugpunkt_modell_m;
-    if(c->aktiv && c->konfiguration.kraft_n>0.) {
-        if(!c->zugpunkt_modell_m)
-            throw std::invalid_argument("CORE-SIM-0001: Physische Buggeometrie fehlt.");
-        const auto bow=p.modellvektor_nach_welt({1.,0.,0.});
-        const double norm=std::hypot(bow[0],bow[1]);
-        if(norm<=1e-10)
-            throw std::invalid_argument("CORE-SIM-0001: Horizontale Bugprojektion singulaer.");
-        const Vektor3 f{c->konfiguration.kraft_n*bow[0]/norm,c->konfiguration.kraft_n*bow[1]/norm,0.};
-        b.vektor=p.weltvektor_nach_modell(f);
-        b.moment_s_nm=moment_um(b.punkt_m,m.schwerpunkt_m,b.vektor);
-        b.zustand=Datenzustand::gueltig;
-        k.kraft_welt_n=plus(k.kraft_welt_n,f);
-        k.moment_modell_nm=plus(k.moment_modell_nm,b.moment_s_nm);
+    if(c) {
+        testparameter(c->konfiguration);
+        if(c->modell_fassung!=m.fassung)
+            throw std::invalid_argument("CORE-SIM-0001: Falsche Testgeometriefassung.");
+        Beitrag b;b.id="testantrieb.bug.kraft";b.art="kraft";
+        b.quelle=Quelle::testantrieb;b.gruppe="testantrieb";
+        b.zustand=c->aktiv?Datenzustand::null:Datenzustand::deaktiviert;
+        b.punkt_bekannt=c->zugpunkt_modell_m.has_value();
+        if(c->zugpunkt_modell_m) b.punkt_m=*c->zugpunkt_modell_m;
+        if(c->aktiv && c->konfiguration.kraft_n>0.) {
+            if(!c->zugpunkt_modell_m)
+                throw std::invalid_argument("CORE-SIM-0001: Physische Buggeometrie fehlt.");
+            const auto bow=p.modellvektor_nach_welt({1.,0.,0.});
+            const double norm=std::hypot(bow[0],bow[1]);
+            if(norm<=1e-10)
+                throw std::invalid_argument("CORE-SIM-0001: Horizontale Bugprojektion singulaer.");
+            const Vektor3 f{c->konfiguration.kraft_n*bow[0]/norm,c->konfiguration.kraft_n*bow[1]/norm,0.};
+            b.vektor=p.weltvektor_nach_modell(f);
+            b.moment_s_nm=moment_um(b.punkt_m,m.schwerpunkt_m,b.vektor);
+            b.zustand=Datenzustand::gueltig;
+            k.kraft_welt_n=plus(k.kraft_welt_n,f);
+            k.moment_modell_nm=plus(k.moment_modell_nm,b.moment_s_nm);
+        }
+        k.beitraege.push_back(b);
+    }
+    if(hydro) {
+        hydrodynamikparameter(hydro->konfiguration);
+        if(hydro->modell_fassung!=m.fassung)
+            throw std::invalid_argument("CORE-HYD-0001: Falsche Hydrodynamik-Modellfassung.");
+        if(!endlich(geschwindigkeit))
+            throw std::invalid_argument("CORE-HYD-0001: Bootsgeschwindigkeit muss endlich sein.");
+        for(const auto& e:m.elemente) {
+            if(e.hydrodynamik_rolle != HydrodynamikRolle::rumpf) continue;
+            Vektor3 kraft_welt{};
+            auto b=rumpfreibung(e,m,p,hydro->konfiguration,geschwindigkeit,kraft_welt);
+            k.kraft_welt_n=plus(k.kraft_welt_n,kraft_welt);
+            k.moment_modell_nm=plus(k.moment_modell_nm,b.moment_s_nm);
+            k.beitraege.push_back(std::move(b));
+        }
     }
     for(auto& sum:k.beitraege) if(sum.rolle==Rolle::gesamtsumme) {
         sum.vektor=k.moment_modell_nm;sum.moment_s_nm=k.moment_modell_nm;
     }
-    k.beitraege.push_back(b);
     return k;
 }
 
@@ -493,6 +677,9 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         }
         context->uebergang=TestantriebUebergang{s.schritt,s.schritt+1,s.zeit_s,dt,ereignisse,{}};
     }
+    std::shared_ptr<HydrodynamikKontext> hydro_context;
+    if(s.hydrodynamik)
+        hydro_context=std::make_shared<HydrodynamikKontext>(*s.hydrodynamik);
     for(double value:s.geschwindigkeit_welt_m_s)
         if(!std::isfinite(value)) throw std::invalid_argument("CORE-SIM-0001: Geschwindigkeit nicht endlich.");
     for(double value:s.omega_modell_rad_s)
@@ -504,7 +691,8 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         I[0]*(I[4]*I[8]-I[5]*I[7])-I[1]*(I[3]*I[8]-I[5]*I[6])+I[2]*(I[3]*I[7]-I[4]*I[6])<=0.)
         throw std::invalid_argument("CORE-SIM-0002: Dynamiktraegheit nicht positiv definit.");
     const auto geflutet=flutung(modell,s.pose,s.geflutet);
-    const auto k=kraefte(modell,s.pose,context.get(),rho,g,geflutet);
+    const auto k=kraefte(modell,s.pose,context.get(),rho,g,geflutet,
+        hydro_context.get(),s.geschwindigkeit_welt_m_s);
     const auto a=mal(k.kraft_welt_n,1./modell.masse_kg);
     Vektor3 impuls{};
     for (std::size_t i=0;i<3;++i)
@@ -524,7 +712,9 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
     const Pose midrotation{{},midq};
     const auto midcg=plus(plus(cg,mal(s.geschwindigkeit_welt_m_s,dt/2)),mal(a,dt*dt/8));
     const Pose midpose{plus(midcg,mal(midrotation.modellvektor_nach_welt(modell.schwerpunkt_m),-1.)),midq};
-    const auto midforce=kraefte(modell,midpose,context.get(),rho,g,geflutet);
+    const auto midvelocity=plus(s.geschwindigkeit_welt_m_s,mal(a,dt/2));
+    const auto midforce=kraefte(modell,midpose,context.get(),rho,g,geflutet,
+        hydro_context.get(),midvelocity);
     Vektor3 midimpuls{};
     for(std::size_t i=0;i<3;++i)
         for(std::size_t j=0;j<3;++j) midimpuls[i]+=I[3*i+j]*omega_mid[j];
@@ -539,6 +729,14 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
     result.omega_modell_rad_s=plus(s.omega_modell_rad_s,mal(midalpha,dt));
     result.zeit_s=s.zeit_s+dt;result.schritt=s.schritt+1;
     result.geflutet=flutung(modell,result.pose,geflutet);
+    if(hydro_context) {
+        hydro_context->auswertung_schritt=result.schritt;
+        hydro_context->auswertung_zeit_s=result.zeit_s;
+        result.hydrodynamik=hydro_context;
+        result.hydrodynamik_erforderlich=true;
+        kraefte(modell,result.pose,context.get(),rho,g,result.geflutet,
+            hydro_context.get(),result.geschwindigkeit_welt_m_s);
+    } else result.hydrodynamik_erforderlich=false;
     if(context) {
         auto& b=context->uebergang->begrenzung;
         b.vorher_welt_m_s=result.geschwindigkeit_welt_m_s;

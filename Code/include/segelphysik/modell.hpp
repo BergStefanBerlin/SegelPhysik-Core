@@ -16,12 +16,15 @@ struct Mesh {
     std::vector<std::array<std::size_t, 3>> dreiecke;
 };
 
+enum class HydrodynamikRolle { rumpf, kiel, ruder };
+
 struct Element {
     std::string id;
     double masse_kg = 0.;
     Vektor3 schwerpunkt_m{};
     std::array<double, 9> traegheit_kg_m2{};
     std::optional<Mesh> volumen;
+    std::optional<HydrodynamikRolle> hydrodynamik_rolle;
     // Open-edge vertices of a shell mass mesh (e.g. the gunwale of a hull
     // without deck). Only kept when the element also has a displacement
     // volume; non-empty means the element can flood (A-C-00047).
@@ -40,8 +43,9 @@ struct Modell {
 };
 
 // JSON 0.1-entwurf: id, gruppen.{name}.elemente; elements contain id and
-// Darstellung and/or Hydrostatik. Hydrostatik requires masse and optionally
-// volumen. Unknown structural/physics fields are rejected. name, status and
+// Darstellung, Hydrostatik and optionally Hydrodynamik. Hydrostatik requires
+// masse and optionally volumen. Hydrodynamik.rolle requires a physical volume
+// mesh and is one of rumpf, kiel or ruder. Unknown structural/physics fields are rejected. name, status and
 // entwurf are metadata only, not a physical validation or simulation approval.
 // Paths are relative to the JSON file; Darstellung is never used for physics
 // (its file is not opened). Darstellung.farbe is an optional "#rrggbb" colour,
