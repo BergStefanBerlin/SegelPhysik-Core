@@ -1097,7 +1097,8 @@ Modell lade_modell(const std::filesystem::path& datei)
     Fingerabdruck fassung;
     fassung.datei(inhalt);
     const auto root = Parser(inhalt, ort).lesen();
-    objekt(root, {"schema_version", "id", "name", "status", "entwurf", "gruppen"}, ort);
+    objekt(root, {"schema_version", "id", "name", "status", "entwurf", "gruppen",
+        "Hydrodynamische_Traegheit"}, ort);
     if (text(pflicht(root, "schema_version", ort), ort) != "0.1-entwurf")
         fehler(2, ort, "Unterstuetzte schema_version: 0.1-entwurf");
     for (const auto* feld : {"name", "status"})
@@ -1106,6 +1107,29 @@ Modell lade_modell(const std::filesystem::path& datei)
         if (entwurf->typ != Json::Typ::objekt) fehler(2, ort, "entwurf muss ein Metadatenobjekt sein");
     Modell modell;
     modell.id = text(pflicht(root, "id", ort), ort + ".id");
+    if (const auto* block = optional(root, "Hydrodynamische_Traegheit")) {
+        const std::string blockort = ort + ".Hydrodynamische_Traegheit";
+        objekt(*block, {"zusatzmasse", "daempfung"}, blockort);
+        HydrodynamischeTraegheitModell traegheit;
+        auto lesen_gruppe = [&](const char* feld, std::initializer_list<const char*> erlaubt,
+                                std::map<std::string, double>& ziel) {
+            const auto* gruppe = optional(*block, feld);
+            if (!gruppe) return;
+            const std::string gruppenort = blockort + "." + feld;
+            objekt(*gruppe, erlaubt, gruppenort);
+            for (const auto& eintrag : gruppe->objekt) {
+                if (eintrag.second.typ != Json::Typ::zahl || !std::isfinite(eintrag.second.zahl))
+                    fehler(2, gruppenort + "." + eintrag.first, "Endliche Zahl erwartet");
+                const double wert = eintrag.second.zahl;
+                if (wert < 0.) fehler(2, gruppenort + "." + eintrag.first, "Wert darf nicht negativ sein");
+                ziel[eintrag.first] = wert;
+            }
+        };
+        lesen_gruppe("zusatzmasse", {"a11", "a22", "a33", "a44", "a55", "a66"}, traegheit.zusatzmasse);
+        lesen_gruppe("daempfung", {"zeta_rollen", "zeta_stampfen", "zeta_tauchen",
+            "gieren_linear", "gieren_quadratisch"}, traegheit.daempfung);
+        modell.hydrodynamische_traegheit = std::move(traegheit);
+    }
     const auto& gruppen = pflicht(root, "gruppen", ort);
     if (gruppen.typ != Json::Typ::objekt) fehler(2, ort, "gruppen muss ein Objekt sein");
     std::set<std::string> ids;

@@ -1,0 +1,81 @@
+{
+  "status": "finalisiert",
+  "thema": "Hydrodynamische Zusatzmasse und Dämpfung",
+  "spezifikation": "../Spezifikation_Hydrodynamik_Zusatzmasse_Daempfung.md",
+  "umsetzungsplan": "../../Umsetzungsplaene/Umsetzungsplan_C-0.7_Hydrodynamik.md",
+  "hinweis": "Vom Nutzer am 28.10.2026 zur Finalisierung freigegeben (A-C-00086 bis A-C-00092). Keine GUI-Anforderungen. Wellenwiderstand (Punkt 5) und Rumpf-Schwert-Ruder-Interaktion (Punkt 7) sind auf später verschoben und nicht Teil dieses Umfangs.",
+  "punkte": [
+    {
+      "id": "IDEE-C-00051",
+      "status": "angenommen",
+      "thema": "Ort und Zielversion der Spezifikation",
+      "bezug": "../Spezifikation_Hydrodynamik_Zusatzmasse_Daempfung.md",
+      "entscheidung": "Eigene Spezifikation neben der Core-Hydrodynamik-Spezifikation; Zielversion C-0.7 (früher C-0.9).",
+      "anforderungen": ["A-C-00092"]
+    },
+    {
+      "id": "IDEE-C-00052",
+      "status": "angenommen",
+      "thema": "Bestimmung der Zusatzmassen",
+      "bezug": "../Spezifikation_Hydrodynamik_Zusatzmasse_Daempfung.md#a-c-00086-bestimmung-der-zusatzmassen",
+      "entscheidung": "Aus Rumpfmesh per Ellipsoid-/Streifennäherung abgeleitet, je Modell in modell.json überschreibbar; Status geschaetzt mit Quelle und Unsicherheit.",
+      "anforderungen": ["A-C-00086", "A-C-00087"]
+    },
+    {
+      "id": "IDEE-C-00053",
+      "status": "angenommen",
+      "thema": "Beitragende Körper",
+      "bezug": "../Spezifikation_Hydrodynamik_Zusatzmasse_Daempfung.md#a-c-00086-bestimmung-der-zusatzmassen",
+      "entscheidung": "Rumpf sowie Ruder und Schwert (Plattennäherung für die Querrichtung).",
+      "anforderungen": ["A-C-00086"]
+    },
+    {
+      "id": "IDEE-C-00054",
+      "status": "angenommen",
+      "thema": "Form der Zusatzmassenmatrix und Integratoreingriff",
+      "bezug": "../Spezifikation_Hydrodynamik_Zusatzmasse_Daempfung.md#a-c-00088-bewegungsgleichung-mit-zusatzmasse",
+      "entscheidung": "Diagonale Matrix (6 Werte) um den Gesamtschwerpunkt mit Coriolis-/Munk-Termen im Körperrahmen; beide Integratorstufen konsistent.",
+      "anforderungen": ["A-C-00088"]
+    },
+    {
+      "id": "IDEE-C-00055",
+      "status": "angenommen",
+      "thema": "Abhängigkeit der Zusatzmasse vom Eintauchzustand",
+      "bezug": "../Spezifikation_Hydrodynamik_Zusatzmasse_Daempfung.md#a-c-00086-bestimmung-der-zusatzmassen",
+      "entscheidung": "Konstant am Referenzzustand (aufrecht, Konstruktionswasserlinie); Einschränkung dokumentiert.",
+      "anforderungen": ["A-C-00086"]
+    },
+    {
+      "id": "IDEE-C-00056",
+      "status": "angenommen",
+      "thema": "Dämpfungsfreiheitsgrade und Form",
+      "bezug": "../Spezifikation_Hydrodynamik_Zusatzmasse_Daempfung.md#a-c-00089-dämpfungsmodell",
+      "entscheidung": "Gieren, Rollen, Stampfen, Tauchen; linear plus quadratisch. Rollen/Stampfen/Tauchen: linearer Anteil über ζ aus der Rückstellsteifigkeit, ζ erst nach Messung der Ist-Abklingraten. Gieren: quadratisch aus Rumpflänge und Fläche, linear als geschätzter Anteil der Zusatzträgheit pro Sekunde. Keine translatorische Zusatzdämpfung.",
+      "anforderungen": ["A-C-00087", "A-C-00089", "A-C-00090"]
+    },
+    {
+      "id": "IDEE-C-00057",
+      "status": "angenommen",
+      "thema": "Vermeidung von Doppelzählung mit Panelkräften",
+      "bezug": "../Spezifikation_Hydrodynamik_Zusatzmasse_Daempfung.md#a-c-00090-messung-der-ist-abklingraten-und-festlegung-der-koeffizienten",
+      "entscheidung": "Vorab Messung der heutigen Abklingraten am Referenzmodell; nur der fehlende Anteil wird ergänzt.",
+      "anforderungen": ["A-C-00090"]
+    },
+    {
+      "id": "IDEE-C-00058",
+      "status": "angenommen",
+      "thema": "Ergebnisvertrag und Bilanz",
+      "bezug": "../Spezifikation_Hydrodynamik_Zusatzmasse_Daempfung.md#a-c-00091-ergebnisvertrag-und-bilanz",
+      "entscheidung": "Additive Erweiterung (effektive Masse/Trägheit, Zusatzmassenwerte mit Herkunft, Dämpfungsbeiträge); bestehende Felder unverändert; keine GUI-Änderung.",
+      "anforderungen": ["A-C-00091"]
+    },
+    {
+      "id": "IDEE-C-00059",
+      "status": "angenommen",
+      "thema": "Abnahmekriterien ohne Messdaten",
+      "bezug": "../Spezifikation_Hydrodynamik_Zusatzmasse_Daempfung.md#a-c-00092-nachweise-und-regression",
+      "entscheidung": "Analytische Referenzen, Energie- und Symmetrietests, unveränderte Statik, Abklingversuche, Live-/Batch-Parität, Referenzmodelle Optimist, 420er, Folkeboot; keine quantitative Genauigkeitsaussage.",
+      "anforderungen": ["A-C-00092"]
+    }
+  ]
+}

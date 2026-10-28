@@ -22,7 +22,7 @@ Integration wird durch diese Core-Spezifikation fachlich beschrieben, aber
 nicht zur Umsetzung freigegeben. Die bisherigen Festlegungen zum festen
 Ruder gelten für C-0.7; für den späteren Bewegungsumfang gilt Abschnitt 13.
 Der separate
-[Planentwurf C-0.8](../Umsetzungsplaene/Umsetzungsplan_C-0.8_Ruder_Schwertbewegung.md)
+[Umsetzungsplan C-0.7, Teil B](../Umsetzungsplaene/Umsetzungsplan_C-0.7_Hydrodynamik.md)
 ordnet die Core-Arbeiten; ein GUI-Plan liegt im GUI-Repository.
 
 **Entscheidungsherkunft und Restpunkte:** [Hydrodynamik](Entwurfspunkte/Hydrodynamik.json)
@@ -257,7 +257,9 @@ Bewegliches Ruder, VPP-Gleichgewicht mit Segelantrieb, Manöverregelung,
 Zusatzmassen, hydrodynamische Dämpfung, freie Oberfläche, Wellenzusatzwiderstand
 in Seegang, Wandnähe, Kavitation sowie CFD oder Modellversuche sind nicht Teil
 des ersten Einstiegs. Sie dürfen nicht durch pauschale Zuschläge als bereits
-modelliert gelten.
+modelliert gelten. Zusatzmassen und hydrodynamische Dämpfung werden in der
+[Spezifikation Hydrodynamische Zusatzmasse und Dämpfung](Spezifikation_Hydrodynamik_Zusatzmasse_Daempfung.md)
+(A-C-00086 bis A-C-00092) geführt.
 
 ## 5. Prüf- und Abnahmeprinzipien für die spätere Finalisierung
 

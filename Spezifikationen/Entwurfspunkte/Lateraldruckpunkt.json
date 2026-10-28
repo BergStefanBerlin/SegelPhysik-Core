@@ -1,0 +1,56 @@
+{
+  "status": "finalisiert",
+  "thema": "Lateraldruckpunkt",
+  "spezifikation": "../Spezifikation_Lateraldruckpunkt.md",
+  "hinweis": "Finalisiert am 28.10.2026 auf Nutzerauftrag. Zielversion: laufender Versionsschritt C-0.7. Segeldruckpunkt ist nicht Teil des Umfangs.",
+  "punkte": [
+    {
+      "id": "IDEE-C-00060",
+      "status": "angenommen",
+      "thema": "Ort und Zielversion der Spezifikation",
+      "bezug": "../Spezifikation_Lateraldruckpunkt.md#2-anforderungen",
+      "entscheidung": "Eigene Spezifikation; Zielversion ist der laufende Versionsschritt C-0.7, kein eigener Plan.",
+      "anforderungen": []
+    },
+    {
+      "id": "IDEE-C-00061",
+      "status": "angenommen",
+      "thema": "Definition und Quellen",
+      "bezug": "../Spezifikation_Lateraldruckpunkt.md#a-c-00093-definition-und-quellen",
+      "entscheidung": "Seitenkraft in Modell-y aus Rumpfdruck, Kiel und Ruder; ohne Reibung, Dämpfung, Hydrostatik und Testantrieb.",
+      "anforderungen": ["A-C-00093"]
+    },
+    {
+      "id": "IDEE-C-00062",
+      "status": "angenommen",
+      "thema": "Berechnung",
+      "bezug": "../Spezifikation_Lateraldruckpunkt.md#a-c-00094-berechnung",
+      "entscheidung": "Kraftgewichteter Mittelpunkt: x = Σ(Fy·x)/ΣFy, z analog, y = 0.",
+      "anforderungen": ["A-C-00094"]
+    },
+    {
+      "id": "IDEE-C-00063",
+      "status": "angenommen",
+      "thema": "Status und Schwelle",
+      "bezug": "../Spezifikation_Lateraldruckpunkt.md#a-c-00095-status-und-schwelle",
+      "entscheidung": "gueltig ab |Fy| >= 5 % von Σ|Fy,i| und >= 1 N, sonst nicht_bestimmbar ohne Position.",
+      "anforderungen": ["A-C-00095"]
+    },
+    {
+      "id": "IDEE-C-00064",
+      "status": "angenommen",
+      "thema": "Ergebnisvertrag",
+      "bezug": "../Spezifikation_Lateraldruckpunkt.md#a-c-00096-ergebnisvertrag",
+      "entscheidung": "Additiver Block druckpunkte.lateral, vertragsversion unverändert, nur Meter, Live und Batch gleich; druckpunkte allgemein für späteres segel.",
+      "anforderungen": ["A-C-00096"]
+    },
+    {
+      "id": "IDEE-C-00065",
+      "status": "angenommen",
+      "thema": "Wirkung und Nachweise",
+      "bezug": "../Spezifikation_Lateraldruckpunkt.md#a-c-00097-wirkung-und-nachweise",
+      "entscheidung": "Reine Auswertegröße; Tests für Ruder-/Schwert-Einzelkraft, Gegenkräfte, Querkraft null, Parität, Altfelder, Referenzmodelle; integrierter Lauf.",
+      "anforderungen": ["A-C-00097"]
+    }
+  ]
+}

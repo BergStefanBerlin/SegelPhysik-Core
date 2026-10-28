@@ -46,7 +46,7 @@ endif()
 configure_file(src/fehlerkatalog.hpp.in generated/fehlerkatalog.hpp @ONLY)
 
 add_library(segelphysik_core STATIC src/core.cpp src/pose.cpp src/modell.cpp
-    src/hydrostatik.cpp src/messung.cpp src/simulation.cpp src/katalog.cpp)
+    src/hydrostatik.cpp src/hydrotraegheit.cpp src/messung.cpp src/simulation.cpp src/katalog.cpp)
 target_include_directories(segelphysik_core PUBLIC include)
 target_include_directories(segelphysik_core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_compile_features(segelphysik_core PUBLIC cxx_std_17)
@@ -90,6 +90,19 @@ if(BUILD_TESTING)
         "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json"
         "${SEGELPHYSIK_MODELLE_DIR}/rolle/modell.json"
         "${SEGELPHYSIK_MODELLE_DIR}/unregelmaessig/modell.json")
+    add_executable(lateraldruckpunkt_tests tests/lateraldruckpunkt_tests.cpp)
+    target_link_libraries(lateraldruckpunkt_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets lateraldruckpunkt_tests)
+    add_test(NAME lateraldruckpunkt COMMAND lateraldruckpunkt_tests)
+    add_executable(traegheit_tests tests/traegheit_tests.cpp)
+    target_link_libraries(traegheit_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets traegheit_tests)
+    add_test(NAME hydrodynamik_traegheit COMMAND traegheit_tests
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/kugel/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/optimist/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/folkeboot/modell.json")
     add_executable(simulation_tests tests/simulation_tests.cpp)
     target_link_libraries(simulation_tests PRIVATE segelphysik_core)
     list(APPEND core_targets simulation_tests)

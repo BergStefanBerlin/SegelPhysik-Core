@@ -61,13 +61,50 @@ struct HydrodynamikKonfiguration {
     double rho_kg_m3 = 1000.;
     double nu_m2_s = 1e-6;
     Vektor3 fluidgeschwindigkeit_welt_m_s{};
+    // false: Verhalten ohne Zusatzmasse und ohne Zusatzdaempfung.
+    bool zusatzmasse_daempfung = true;
 };
+
+// Ein Zusatzmassen- bzw. Daempfungswert mit Herkunft (A-C-00086, A-C-00092).
+struct TraegheitsWert {
+    double wert{};
+    std::string status;     // geschaetzt | modell
+    std::string methode;
+    std::string quelle;
+    std::string unsicherheit;
+};
+
+// Hydrodynamische Zusatzmasse und Daempfung eines Modells (A-C-00086..00090).
+// Zusatzmassen im Modellrahmen um den Gesamtschwerpunkt:
+// a[0..2] kg (a11,a22,a33), a[3..5] kg m^2 (a44,a55,a66).
+struct HydrodynamischeTraegheit {
+    std::array<TraegheitsWert, 6> zusatzmasse;
+    TraegheitsWert zeta_rollen, zeta_stampfen, zeta_tauchen;
+    TraegheitsWert gieren_linear;       // 1/s, Anteil von (Izz+a66)
+    TraegheitsWert gieren_quadratisch;  // kg m^2
+    double c33_n_m{}, c44_nm_rad{}, c55_nm_rad{};  // Rueckstellsteifigkeiten
+    double b_rollen_nms{}, b_stampfen_nms{}, b_tauchen_ns_m{};
+    Vektor3 effektive_masse_kg{};
+    Vektor3 effektive_traegheit_kg_m2{};
+    std::vector<std::string> diagnosen;
+};
+
 struct HydrodynamikKontext {
     HydrodynamikKonfiguration konfiguration;
     std::string modell_fassung;
     std::size_t auswertung_schritt{};
     double auswertung_zeit_s{};
+    std::shared_ptr<const HydrodynamischeTraegheit> traegheit;
 };
+
+// Berechnet Zusatzmassen und Daempfung fuer die Lage pose (A-C-00086, A-C-00089).
+// Wirft std::invalid_argument CORE-SIM-0002 bei ungueltigen Werten.
+HydrodynamischeTraegheit berechne_hydrodynamische_traegheit(
+    const Modell& modell, const Pose& pose, double rho, double g);
+// Zusatzmassen eines Doppelkoerper-Halbellipsoids (Lamb) mit Halbachsen a,b,c
+// und Verdraengungsvolumen v: {a11,a22,a33,a44,a55,a66} um das Zentrum.
+std::array<double, 6> ellipsoid_zusatzmasse(double a, double b, double c, double v, double rho);
+
 
 VolumenWerte wasseranteil(const Mesh& mesh, const Pose& pose);
 // M_P = (A - P) x F + M_A: moment of a force applied at A (with own moment M_A) about P.
@@ -164,6 +201,21 @@ Kraefte kraefte(const Modell&, const Pose&, const TestantriebKontext*,
     const Vektor3& omega_modell_rad_s = {},
     const std::vector<Bewegungsstellung>& bewegungsstellungen = {});
 std::array<double, 16> bewegungstransformation(const Modell&, const std::string& element_id,
+    const std::vector<Bewegungsstellung>& bewegungsstellungen = {});
+
+// Lateraldruckpunkt (A-C-00093..00096): reine Auswertegroesse, aendert keine Kraefte.
+// status: "gueltig" (kraftgewichtet aus den hydrodynamischen Seitenkraeften),
+// "geometrisch" (Flaechenschwerpunkt der benetzten Lateralflaeche, wenn die Seitenkraefte
+// nicht ausreichen, z. B. in Ruhe) oder "nicht_bestimmbar" (keine Position).
+struct Lateraldruckpunkt {
+    bool vorhanden{};  // false: Modell ohne Hydrodynamik-Elemente, kein Block
+    std::string status = "nicht_bestimmbar";
+    std::optional<Vektor3> position_modell_m;
+    double querkraft_modell_n{};
+    double lateralflaeche_m2{};
+    std::vector<std::string> quellen;
+};
+Lateraldruckpunkt lateraldruckpunkt(const Modell&, const Pose&, const Kraefte&,
     const std::vector<Bewegungsstellung>& bewegungsstellungen = {});
 
 struct Gleichgewichtsangaben {

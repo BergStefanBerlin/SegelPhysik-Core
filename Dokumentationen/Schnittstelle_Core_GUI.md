@@ -88,7 +88,7 @@ Bilanz-/Simulations-/CLI-Tests; reproduzierbare vierzeilige 420er-Aufzeichnung
 Testziels. Sie enthält unveränderten Start mit 6 m/s, aktive Begrenzung,
 Ausschalten und erneutes Einschalten. Keine grafische Abnahme.
 
-## C-0.8: Dynamische Ruder-/Schwertbewegung, Ergebnisversion 4
+## C-0.7: Dynamische Ruder-/Schwertbewegung, Ergebnisversion 4
 
 Eine Elementdefinition kann optional `Bewegung` enthalten:
 `art: "drehen"` mit `achse_modell` und `drehpunkt_modell_m` oder
@@ -115,7 +115,7 @@ verwenden unveränderte Modelldaten. Live- und Batchpfad teilen denselben
 Integrator und dasselbe Ereignismodell. Bei gleichzeitiger Nutzung des
 Testantriebs bleibt dessen Kontext optional in Version 4 enthalten.
 
-Version 4 ist für das Core- und GUI-Bewegungspaket C-0.8/G-0.7 bestimmt;
+Version 4 ist für das Core- und GUI-Bewegungspaket C-0.7/G-0.7 bestimmt;
 das unterstützt weder Hub-Kiele noch Stellgeschwindigkeit,
 Betätigungskräfte oder Kollisionen.
 

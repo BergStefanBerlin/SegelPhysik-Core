@@ -7,8 +7,15 @@ Technische Gesamt- und fachliche Abnahme sind noch offen.**
 C-0.6. Die Versionsbezeichnung ordnet diesen Plan im CORE-Arbeitsverlauf
 ein; sie erstellt oder autorisiert keinen Git-Tag oder Release.
 
-Dieser Plan ist der einzige maßgebliche Umsetzungsplan für den
-Hydrodynamik-Folgeumfang C-0.7. Maßgebliche fachliche Grundlage ist die
+Dieser Plan ist der einzige maßgebliche Umsetzungsplan für den Versionsschritt
+C-0.7. Er ist in vier Teile gegliedert: **Teil A** (Abschnitte 1 bis 7)
+Dreidimensionale Hydrodynamik, **Teil B** bewegliche Ruder und Schwerter
+(früher als „C-0.8“ geführt), **Teil C** Zusatzmasse und Dämpfung (früher
+„C-0.9“) und **Teil D** Lateraldruckpunkt. Die Versionsbezeichnungen
+„C-0.8“ und „C-0.9“ sind aufgehoben; es gilt durchgehend C-0.7. Die
+Kennungen A-C und U-C bleiben unverändert.
+Die Aussagen zum Umfang in den Abschnitten 1 bis 7 gelten für Teil A.
+Maßgebliche fachliche Grundlage von Teil A ist die
 [Hydrodynamik-Spezifikation](../Spezifikationen/Spezifikation_Hydrodynamik.md),
 insbesondere Abschnitt 12.
 Die zugehörigen Herkunftsentscheidungen und Restpunkte stehen in der
@@ -163,3 +170,263 @@ allen 16 Core-CTest-Prüfungen. Diese Ergebnisse belegen technische
 Regressionen für den aktuellen Core-Arbeitsstand, nicht die Vollständigkeit
 der Referenzmodelle oder eine fachliche Vorhersagegenauigkeit. Es wurden
 weder GUI- noch externe Modell-Repositories geändert.
+
+# Teil B: Bewegliche Ruder und Schwerter (ehemals Plan C-0.8)
+
+Teil B ist aus dem früheren Plan „C-0.8“ übernommen. Der Versionsschritt
+ist C-0.7 (es gab keinen eigenen Tag für 0.8); die Kennungen
+U-C-000060 bis U-C-000066 bleiben unverändert. Maßgebliche fachliche
+Grundlage ist Abschnitt 13 der
+[Core-Hydrodynamik-Spezifikation](../Spezifikationen/Spezifikation_Hydrodynamik.md#13-dynamische-verstellung-von-ruder-und-schwert);
+Herkunft: [Entwurfspunkteliste Hydrodynamik](../Spezifikationen/Entwurfspunkte/Hydrodynamik.json).
+Teil B enthält ausschließlich Core-Arbeiten; die GUI-Seite steht im
+[GUI-Plan G-0.7](../../GUI/Umsetzungsplaene/Umsetzungsplan_G-0.7_Ruder_Schwertsteuerung.md).
+
+## B.1 Umfang und Rückverfolgbarkeit
+
+Der Plan setzt die Core-Bewegungsdefinition, Stellzustände und deren
+hydrodynamische Verwendung um. Bewegte Elemente ändern weder
+Massenverteilung noch Schwerpunkt, Trägheit, Auftrieb oder Hydrostatik.
+Hub-Kiele, Aktuatordynamik, Bauteilinterferenz, Wasserzutritt durch
+Rumpfdurchbrüche und Strömungsnachläufe sind ausgeschlossen.
+
+| IDEE-ID | Core-Anforderung | Gegenstand |
+|---|---|---|
+| IDEE-C-00050 | A-C-00079 | JSON-Bewegungsvertrag und Importvalidierung |
+| IDEE-C-00050 | A-C-00080 | Modellachsen, Drehpunkte und projektweite Stellkonvention |
+| IDEE-C-00050 | A-C-00082 | Zeitgeordnete Eingaben und Hydrodynamikpose |
+| IDEE-C-00050 | A-C-00084 | Invariante Masse, Schwerpunkt, Trägheit und Hydrostatik |
+| IDEE-C-00050 | A-C-00085 | Core-Bewegungstests, Integrations- und Regressionstests |
+
+A-C-00081 und A-C-00083 sind GUI-seitige Liefergegenstände (A-G-00046 bis
+A-G-00051 im GUI-Plan).
+
+| U-ID | Anforderung(en) | Arbeitspaket und Ergebnis | Abhängigkeit |
+|---|---|---|---|
+| U-C-000060 | A-C-00080, A-C-00085 | Bestehende Modelle, Meshachsen, Ruderstock-/Schwertlager und relevante Dreh-/Hubräume inventarisieren; Pivot-Startwerte und Vorzeichen gegen Modellframe prüfen, Abweichungen dokumentieren | Keine |
+| U-C-000061 | A-C-00079, A-C-00080 | Rückwärtskompatiblen JSON-Bewegungsvertrag, Einheiten, gültige Bewegungsarten, Vektor-/Pivotvalidierung und robuste Hubwegableitung in die bestehende Modellbeschreibung integrieren | U-C-000060 |
+| U-C-000062 | A-C-00079, A-C-00080, A-C-00085 | Modellfeste Pose-/Transformationslogik für Drehen und Heben umsetzen; projektweite Ruderwinkel- und Schwertstellungsabbildung samt Endstellungen isoliert testen | U-C-000061 |
+| U-C-000063 | A-C-00082, A-C-00085 | Typisierte Stellereignisse, Simulationszeitbezug, stabile Ereignisfolge, Bestätigung und reproduzierbare Zustands-/Ergebnisbindung implementieren | U-C-000061, U-C-000062 |
+| U-C-000064 | A-C-00082, A-C-00084 | Core-Bewegungszustand in allen Integratorstufen verwenden; benetzte bewegte Simulationsgeometrie und Hydrodynamikbeiträge aktualisieren, Massen- und Hydrostatikwerte invariabel halten | U-C-000062, U-C-000063 |
+| U-C-000065 | A-C-00079 bis A-C-00085 | Referenzmodelle, Fehlerszenarien, dynamische Ereignisfolgen und Live-/Batch-Parität integrieren; Ergebnis-/Diagnoseverträge regressionsprüfen | U-C-000064 |
+| U-C-000066 | A-C-00079 bis A-C-00085 | Rückverfolgbarkeitsmatrix, technische Nachweise, Modell-/Pivotgrenzen und offene Validierungslücken vervollständigen | U-C-000065 |
+
+Umsetzungsschritte werden nur nach tatsächlicher Bearbeitung als
+abgeschlossen markiert; Geometrieinventar, Import, Transformation,
+Ereignisfolge, Dynamikintegration und Abschlussnachweise sind getrennte
+Prüfgegenstände.
+
+## B.2 Voraussetzungen und Grenzen
+
+- Der Arbeitsbaum enthält fremde Änderungen; sie dürfen nicht überschrieben,
+  zurückgesetzt oder pauschal gestagt werden.
+- Die Pivotkoordinaten sind meshbasierte Startnäherungen, keine vermessenen
+  Lagerdaten, und müssen mit Darstellungsmesh und Skizzen plausibilisiert
+  werden. Anpassungen erfolgen in den Modell-JSONs.
+- Achsen im modellfesten Frame: +X zum Bug, +Y nach Backbord, +Z nach oben.
+  Optimist-Schwert: Heben +Z. 420er-Schwert: Drehung +Y, 0-%-Stellung 90°
+  nach achtern gegenüber der 100-%-Meshlage. Ruder: Drehung um +Z, Grenzen
+  -90° bis +90°.
+- Altmodelle ohne Bewegungsblock bleiben unverändert; eine Bewegung wird nie
+  aus Namen oder Meshs erraten. Ein ungültiger Bewegungsblock wird
+  ausdrücklich diagnostiziert.
+- Die Stellposition ist für alle Berechnungen eines Integratorzeitschritts
+  konsistent; die Ereignisreihenfolge bei gleicher Simulationszeit ist
+  stabil und reproduzierbar.
+- Verstellungen verändern keine Masse, Schwerpunkt, Trägheit oder
+  Hydrostatik. Das Hydrodynamik-Simulationsmesh darf von der Darstellung
+  getrennt sein; Rumpfdurchbrüche werden nur dort geschlossen.
+- Nachläufe, Abschirmung, Kollisionen, Wasseraufprall und Betätigungsdynamik
+  sind keine stillen Ersatzmodelle. Fehlende Messdaten begrenzen die
+  fachliche Genauigkeit, blockieren aber technische Tests nicht.
+
+## B.3 Abhängigkeiten, Meilensteine und Prüfstrategie
+
+| Stufe | Eingang | Ausgang / Freigabekriterium |
+|---|---|---|
+| A. Baseline und Geometrie | Core-Build/API, Referenzmodelle | Achsen, Meshfassungen, plausible Drehpunkte und Hubendstellungen verifiziert |
+| B. Datenvertrag | Stufe A | Strikter, rückwärtskompatibler Import; Hubweg reproduzierbar |
+| C. Kinematik | Stufe B | Testbare Dreh-/Hubtransformation ohne Masse-/Hydrostatikmutation |
+| D. Eingabe und Laufzustand | Stufe C | Stellereignisse deterministisch angenommen, bestätigt und reproduzierbar |
+| E. Hydrodynamikkopplung | Stufe D | Konsistente bewegte Geometrie in jedem Integratorsample |
+| F. Integration und Übergabe | Stufe E | Regressionen, Live-/Batch-Parität, dokumentierte GUI-Schnittstelle |
+
+| Meilenstein | Eintritt | Abnahme |
+|---|---|---|
+| M7 – Geometrie und Baseline (B) | U-C-000060 begonnen | Baseline und Modellfassungen bekannt; Pivots/Achsen als plausibel, zu korrigieren oder offen markiert |
+| M8 – Modellvertrag und Kinematik (B) | M7 | Strikte Validierung; Altmodelle laden; Transformationen und Endpunkte analytisch getestet |
+| M9 – Dynamische Stellereignisse (B) | M8 | Ereignisannahme, Zeitbezug, Reihenfolge und Bestätigung reproduzierbar |
+| M10 – Hydrodynamik und Invarianten (B) | M9 | Dynamische Pose ändert erwartete Hydrodynamik; Masse, Schwerpunkt, Trägheit, Hydrostatik unverändert |
+| M11 – Integration und Übergabe (B) | M10 | Build, CTest, Live-/Batch-Parität; GUI-Vertrag dokumentiert |
+
+Prüfstrategie: Import/Vertrag (gültig, ungültig, Altmodell); Kinematik (-90°,
+0°, +90° Ruder; 0 %, Zwischenwert, 100 % Schwert; Drehung um Pivot);
+Ereignisfolge (gleiche und verschiedene Zeitpunkte, Reset); Dynamik und
+Hydrodynamik (alle Integratorstufen, Angriffspunkt, Moment, Bilanz);
+Invarianten und Regression; nativer Release-Build und CTest.
+
+## B.4 Rückverfolgbarkeit und tatsächlicher Stand
+
+| A-ID | Core-Arbeitspaket(e) | Nachweis | Status |
+|---|---|---|---|
+| A-C-00079 | U-C-000061–000063, U-C-000065–000066 | JSON-Import, Referenzmodelle und gezielte Validierungstests; weitere Fehler-/Altmodellfälle offen | teilweise |
+| A-C-00080 | U-C-000060–000062, U-C-000065–000066 | Achsen, Transformationen und Hubweg technisch umgesetzt; Pivot-Näherungen noch nicht visuell/fachlich abgenommen | teilweise |
+| A-C-00082 | U-C-000063–000065 | Ereignisannahme und V4-Zustand vorhanden; Ereignisreihenfolge, Replay und Live-/Batch-Parität noch nicht vollständig geprüft | teilweise |
+| A-C-00084 | U-C-000064–000066 | Bewegungsabhängige Hydrodynamik; Ruderseitenkraft und Giermoment im lokalen Profilrahmen mit synthetischem Ruder und 420er-Rudermesh auf Vorzeichen geprüft. Umfassende Hydrostatik-/Integratorregression und quantitative Validierung offen | teilweise |
+| A-C-00085 | U-C-000060–000066 | Core-Release-Build und Core-Tests bestanden; integrierter GUI/Core-CTest-Lauf bestanden (29/29, nach C-0.9-Umfang 30/30). Fachliche Pivot-/Modellabnahme und vollständige Rückverfolgbarkeitsmatrix offen | teilweise |
+
+| U-ID | Tatsächlicher Stand | Nachweis / offener Punkt |
+|---|---|---|
+| U-C-000060 | teilweise umgesetzt | Achsen/Pivots in Optimist und 420 JSON ergänzt; Pivotlagen sind Näherungen und warten auf Sicht-/Geometrieprüfung. Folkeboot: Ruder-`Bewegung` (Drehachse [0,0,1], Drehpunkt [-3.36,0,-0.47], aus der Geometrie geschätzt) ergänzt, Kiel starr; GUI-Probelauf offen |
+| U-C-000061 | technisch umgesetzt | Bewegungsdefinitionen, Importvalidierung und Hubwegableitung; Core-Build und Referenzmodelltests bestanden |
+| U-C-000062 | teilweise umgesetzt | Dreh- und Hubtransformationen einschließlich Ruder-/Schwertrotation und Hubtranslation getestet; vollständige Endlagen-/Pivotabnahme offen |
+| U-C-000063 | teilweise umgesetzt | Stellereignisse, Bestätigung und Ergebnisvertrag V4 umgesetzt; zeitgleiche Reihenfolge, Wiederholung und Live-/Batch-Parität nicht vollständig nachgewiesen |
+| U-C-000064 | teilweise umgesetzt | Bewegte Geometrie wirkt auf Hydrodynamik; Ruderseitenkraft nutzt den mitbewegten lokalen Profilrahmen. Korrektur 28.10.2026: Profilabmessungen werden am unverstellten Mesh bestimmt (ein stark ausgelenktes Ruder galt zuvor als Nicht-Tragfläche und lieferte keine Seitenkraft), Bezugsfläche folgt der lokalen Profilnormalen, oberhalb des Ablösewinkels geht die Kraft in ein Flachplatten-Normalkraftmodell über (cn = (1,1 + 0,018·AR)·sin α, geschätzt, nicht kalibriert). Vorzeichen von Seitenkraft und Giermoment für ±20°, ±60° sowie ±85° (Moment nur bis 60°) am 420er-Ruder getestet; Core-Szenario 420er (100 N bis 1,9 m/s, Kraft weg, Ruder −20°/0°/+20°) zeigt Drehung des Bugs in die erwartete Richtung. Erste Masse-/Hydrostatik-Invariante getestet; Integratorstufen und quantitative Kraft-/Momentenabnahme offen |
+| U-C-000065 | teilweise umgesetzt | Referenzmodelle, Import-/Hydrodynamiktests und Regressionen bestanden; integrierte GUI/Core-CTest-Suite bestanden; fachliche Pivotabnahme und vollständige Live-/Batch-Nachweise offen |
+| U-C-000066 | teilweise umgesetzt | Core-/Schnittstellendokumentation ergänzt; Core-CTest und integrierter Lauf bestanden. Vollständige Rückverfolgbarkeit, Pivotvalidierung, quantitative Bootsvalidierung und offene Datenlücken noch abzuschließen |
+
+# Teil C: Hydrodynamische Zusatzmasse und Dämpfung (ehemals Plan C-0.9)
+
+Teil C ist aus dem früheren Plan „C-0.9“ übernommen. Der Versionsschritt
+ist C-0.7; die Kennungen U-C-000067 bis U-C-000073 bleiben unverändert.
+Fachliche Grundlage ist die
+[Spezifikation Hydrodynamische Zusatzmasse und Dämpfung](../Spezifikationen/Spezifikation_Hydrodynamik_Zusatzmasse_Daempfung.md)
+(A-C-00086 bis A-C-00092); Herkunft:
+[Entwurfspunkteliste](../Spezifikationen/Entwurfspunkte/Hydrodynamik_Zusatzmasse_Daempfung.json).
+Es gibt keinen GUI-Plan; die GUI-Verträglichkeit wird über den integrierten
+GUI/Core-Lauf nachgewiesen.
+
+## C.1 Umfang und Rückverfolgbarkeit
+
+| A-ID | Gegenstand |
+|---|---|
+| A-C-00086 | Bestimmung der Zusatzmassen (Rumpf, Ruder, Schwert) |
+| A-C-00087 | Modellvertrag (optionaler Block, Überschreiben, Validierung) |
+| A-C-00088 | Bewegungsgleichung mit Zusatzmasse und Munk-Termen |
+| A-C-00089 | Dämpfungsmodell (Gieren, Rollen, Stampfen, Tauchen) |
+| A-C-00090 | Messung der Ist-Abklingraten, Festlegung ζ und Gierkoeffizienten |
+| A-C-00091 | Ergebnisvertrag und Bilanz (additiv) |
+| A-C-00092 | Nachweise und Regression |
+
+Ausgeschlossen: Wellenwiderstand, Nachlauf, Interaktion Rumpf/Schwert/Ruder,
+freie Oberfläche, Frequenzabhängigkeit, Eintauchabhängigkeit, Kopplungsterme,
+translatorische Zusatzdämpfung.
+
+| U-ID | Anforderung(en) | Arbeitspaket und Ergebnis | Abhängigkeit |
+|---|---|---|---|
+| U-C-000067 | A-C-00090, A-C-00092 | Baseline: Core bauen, CTest sichern. Ist-Abklingraten für Rollen, Stampfen, Tauchen und Gieren an Optimist, 420er und Folkeboot messen und dokumentieren | Keine |
+| U-C-000068 | A-C-00086, A-C-00092 | Zusatzmassenberechnung (Rumpf per Ellipsoid-/Streifennäherung, Ruder/Schwert per Plattennäherung) mit Diagnose; isoliert gegen Kugel, Ellipsoid, Platte testen | U-C-000067 |
+| U-C-000069 | A-C-00087, A-C-00092 | Optionalen, rückwärtskompatiblen Modellblock in Modellbeschreibung und Import integrieren; Validierung, Herkunft `modell`; Altmodelle unverändert | U-C-000068 |
+| U-C-000070 | A-C-00088, A-C-00092 | Bewegungsgleichung mit effektiver Masse und Munk-/Coriolis-Termen im Körperrahmen in beiden Integratorstufen; Positiv-Definit-Prüfung; Statik und Testantrieb unverändert | U-C-000068 |
+| U-C-000071 | A-C-00089, A-C-00090, A-C-00092 | Dämpfungsbeitrag je Freiheitsgrad; ζ und Gierkoeffizienten aus der Messung festlegen und begründen; Abklingversuche, Energiemonotonie, Stabilität | U-C-000069, U-C-000070 |
+| U-C-000072 | A-C-00091, A-C-00092 | Additive Ergebniserweiterung (effektive Masse/Trägheit, Zusatzmassen mit Herkunft, Dämpfungsbeiträge in der Bilanz); Ergebnisvertrags- und Bilanztests; Schnittstellenregister | U-C-000071 |
+| U-C-000073 | A-C-00086 bis A-C-00092 | Referenzmodelle, bestehende Ruder-/Schwert-Szenarien, Live-/Batch-Parität; Core-Build, vollständiger CTest, integrierter GUI/Core-Lauf; Rückverfolgbarkeit und offene Punkte | U-C-000072 |
+
+## C.2 Voraussetzungen, Meilensteine und Prüfstrategie
+
+- Die Abklingmessung (U-C-000067) erfolgt vor jeder Änderung an Integrator
+  oder Kräften. Alle Koeffizienten sind Schätzungen.
+- Ein verändertes Steuerverhalten (z. B. im 420er-Ruderversuch) ist erwartet
+  und wird dokumentiert; Testwerte werden nie stillschweigend gelockert.
+- Der Ergebnisvertrag wird nur additiv erweitert.
+
+| Meilenstein | Eintritt | Abnahme |
+|---|---|---|
+| M12 – Baseline und Messung (C) | Start Teil C | Build/CTest grün, Messprotokoll der Ist-Abklingraten |
+| M13 – Zusatzmassen und Modellvertrag (C) | M12 | Analytische Referenzen und Importtests bestanden |
+| M14 – Integrator (C) | M13 | Beschleunigungs-, Energie- und Statiktests; beide Stufen konsistent |
+| M15 – Dämpfung (C) | M14 | Koeffizienten festgelegt und begründet; Abklingtests stabil |
+| M16 – Ergebnisvertrag und Integration (C) | M15 | CTest vollständig, integrierter GUI/Core-Lauf, Live-/Batch-Parität |
+
+Prüfstrategie: Zusatzmasse (Kugel, Ellipsoid, Platte, Symmetrie); Import
+(gültig, ungültig, partiell, Altmodell); Integrator (a = F/(m + A11),
+Energiebilanz, Statik); Dämpfung (Abklingversuche, Energiemonotonie);
+Ergebnisvertrag (neue und unveränderte Felder, Bilanz); Regression und
+Integration (Ruder-/Schwert-Szenarien, Release-Build, CTest, ggf.
+`SEGELPHYSIK_TEST_INSTRUMENTATION=ON`, integrierter Lauf). Quantitative
+Bootsgenauigkeit wird nicht behauptet.
+
+## C.3 Rückverfolgbarkeit und tatsächlicher Stand
+
+| A-ID | Arbeitspaket(e) | Nachweis | Status |
+|---|---|---|---|
+| A-C-00086 | U-C-000068, U-C-000073 | Referenztests, Modellwerte | umgesetzt, getestet; Werte geschätzt |
+| A-C-00087 | U-C-000069, U-C-000073 | Importtests, Altmodelle | umgesetzt, getestet |
+| A-C-00088 | U-C-000070, U-C-000073 | Beschleunigungs-, Energie-, Statiktests | umgesetzt, getestet |
+| A-C-00089 | U-C-000071, U-C-000073 | Abklingversuche | umgesetzt, getestet; ζ geschätzt |
+| A-C-00090 | U-C-000067, U-C-000071, U-C-000073 | Messprotokoll, Koeffizientenbegründung | umgesetzt; Stampfmessung Optimist/420er unzuverlässig |
+| A-C-00091 | U-C-000072, U-C-000073 | Ergebnisvertrags- und Bilanztests | umgesetzt, getestet |
+| A-C-00092 | U-C-000067 bis U-C-000073 | Gesamtregression, integrierter Lauf | teilweise |
+
+| U-ID | Tatsächlicher Stand | Nachweis / offener Punkt |
+|---|---|---|
+| U-C-000067 | erledigt (Messung) | Baseline Codestand `9bb7f04`, Probe `abklingprobe.cpp`, dt=5 ms, 30 s, Start: Rollen 8°, Stampfen 4°, Tauchen 3 cm, Gieren r0=0,5 rad/s. ζ_ist (Rollen/Stampfen/Tauchen) und Gier-Abklingrate: Optimist 0,063 / 0,047 / 0,054 / 0,42 s⁻¹; 420er 0,070 / n.a. (kein Maximum erkennbar, x_end=-0,027) / 0,051 / 0,47 s⁻¹; Folkeboot -0,012 / 0,034 / 0,007 / 0,61 s⁻¹ (Rollen leicht angefacht: Messartefakt oder numerische Anregung, offen). Perioden: Optimist 0,79/0,57/0,47 s, 420er 1,14/–/0,55 s, Folkeboot 2,42/0,82/1,00 s. Core-Baseline CTest 16/16. |
+| U-C-000068 | umgesetzt, getestet | `hydrotraegheit.cpp` (Lamb-Doppelkörper-Ellipsoid aus Wasserlinie/Tiefgang/Verdrängung, Steiner-Terme, Plattennäherung für Ruder/Schwert, Diagnose). `traegheit_tests`: Kugel A11=½ρV, Spheroid k1=0,209/k2=0,702, Axialsymmetrie, drei Referenzboote endlich/positiv. Offen: Werte sind Schätzungen, nicht gegen Messdaten validiert; Kopplungsterme fehlen. |
+| U-C-000069 | umgesetzt, getestet | Optionaler Block `Hydrodynamische_Traegheit` (modell.cpp), Fehler CORE-MOD-0002, Herkunft `modell`/`geschaetzt`. Tests: gültig, partiell, negativ, unbekannter Schlüssel/Gruppe, Text statt Zahl, Altmodell. |
+| U-C-000070 | umgesetzt, getestet | Kirchhoff-Gleichung im Körperrahmen beider Integratorstufen mit Munk-Termen, Positiv-Definit-Prüfung, nur bei aktivem Hydrokontext (Schalter `zusatzmasse_daempfung`). Tests: A=0 ⇒ identisch zu vorher (1e-9), a=F/(m+a33) (Verhältnis 0,5±1e-3). Testantrieb-Begrenzer nutzt unverändert die Körpermasse. |
+| U-C-000071 | umgesetzt, getestet | Dämpfungsbeiträge `daempfung:{rollen,stampfen,gieren,tauchen}`; Rückstellung aus Wasserlinienschnitt; B=2ζ√(C(I+A)). Gewählt nach Messung (Zusatz-ζ): Rollen 0,10, Stampfen 0,35, Tauchen 0,30; Gieren linear 0,1 1/s·(Izz+a66), quadratisch 0,1·ρ·T·L⁴/64. Gemessene Gesamt-ζ (20-s-Probe, Optimist / 420er / Folkeboot): Rollen 0,129 / 0,115 / 0,117; Tauchen 0,322 / 0,217 / 0,301; Stampfen 0,049 / n.a. / 0,232; Gier-Abklingrate 0,32 / 0,42 / 0,47 1/s. Offen: Die Stampf-Messung des Optimist (0,049) und des 420ers ist unzuverlässig (Restversatz, Maximumsuche relativ zu null); Stampfziel 0,2–0,4 damit nur für das Folkeboot belegt. Wahl der ζ ist Schätzung. |
+| U-C-000072 | umgesetzt, getestet | Additiver Ergebnisblock `hydrodynamische_traegheit` (Zusatzmassen mit Herkunft, Dämpfung, effektive Masse/Trägheit, Rückstellung, Diagnosen), Bilanz erwartet `daempfung:*`. CPPI-0026 bis -0030 im Register. Test auf neue und unveränderte Altfelder. |
+| U-C-000073 | teilweise | Core Release 17/17 CTest, integriert (GUI/Core, `C:\spdeps\guibuild`) 30/30. Bestehende Ruder-/Schwert-/Testantriebstests unverändert grün. Nicht erledigt: instrumentierter Build (Messgating nicht berührt, nicht ausgeführt), erneute Szenario-Messung des 420er-Ruderversuchs, fachliche Abnahme durch den Nutzer. |
+
+# Teil D: Lateraldruckpunkt
+
+Fachliche Grundlage ist die
+[Spezifikation Lateraldruckpunkt](../Spezifikationen/Spezifikation_Lateraldruckpunkt.md)
+(A-C-00093 bis A-C-00097); Herkunft:
+[Entwurfspunkteliste](../Spezifikationen/Entwurfspunkte/Lateraldruckpunkt.json).
+Teil D enthält ausschließlich Core-Arbeiten. Die Darstellung steht im
+[GUI-Plan G-0.7](../../GUI/Umsetzungsplaene/Umsetzungsplan_G-0.7_Ruder_Schwertsteuerung.md),
+Teil B. Der Segeldruckpunkt ist ausgeschlossen.
+
+## D.1 Umfang und Rückverfolgbarkeit
+
+| IDEE-ID | A-ID | Gegenstand |
+|---|---|---|
+| IDEE-C-00061 | A-C-00093 | Definition und Quellen |
+| IDEE-C-00062 | A-C-00094 | Berechnung |
+| IDEE-C-00063 | A-C-00095 | Status und Schwelle |
+| IDEE-C-00064 | A-C-00096 | Ergebnisvertrag |
+| IDEE-C-00065 | A-C-00097 | Wirkung und Nachweise |
+
+| U-ID | Anforderung(en) | Arbeitspaket und Ergebnis | Abhängigkeit |
+|---|---|---|---|
+| U-C-000074 | A-C-00093, A-C-00094, A-C-00095 | Auswertung `lateraldruckpunkt` aus den hydrodynamischen Seitenkraftbeiträgen (Modell-y, Angriffspunkt), kraftgewichteter Mittelpunkt, Status mit Schwelle 5 % von Σ|Fy,i| und 1 N; keine Rückwirkung auf Kräfte | Keine (Baseline: Build und CTest sichern) |
+| U-C-000075 | A-C-00097 | Isolierte Core-Tests: Kraft nur am Ruder, nur am Schwert, zwei gleichgerichtete Beiträge, Gegenkräfte, Querkraft ≈ 0, Schwellenwerte, Kräfte mit/ohne Auswertung identisch | U-C-000074 |
+| U-C-000076 | A-C-00096 | Additiver Ergebnisblock `druckpunkte.lateral` in `zustand_json` (Live und Batch gleich), `vertragsversion` unverändert; Schnittstellenregister (CPPI ab 0031), Schnittstellendokumentation | U-C-000074 |
+| U-C-000077 | A-C-00093 bis A-C-00097 | Referenzmodelle Optimist, 420er, Folkeboot bei Querfahrt; Regression, Altfelder, Live-/Batch-Parität; Core-Release-Build, vollständiger CTest, integrierter GUI/Core-Lauf; Rückverfolgbarkeit | U-C-000075, U-C-000076 |
+
+## D.2 Voraussetzungen, Meilensteine und Prüfstrategie
+
+- Der Lateraldruckpunkt ist eine reine Auswertegröße; Kräfte, Momente und
+  Zustand bleiben bitgleich.
+- Nur Meter im Modellrahmen; keine Prozentangabe im Core.
+- Fremde, uncommittete Änderungen werden nicht überschrieben.
+- Messgating ist nicht berührt; ein instrumentierter Build ist nur bei
+  Eingriffen in das Messgating nötig.
+
+| Meilenstein | Eintritt | Abnahme |
+|---|---|---|
+| M17 – Auswertung (D) | Start Teil D | Berechnung und Status implementiert; isolierte Tests bestehen |
+| M18 – Ergebnisvertrag (D) | M17 | Block in Live und Batch, Altfelder unverändert, CPPI eingetragen |
+| M19 – C-0.7 Abschluss | M18, Teile A bis C erledigt | Core-CTest, integrierter GUI/Core-Lauf, Rückverfolgbarkeit; offene Punkte ausgewiesen |
+
+## D.3 Rückverfolgbarkeit und tatsächlicher Stand
+
+| A-ID | Arbeitspaket(e) | Nachweis | Status |
+|---|---|---|---|
+| A-C-00093 | U-C-000074, U-C-000075, U-C-000077 | Tests zu Quellen | offen |
+| A-C-00094 | U-C-000074, U-C-000075, U-C-000077 | Handrechnungsvergleich | offen |
+| A-C-00095 | U-C-000074, U-C-000075, U-C-000077 | Statustests | offen |
+| A-C-00096 | U-C-000076, U-C-000077 | Vertragstest, Parität, Register | offen |
+| A-C-00097 | U-C-000075, U-C-000077 | Gesamttests, integrierter Lauf | offen |
+
+| U-ID | Tatsächlicher Stand | Nachweis / offener Punkt |
+|---|---|---|
+| U-C-000074 | teilweise umgesetzt | Auswertung `lateraldruckpunkt` in `hydrostatik.cpp`; Abweichung von A-C-00095: zusätzlicher Status `geometrisch` (Flächenschwerpunkt der benetzten Lateralfläche, wenn Seitenkräfte nicht ausreichen, z. B. in Ruhe/statisch) – Nutzerfreigabe der Spezifikationsänderung steht aus |
+| U-C-000075 | teilweise umgesetzt | `lateraldruckpunkt_tests` (Quader: Ruhe geometrisch, Querfahrt kraftgewichtet, JSON, Modell ohne Hydrodynamik); Ruder/Schwert-Einzelfälle und Schwellen offen |
+| U-C-000076 | umgesetzt (Register offen) | Block `druckpunkte.lateral` in `zustand_json` immer bei Hydrodynamik-Elementen, auch ohne Hydrodynamik-Kontext (statische Simulation); CPPI-0031 siehe Register |
+| U-C-000077 | offen | Referenzmodelle bei Querfahrt und Sichtprüfung nicht durchgeführt; Core-CTest 18/18; integrierter Lauf 28/31, die 3 Fehlschläge `gui_graphics_render_*` ("420 disabling course trail must restore the exact image") bestehen unabhängig vom Lateraldruckpunkt |
+
+Statusänderungen erfolgen erst nach tatsächlichem Ergebnis. Build-/Test-
+Erfolg, Messung, externe Validierung und Nutzerabnahme werden getrennt
+ausgewiesen. Commit, Push, Tag und Release bleiben nicht beauftragt.

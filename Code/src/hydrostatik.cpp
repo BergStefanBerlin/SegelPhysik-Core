@@ -837,6 +837,10 @@ Bilanz bilanz(const Modell& modell,std::vector<Beitrag>& beitraege,bool hydrodyn
                 result.erwartete_beitraege.push_back(e.id+":hydrodynamik:seitenkraft");
         }
     }
+    if(hydrodynamik_aktiv &&
+        std::any_of(beitraege.begin(),beitraege.end(),[](const Beitrag& b){return b.id.rfind("daempfung:",0)==0;}))
+        for(const char* id:{"daempfung:rollen","daempfung:stampfen","daempfung:gieren","daempfung:tauchen"})
+            result.erwartete_beitraege.push_back(id);
     auto endlich=[](const Vektor3& v) {return std::isfinite(v[0])&&std::isfinite(v[1])&&std::isfinite(v[2]);};
     for (auto& b : beitraege) {
         const bool hat_werte=b.zustand==Datenzustand::gueltig||b.zustand==Datenzustand::null;
@@ -1076,6 +1080,9 @@ Zustand hydrodynamik_start(const Modell& m,const Zustand& s,
     context->modell_fassung=m.fassung;
     context->auswertung_schritt=s.schritt;
     context->auswertung_zeit_s=s.zeit_s;
+    if(config.zusatzmasse_daempfung)
+        context->traegheit=std::make_shared<const HydrodynamischeTraegheit>(
+            berechne_hydrodynamische_traegheit(m,s.pose,config.rho_kg_m3,9.81));
     kraefte(m,s.pose,s.testantrieb.get(),1000.,9.81,s.geflutet,context.get(),
         s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s);
     auto result=s;
@@ -1145,11 +1152,83 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
                 add(seitenkraftbeitrag(hydrodynamik_element,m,p,hydro->konfiguration,
                     geschwindigkeit,omega,panels,bewegungsstellungen));
         }
+        if(const auto* ht=hydro->traegheit.get()) {
+            auto moment=[&](const char* id,const Vektor3& wert) {
+                Beitrag b;b.id=id;b.art="moment";b.quelle=Quelle::hydrodynamik;
+                b.gruppe="hydrodynamik";b.punktart=Punktart::bezugspunkt;
+                b.punkt_m=m.schwerpunkt_m;b.vektor=wert;b.moment_s_nm=wert;
+                b.modell_status="geschaetzt";b.modell_methode="lineare/quadratische Daempfung";
+                k.moment_modell_nm=plus(k.moment_modell_nm,wert);
+                k.beitraege.push_back(std::move(b));
+            };
+            const double izz=m.traegheit_kg_m2[8]+ht->zusatzmasse[5].wert;
+            const double b1_gier=ht->gieren_linear.wert*izz;
+            const double b2_gier=ht->gieren_quadratisch.wert;
+            moment("daempfung:rollen",{-ht->b_rollen_nms*omega[0],0.,0.});
+            moment("daempfung:stampfen",{0.,-ht->b_stampfen_nms*omega[1],0.});
+            moment("daempfung:gieren",{0.,0.,-(b1_gier+b2_gier*std::abs(omega[2]))*omega[2]});
+            Beitrag b;b.id="daempfung:tauchen";b.art="kraft";b.quelle=Quelle::hydrodynamik;
+            b.gruppe="hydrodynamik";b.punktart=Punktart::angriffspunkt;b.punkt_m=m.schwerpunkt_m;
+            const Vektor3 f{0.,0.,-ht->b_tauchen_ns_m*geschwindigkeit[2]};
+            b.vektor=p.weltvektor_nach_modell(f);
+            b.modell_status="geschaetzt";b.modell_methode="lineare Daempfung";
+            k.kraft_welt_n=plus(k.kraft_welt_n,f);
+            k.beitraege.push_back(std::move(b));
+        }
     }
     for(auto& sum:k.beitraege) if(sum.rolle==Rolle::gesamtsumme) {
         sum.vektor=k.moment_modell_nm;sum.moment_s_nm=k.moment_modell_nm;
     }
     return k;
+}
+
+Lateraldruckpunkt lateraldruckpunkt(const Modell& m,const Pose& p,const Kraefte& k,
+    const std::vector<Bewegungsstellung>& bewegungsstellungen)
+{
+    Lateraldruckpunkt result;
+    result.vorhanden=std::any_of(m.elemente.begin(),m.elemente.end(),[](const Element& e) {
+        return e.hydrodynamik_rolle.has_value()&&e.volumen.has_value();
+    });
+    if(!result.vorhanden) return result;
+    auto endet_mit=[](const std::string& text,const std::string& ende) {
+        return text.size()>=ende.size()&&text.compare(text.size()-ende.size(),ende.size(),ende)==0;
+    };
+    double fy=0.,fy_betrag=0.,fy_x=0.,fy_z=0.;
+    std::vector<std::string> quellen;
+    for(const auto& b:k.beitraege) {
+        if(b.quelle!=Quelle::hydrodynamik||b.zustand!=Datenzustand::gueltig||b.art!="kraft"||!b.punkt_bekannt)
+            continue;
+        if(!endet_mit(b.id,":hydrodynamik:druck")&&!endet_mit(b.id,":hydrodynamik:seitenkraft")) continue;
+        const double f=b.vektor[1];
+        if(!std::isfinite(f)||f==0.) continue;
+        fy+=f;fy_betrag+=std::abs(f);fy_x+=f*b.punkt_m[0];fy_z+=f*b.punkt_m[2];
+        quellen.push_back(b.id);
+    }
+    result.querkraft_modell_n=fy;
+    if(std::abs(fy)>=1.&&std::abs(fy)>=.05*fy_betrag) {
+        result.status="gueltig";
+        result.position_modell_m=Vektor3{fy_x/fy,0.,fy_z/fy};
+        result.quellen=std::move(quellen);
+        return result;
+    }
+    double flaeche=0.,fx=0.,fz=0.;
+    for(const auto& e:m.elemente) {
+        if(!e.hydrodynamik_rolle||!e.volumen) continue;
+        Mesh mesh=*e.volumen;
+        if(const auto* eigentuemer=bewegungseigentuemer(m,e.id))
+            mesh=bewegtes_mesh(mesh,*eigentuemer,bewegungswert(*eigentuemer,bewegungsstellungen));
+        for(const auto& panel:nasspanels(mesh,p)) {
+            const double lateral=panel.flaeche_m2*std::abs(p.weltvektor_nach_modell(panel.normale_welt)[1]);
+            const auto punkt=p.weltpunkt_nach_modell(panel.punkt_welt);
+            flaeche+=lateral;fx+=lateral*punkt[0];fz+=lateral*punkt[2];
+        }
+    }
+    result.lateralflaeche_m2=flaeche;
+    if(flaeche>1e-9&&std::isfinite(fx)&&std::isfinite(fz)) {
+        result.status="geometrisch";
+        result.position_modell_m=Vektor3{fx/flaeche,0.,fz/flaeche};
+    }
+    return result;
 }
 
 std::array<double,16> bewegungstransformation(const Modell& modell,
@@ -1242,13 +1321,51 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         I[0]*(I[4]*I[8]-I[5]*I[7])-I[1]*(I[3]*I[8]-I[5]*I[6])+I[2]*(I[3]*I[7]-I[4]*I[6])<=0.)
         throw std::invalid_argument("CORE-SIM-0002: Dynamiktraegheit nicht positiv definit.");
     const auto geflutet=flutung(modell,s.pose,s.geflutet);
+    const HydrodynamischeTraegheit* ht=hydro_context?hydro_context->traegheit.get():nullptr;
+    std::array<double,9> ieff=I;
+    Vektor3 mlin{modell.masse_kg,modell.masse_kg,modell.masse_kg};
+    if(ht) {
+        for(std::size_t i=0;i<3;++i) {
+            ieff[4*i]+=ht->zusatzmasse[3+i].wert;
+            mlin[i]+=ht->zusatzmasse[i].wert;
+        }
+        if (ieff[0]<=0. || ieff[0]*ieff[4]-ieff[1]*ieff[3]<=0. ||
+            ieff[0]*(ieff[4]*ieff[8]-ieff[5]*ieff[7])-ieff[1]*(ieff[3]*ieff[8]-ieff[5]*ieff[6])+
+            ieff[2]*(ieff[3]*ieff[7]-ieff[4]*ieff[6])<=0.)
+            throw std::invalid_argument("CORE-SIM-0002: Effektive Traegheit nicht positiv definit.");
+    }
+    struct Beschleunigung { Vektor3 linear_welt; Vektor3 winkel; };
+    // Kirchhoff-Gleichungen im Koerperrahmen; ohne Zusatzmasse identisch zur Gleichung ohne Zusatzmasse.
+    auto beschleunigung=[&](const Pose& lage,const Kraefte& kr,const Vektor3& v_welt,
+        const Vektor3& om) {
+        Beschleunigung r;
+        if(!ht) {
+            r.linear_welt=mal(kr.kraft_welt_n,1./modell.masse_kg);
+            Vektor3 imp0{};
+            for (std::size_t i=0;i<3;++i)
+                for (std::size_t j=0;j<3;++j) imp0[i]+=I[3*i+j]*om[j];
+            r.winkel=loesen(I,plus(kr.moment_modell_nm,mal(cross(om,imp0),-1.)));
+            return r;
+        }
+        const auto vb=lage.weltvektor_nach_modell(v_welt);
+        const auto fb=lage.weltvektor_nach_modell(kr.kraft_welt_n);
+        const Vektor3 pl{mlin[0]*vb[0],mlin[1]*vb[1],mlin[2]*vb[2]};
+        const auto gyro=cross(om,pl);
+        Vektor3 dvb{(fb[0]-gyro[0])/mlin[0],(fb[1]-gyro[1])/mlin[1],(fb[2]-gyro[2])/mlin[2]};
+        r.linear_welt=lage.modellvektor_nach_welt(plus(dvb,cross(om,vb)));
+        Vektor3 imp{};
+        for (std::size_t i=0;i<3;++i)
+            for (std::size_t j=0;j<3;++j) imp[i]+=ieff[3*i+j]*om[j];
+        auto rhs=plus(kr.moment_modell_nm,mal(cross(om,imp),-1.));
+        rhs=plus(rhs,mal(cross(vb,pl),-1.));
+        r.winkel=loesen(ieff,rhs);
+        return r;
+    };
     const auto k=kraefte(modell,s.pose,context.get(),rho,g,geflutet,
         hydro_context.get(),s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s,bewegungsstellungen);
-    const auto a=mal(k.kraft_welt_n,1./modell.masse_kg);
-    Vektor3 impuls{};
-    for (std::size_t i=0;i<3;++i)
-        for (std::size_t j=0;j<3;++j) impuls[i]+=I[3*i+j]*s.omega_modell_rad_s[j];
-    const auto alpha=loesen(I,plus(k.moment_modell_nm,mal(cross(s.omega_modell_rad_s,impuls),-1.)));
+    const auto beschl=beschleunigung(s.pose,k,s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s);
+    const auto a=beschl.linear_welt;
+    const auto alpha=beschl.winkel;
     const auto omega_mid=plus(s.omega_modell_rad_s,mal(alpha,dt/2));
     const double angle=std::sqrt(dot(omega_mid,omega_mid))*dt;
     QuaternionXyzw dq{0.,0.,0.,1.};
@@ -1266,17 +1383,14 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
     const auto midvelocity=plus(s.geschwindigkeit_welt_m_s,mal(a,dt/2));
     const auto midforce=kraefte(modell,midpose,context.get(),rho,g,geflutet,
         hydro_context.get(),midvelocity,omega_mid,bewegungsstellungen);
-    Vektor3 midimpuls{};
-    for(std::size_t i=0;i<3;++i)
-        for(std::size_t j=0;j<3;++j) midimpuls[i]+=I[3*i+j]*omega_mid[j];
-    const auto midalpha=loesen(I,plus(midforce.moment_modell_nm,
-        mal(cross(omega_mid,midimpuls),-1.)));
+    const auto midbeschl=beschleunigung(midpose,midforce,midvelocity,omega_mid);
+    const auto midalpha=midbeschl.winkel;
     const auto cgnew=plus(plus(cg,mal(s.geschwindigkeit_welt_m_s,dt)),mal(a,dt*dt/2));
     const Pose rotation{{},qnew};
     Zustand result;
     result.pose=Pose{plus(cgnew,mal(rotation.modellvektor_nach_welt(modell.schwerpunkt_m),-1.)),qnew};
     result.geschwindigkeit_welt_m_s=plus(s.geschwindigkeit_welt_m_s,
-        mal(midforce.kraft_welt_n,dt/modell.masse_kg));
+        mal(midbeschl.linear_welt,dt));
     result.omega_modell_rad_s=plus(s.omega_modell_rad_s,mal(midalpha,dt));
     result.zeit_s=s.zeit_s+dt;result.schritt=s.schritt+1;
     result.geflutet=flutung(modell,result.pose,geflutet);

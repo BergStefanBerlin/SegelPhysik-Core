@@ -272,6 +272,49 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
         out<<",\"modell_fassung\":"<<text(s.hydrodynamik->modell_fassung)
            <<",\"auswertung_schritt\":"<<s.hydrodynamik->auswertung_schritt
            <<",\"auswertung_zeit_s\":"<<s.hydrodynamik->auswertung_zeit_s<<'}';
+        if(const auto* ht=s.hydrodynamik->traegheit.get()) {
+            auto wert=[&](const char* name,const TraegheitsWert& w) {
+                out<<'"'<<name<<"\":{\"wert\":"<<w.wert<<",\"status\":"<<text(w.status)
+                   <<",\"methode\":"<<text(w.methode)<<",\"quelle\":"<<text(w.quelle)
+                   <<",\"unsicherheit\":"<<text(w.unsicherheit)<<'}';
+            };
+            static const char* namen[6]={"a11","a22","a33","a44","a55","a66"};
+            out<<",\"hydrodynamische_traegheit\":{\"zusatzmasse\":{";
+            for(std::size_t i=0;i<6;++i) {
+                if(i) out<<',';
+                wert(namen[i],ht->zusatzmasse[i]);
+            }
+            out<<"},\"daempfung\":{";
+            wert("zeta_rollen",ht->zeta_rollen);out<<',';
+            wert("zeta_stampfen",ht->zeta_stampfen);out<<',';
+            wert("zeta_tauchen",ht->zeta_tauchen);out<<',';
+            wert("gieren_linear",ht->gieren_linear);out<<',';
+            wert("gieren_quadratisch",ht->gieren_quadratisch);
+            out<<"},\"effektive_masse_kg\":";array(out,ht->effektive_masse_kg);
+            out<<",\"effektive_traegheit_kg_m2\":";array(out,ht->effektive_traegheit_kg_m2);
+            out<<",\"rueckstellung\":{\"c33_n_m\":"<<ht->c33_n_m<<",\"c44_nm_rad\":"<<ht->c44_nm_rad
+               <<",\"c55_nm_rad\":"<<ht->c55_nm_rad<<"},\"diagnosen\":[";
+            for(std::size_t i=0;i<ht->diagnosen.size();++i) {
+                if(i) out<<',';
+                out<<text(ht->diagnosen[i]);
+            }
+            out<<"]}";
+        }
+    }
+    const auto ldp=lateraldruckpunkt(m,s.pose,k,s.bewegungsstellungen);
+    if(ldp.vorhanden) {
+        out<<",\"druckpunkte\":{\"lateral\":{\"status\":"<<text(ldp.status)
+           <<",\"querkraft_modell_n\":"<<ldp.querkraft_modell_n
+           <<",\"lateralflaeche_m2\":"<<ldp.lateralflaeche_m2;
+        if(ldp.position_modell_m) {
+            out<<",\"position_modell_m\":";array(out,*ldp.position_modell_m);
+        }
+        out<<",\"quellen\":[";
+        for(std::size_t i=0;i<ldp.quellen.size();++i) {
+            if(i) out<<',';
+            out<<text(ldp.quellen[i]);
+        }
+        out<<"]}}";
     }
     out<<'}';return out.str();
 }

@@ -81,6 +81,15 @@ struct Element {
     std::vector<Vektor3> massenpunkte_m;
 };
 
+// Optionaler Modellblock "Hydrodynamische_Traegheit" (A-C-00087): ueberschreibt
+// berechnete Zusatzmassen (a11..a66, kg bzw. kg m^2 im Modellrahmen um den
+// Gesamtschwerpunkt) und Daempfungsparameter (zeta_rollen, zeta_stampfen,
+// zeta_tauchen, gieren_linear [1/s], gieren_quadratisch [kg m^2]).
+struct HydrodynamischeTraegheitModell {
+    std::map<std::string, double> zusatzmasse;
+    std::map<std::string, double> daempfung;
+};
+
 struct Modell {
     std::string id;
     std::vector<Element> elemente;
@@ -88,6 +97,7 @@ struct Modell {
     Vektor3 schwerpunkt_m{};
     std::array<double, 9> traegheit_kg_m2{};
     std::string fassung;
+    std::optional<HydrodynamischeTraegheitModell> hydrodynamische_traegheit;
 };
 
 // JSON 0.1-entwurf: id, gruppen.{name}.elemente; elements contain id and
