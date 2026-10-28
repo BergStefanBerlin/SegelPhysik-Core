@@ -17,6 +17,7 @@ struct Laufoptionen {
     std::optional<HydrodynamikKonfiguration> hydrodynamik;
     // Scheduled events are applied before the indicated source step.
     std::vector<std::pair<std::size_t, TestantriebEreignis>> testantrieb_ereignisse;
+    std::vector<std::pair<std::size_t, Bewegungsereignis>> bewegungsereignisse;
 };
 struct Laufbericht {
     std::string status;

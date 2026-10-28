@@ -173,6 +173,11 @@ int main(int argc,char* argv[]) {
         const auto report=simulieren(argv[1],output,o);
         check(report.status=="abgeschlossen"&&report.zustaende==4,"Batch-Testlauf");
         auto direct=testantrieb_start(imported,o.start,*o.testantrieb,true);
+        if(std::any_of(imported.elemente.begin(),imported.elemente.end(),
+            [](const segelphysik::Element& element) {
+                return element.hydrodynamik_rolle.has_value();
+            }))
+            direct=hydrodynamik_start(imported,direct,HydrodynamikKonfiguration{});
         std::ifstream in(output);std::string line;std::getline(in,line);
         check(line==zustand_json(imported,direct,"laufend"),"Batch-Startparitaet");
         for(std::size_t i=0;i<3;++i) {

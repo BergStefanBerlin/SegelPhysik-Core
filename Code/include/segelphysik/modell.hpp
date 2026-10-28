@@ -5,6 +5,7 @@
 #include <array>
 #include <cstddef>
 #include <filesystem>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -17,6 +18,51 @@ struct Mesh {
 };
 
 enum class HydrodynamikRolle { rumpf, kiel, ruder };
+enum class Bewegungsart { drehen, heben };
+
+struct Bewegungsdefinition {
+    Bewegungsart art = Bewegungsart::drehen;
+    bool ruderwinkel{};
+    Vektor3 achse_modell{};
+    Vektor3 drehpunkt_modell_m{};
+    Vektor3 richtung_modell{};
+    std::vector<std::string> mitbewegte_elemente;
+    double hubweg_m{};
+};
+
+struct HydrodynamikParameter {
+    double wert{};
+    std::string einheit;
+    std::string status;
+    std::string quelle;
+    std::string gueltigkeit;
+    std::string unsicherheit;
+};
+
+struct HydrodynamikKennfeldpunkt {
+    double anstellwinkel_rad{};
+    double reynolds_zahl{};
+    double cl{};
+    double cd{};
+    std::string status;
+    std::string quelle;
+    std::string gueltigkeit;
+    std::string unsicherheit;
+};
+
+struct HydrodynamikKraftmodell {
+    std::string methode;
+    std::map<std::string, HydrodynamikParameter> parameter;
+    std::vector<HydrodynamikKennfeldpunkt> kennfeld;
+    std::vector<std::string> widerstandsanteile;
+    std::string gueltigkeit;
+    std::string quelle;
+};
+
+struct ElementHydrodynamikDaten {
+    std::map<std::string, HydrodynamikKraftmodell> modelle;
+    std::optional<std::string> materialreferenz;
+};
 
 struct Element {
     std::string id;
@@ -25,6 +71,8 @@ struct Element {
     std::array<double, 9> traegheit_kg_m2{};
     std::optional<Mesh> volumen;
     std::optional<HydrodynamikRolle> hydrodynamik_rolle;
+    std::optional<ElementHydrodynamikDaten> hydrodynamik_daten;
+    std::optional<Bewegungsdefinition> bewegung;
     // Open-edge vertices of a shell mass mesh (e.g. the gunwale of a hull
     // without deck). Only kept when the element also has a displacement
     // volume; non-empty means the element can flood (A-C-00047).
@@ -43,10 +91,14 @@ struct Modell {
 };
 
 // JSON 0.1-entwurf: id, gruppen.{name}.elemente; elements contain id and
-// Darstellung, Hydrostatik and optionally Hydrodynamik. Hydrostatik requires
+// Darstellung, Hydrostatik, and optionally Hydrodynamik and Bewegung. Hydrostatik requires
 // masse and optionally volumen. Hydrodynamik.rolle requires a physical volume
-// mesh and is one of rumpf, kiel or ruder. Unknown structural/physics fields are rejected. name, status and
+// mesh and is one of rumpf, kiel or ruder; optional model data carries
+// coefficients, provenance and two-axis foil polars. Unknown structural/physics fields are rejected. name, status and
 // entwurf are metadata only, not a physical validation or simulation approval.
+// The eight canonical simple model IDs (bleistift, kegel, kugel, platte,
+// pyramide, quader, rolle, unregelmaessig) require exactly one physical
+// volume element and receive the rumpf role in the Core importer.
 // Paths are relative to the JSON file; Darstellung is never used for physics
 // (its file is not opened). Darstellung.farbe is an optional "#rrggbb" colour,
 // Darstellung.oberflaeche an optional "matt", "glaenzend", "metall", "chrom", "lack", "glas",
@@ -95,6 +147,7 @@ struct ElementBeschreibung {
     std::optional<std::filesystem::path> volumen;
     std::optional<std::array<double, 3>> farbe_rgb;  // Darstellung.farbe "#rrggbb", 0..1
     std::optional<std::string> oberflaeche;          // Darstellung.oberflaeche, siehe oben
+    std::optional<Bewegungsdefinition> bewegung;
 };
 struct ModellBeschreibung {
     std::string id;

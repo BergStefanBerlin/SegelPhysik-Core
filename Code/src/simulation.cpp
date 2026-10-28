@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iomanip>
 #include <locale>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 
@@ -71,11 +72,26 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
         s.hydrodynamik->auswertung_schritt!=s.schritt ||
         s.hydrodynamik->auswertung_zeit_s!=s.zeit_s))
         throw std::invalid_argument("CORE-HYD-0001: Historischer Hydrodynamikkontext passt nicht zum Zustand.");
+    std::set<std::string> bewegte_ids;
+    for (const auto& stellung : s.bewegungsstellungen) {
+        const auto element = std::find_if(m.elemente.begin(), m.elemente.end(),
+            [&](const Element& candidate) { return candidate.id == stellung.element_id; });
+        if (element == m.elemente.end() || !element->bewegung ||
+            !bewegte_ids.insert(stellung.element_id).second)
+            throw std::invalid_argument("CORE-MOD-0002: Ungueltige oder doppelte Bewegungsstellung.");
+        const double minimum = element->bewegung->ruderwinkel ? -90. : 0.;
+        const double maximum = element->bewegung->ruderwinkel ? 90. : 100.;
+        if (!std::isfinite(stellung.wert) || stellung.wert < minimum || stellung.wert > maximum)
+            throw std::invalid_argument("CORE-MOD-0002: Bewegungsstellung ausserhalb des zulaessigen Bereichs.");
+    }
     auto k=kraefte(m,s.pose,s.testantrieb.get(),1000.,9.81,s.geflutet,
-        s.hydrodynamik.get(),s.geschwindigkeit_welt_m_s);
+        s.hydrodynamik.get(),s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s,
+        s.bewegungsstellungen);
     const auto b2=bilanz(m,k.beitraege,static_cast<bool>(s.hydrodynamik));
     std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(17);
-    out<<"{\"vertragsversion\":"<<text(s.testantrieb?"3":"2")<<",\"modell_id\":"<<text(m.id)
+    const bool beweglich=std::any_of(m.elemente.begin(),m.elemente.end(),
+        [](const Element& element) { return element.bewegung.has_value(); });
+    out<<"{\"vertragsversion\":"<<text(beweglich?"4":s.testantrieb?"3":"2")<<",\"modell_id\":"<<text(m.id)
        <<",\"modell_fassung\":"<<text(m.fassung)
        <<",\"status\":"<<text(status)<<",\"diagnose\":"<<text(diagnose)<<",\"zeit_s\":"<<s.zeit_s
        <<",\"schritt\":"<<s.schritt<<",\"position_m\":";
@@ -101,7 +117,29 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
                 b.quellname:name(b.quelle))
            <<",\"gruppe\":"<<text(std::string(b.gruppe))<<",\"rolle\":"<<text(name(b.rolle))
            <<",\"punktart\":"<<text(name(b.punktart))<<",\"zustand\":"<<text(name(b.zustand))
-           <<",\"fehler_id\":";
+           <<",\"modell_status\":"<<text(b.modell_status)
+           <<",\"modell_methode\":"<<text(b.modell_methode)
+           <<",\"modell_quelle\":"<<text(b.modell_quelle)
+           <<",\"modell_unsicherheit\":"<<text(b.modell_unsicherheit)
+           <<",\"modell_parameter\":{";
+        bool first_parameter = true;
+        for (const auto& parameter : b.modell_parameter) {
+            const auto& value = parameter.second;
+            if (!std::isfinite(value.wert))
+                throw std::runtime_error("CORE-SIM-0001: Hydrodynamikparameter nicht endlich.");
+            if (!first_parameter) out << ',';
+            first_parameter = false;
+            out << text(parameter.first) << ":{\"wert\":" << value.wert
+                << ",\"einheit\":" << text(value.einheit)
+                << ",\"status\":" << text(value.status)
+                << ",\"quelle\":" << text(value.quelle)
+                << ",\"gueltigkeit\":" << text(value.gueltigkeit)
+                << ",\"unsicherheit\":" << text(value.unsicherheit) << '}';
+        }
+        out << "},\"modell_widerstandsanteile\":[";
+        for (std::size_t i = 0; i < b.modell_widerstandsanteile.size(); ++i)
+            out << (i ? "," : "") << text(b.modell_widerstandsanteile[i]);
+        out << "],\"fehler_id\":";
         if(b.fehler_id.empty()) out<<"null";else out<<text(b.fehler_id);
         out<<",\"moment_s_nm\":";
         if(werte) array(out,b.moment_s_nm);else out<<"null";
@@ -120,6 +158,52 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
     }
     out<<"],\"moment_modell_nm\":";array(out,k.moment_modell_nm);
     out<<",\"moment_bezug_modell_m\":";array(out,m.schwerpunkt_m);
+    if(beweglich) {
+        out<<",\"bewegungen\":[";
+        bool erste_bewegung=true;
+        for(const auto& element:m.elemente) {
+            if(!element.bewegung) continue;
+            const auto stellung=std::find_if(s.bewegungsstellungen.begin(),
+                s.bewegungsstellungen.end(),[&](const Bewegungsstellung& wert) {
+                    return wert.element_id==element.id;
+                });
+            const double wert=stellung==s.bewegungsstellungen.end()
+                ? (element.bewegung->ruderwinkel?0.:100.)
+                : stellung->wert;
+            if(!erste_bewegung) out<<',';
+            erste_bewegung=false;
+            out<<"{\"element_id\":"<<text(element.id)<<",\"wert\":"<<wert<<'}';
+        }
+        out<<"],\"letzte_bewegungsereigniskennung\":"<<s.letzte_bewegungsereigniskennung
+           <<",\"elementtransformationen_modell\":[";
+        bool erste_transformation=true;
+        for(const auto& element:m.elemente) {
+            const auto matrix=bewegungstransformation(m,element.id,s.bewegungsstellungen);
+            if(!erste_transformation) out<<',';
+            erste_transformation=false;
+            out<<"{\"element_id\":"<<text(element.id)<<",\"matrix_zeilenweise\":[";
+            for(std::size_t i=0;i<matrix.size();++i) out<<(i?",":"")<<matrix[i];
+            out<<"]}";
+        }
+        out<<"],\"bewegungsuebergang\":";
+        if(!s.bewegungsuebergang) out<<"null";
+        else {
+            const auto& uebergang=*s.bewegungsuebergang;
+            out<<"{\"von_schritt\":"<<uebergang.von_schritt
+               <<",\"nach_schritt\":"<<uebergang.nach_schritt
+               <<",\"startzeit_s\":"<<uebergang.startzeit_s
+               <<",\"dt_s\":"<<uebergang.dt_s<<",\"ereignisse\":[";
+            for(std::size_t i=0;i<uebergang.ereignisse.size();++i) {
+                const auto& ereignis=uebergang.ereignisse[i];
+                if(!std::isfinite(ereignis.wert))
+                    throw std::invalid_argument("CORE-SIM-0001: Bewegungsereignis nicht endlich.");
+                out<<(i?",":"")<<"{\"kennung\":"<<ereignis.kennung
+                   <<",\"element_id\":"<<text(ereignis.element_id)
+                   <<",\"wert\":"<<ereignis.wert<<'}';
+            }
+            out<<"]}";
+        }
+    }
     out<<",\"beitraege_auswertung\":\"gelieferter_zustand\",\"summen\":{\"gesamt\":";
     auto summe=[&](const Summe& sum) {
         out<<"{\"gruppe\":"<<text(sum.gruppe)<<",\"frame\":\"modell\",\"kraft_modell_n\":";
@@ -211,13 +295,20 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
             throw std::invalid_argument("CORE-SIM-0001: Ausgabedatei existiert bereits; kein Ueberschreiben.");
         const auto m=lade_modell(path);
         Zustand s=o.start;
+        for(const auto& element:m.elemente) if(element.bewegung) {
+            const auto fund=std::find_if(s.bewegungsstellungen.begin(),s.bewegungsstellungen.end(),
+                [&](const Bewegungsstellung& stellung) { return stellung.element_id==element.id; });
+            if(fund==s.bewegungsstellungen.end())
+                s.bewegungsstellungen.push_back({element.id,
+                    element.bewegung->ruderwinkel?0.:100.});
+        }
         if(o.testantrieb) s=testantrieb_start(m,s,*o.testantrieb,o.testantrieb_aktiv);
         if(o.hydrodynamik && !o.dynamisch)
             throw std::invalid_argument("CORE-HYD-0001: Hydrodynamik ist nur fuer dynamische Laeufe verfuegbar.");
-        const bool rumpfvorhanden=std::any_of(m.elemente.begin(),m.elemente.end(),
-            [](const Element& e) {return e.hydrodynamik_rolle==HydrodynamikRolle::rumpf;});
+        const bool hydrodynamikvorhanden=std::any_of(m.elemente.begin(),m.elemente.end(),
+            [](const Element& e) {return e.hydrodynamik_rolle.has_value();});
         if(o.hydrodynamik) s=hydrodynamik_start(m,s,*o.hydrodynamik);
-        else if(o.dynamisch && rumpfvorhanden && !s.hydrodynamik &&
+        else if(o.dynamisch && hydrodynamikvorhanden && !s.hydrodynamik &&
             !s.hydrodynamik_erforderlich) {
             HydrodynamikKonfiguration standardwasser;
             s=hydrodynamik_start(m,s,standardwasser);
@@ -228,13 +319,42 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
             (o.testantrieb_aktiv||!o.testantrieb_ereignisse.empty()))
             throw std::invalid_argument("CORE-SIM-0001: Teststeuerung ohne Konfiguration.");
         if(!o.dynamisch && ((s.testantrieb&&s.testantrieb->aktiv) ||
-            !o.testantrieb_ereignisse.empty()))
+            !o.testantrieb_ereignisse.empty() || !o.bewegungsereignisse.empty()))
             throw std::invalid_argument("CORE-SIM-0001: Aktiver Testantrieb oder Ereignisse in Statik.");
         std::size_t letzte_grenze=s.schritt,letzte_kennung=s.testantrieb?s.testantrieb->letzte_ereigniskennung:0;
         for(const auto& e:o.testantrieb_ereignisse) {
             if(e.first<letzte_grenze || e.second.kennung<=letzte_kennung)
                 throw std::invalid_argument("CORE-SIM-0001: Ungeordnete Testereignisse.");
             letzte_grenze=e.first;letzte_kennung=e.second.kennung;
+        }
+        letzte_grenze=s.schritt;
+        letzte_kennung=s.letzte_bewegungsereigniskennung;
+        for(const auto& e:o.bewegungsereignisse) {
+            if(e.first<letzte_grenze || e.second.kennung<=letzte_kennung)
+                throw std::invalid_argument("CORE-SIM-0001: Ungeordnete Bewegungsereignisse.");
+            letzte_grenze=e.first;letzte_kennung=e.second.kennung;
+            const auto element=std::find_if(m.elemente.begin(),m.elemente.end(),
+                [&](const Element& candidate) { return candidate.id==e.second.element_id; });
+            if(element==m.elemente.end() || !element->bewegung)
+                throw std::invalid_argument("CORE-MOD-0002: Bewegungsereignis fuer Element ohne Bewegung: "+
+                    e.second.element_id);
+            const double minimum=element->bewegung->ruderwinkel?-90.:0.;
+            const double maximum=element->bewegung->ruderwinkel?90.:100.;
+            if(!std::isfinite(e.second.wert)||e.second.wert<minimum||e.second.wert>maximum)
+                throw std::invalid_argument("CORE-MOD-0002: Bewegungsereignis ausserhalb des zulaessigen Bereichs: "+
+                    e.second.element_id);
+        }
+        std::set<std::string> start_bewegungen;
+        for(const auto& stellung:s.bewegungsstellungen) {
+            const auto element=std::find_if(m.elemente.begin(),m.elemente.end(),
+                [&](const Element& candidate) { return candidate.id==stellung.element_id; });
+            if(element==m.elemente.end() || !element->bewegung ||
+                !start_bewegungen.insert(stellung.element_id).second)
+                throw std::invalid_argument("CORE-MOD-0002: Ungueltige oder doppelte Bewegungsstellung im Startzustand.");
+            const double minimum=element->bewegung->ruderwinkel?-90.:0.;
+            const double maximum=element->bewegung->ruderwinkel?90.:100.;
+            if(!std::isfinite(stellung.wert)||stellung.wert<minimum||stellung.wert>maximum)
+                throw std::invalid_argument("CORE-MOD-0002: Bewegungsstellung im Startzustand ausserhalb des Bereichs.");
         }
         std::ofstream out(ausgabe,std::ios::binary);
         if(!out) throw std::runtime_error("CORE-IO-0001: Ergebnisdatei nicht schreibbar.");
@@ -260,7 +380,10 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
                 const double dt=ziel-s.zeit_s;
                 std::vector<TestantriebEreignis> ereignisse;
                 for(const auto& e:o.testantrieb_ereignisse) if(e.first==s.schritt) ereignisse.push_back(e.second);
-                auto next=dynamikschritt(m,s,dt,ereignisse);
+                std::vector<Bewegungsereignis> bewegungsereignisse;
+                for(const auto& e:o.bewegungsereignisse)
+                    if(e.first==s.schritt) bewegungsereignisse.push_back(e.second);
+                auto next=dynamikschritt(m,s,dt,ereignisse,bewegungsereignisse);
                 if(next.zeit_s<=s.zeit_s) throw std::runtime_error("CORE-SIM-0001: Kein Zeitfortschritt.");
                 next.zeit_s=ziel;
                 if(next.testantrieb) {

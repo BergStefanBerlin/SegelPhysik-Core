@@ -332,7 +332,8 @@ Modellstruktur modellstruktur(const Modellkatalog& katalog, const std::string& m
             auto gruppe = std::find_if(result.gruppen.begin(), result.gruppen.end(),
                 [&](const StrukturGruppe& g) { return g.id == e.gruppe; });
             if (gruppe != result.gruppen.end())
-                gruppe->elemente.push_back({e.id, e.id, e.darstellung.has_value(), e.volumen.has_value()});
+                gruppe->elemente.push_back({e.id, e.id, e.darstellung.has_value(),
+                    e.volumen.has_value(), e.bewegung});
         }
     } catch (const std::exception&) {
         // Unreadable description: structure stays empty, see modelldiagnose.
@@ -383,7 +384,29 @@ std::string modellstruktur_json(const Modellstruktur& s)
             const auto& e = gruppe.elemente[i];
             out << (i ? "," : "") << "{\"id\":" << json_text(e.id) << ",\"name\":" << json_text(e.name)
                 << ",\"darstellung\":" << (e.darstellung ? "true" : "false")
-                << ",\"hydrostatik_volumen\":" << (e.hydrostatik_volumen ? "true" : "false") << '}';
+                << ",\"hydrostatik_volumen\":" << (e.hydrostatik_volumen ? "true" : "false")
+                << ",\"bewegung\":";
+            if (!e.bewegung) out << "null";
+            else {
+                const auto& b = *e.bewegung;
+                out << "{\"art\":" << json_text(b.art == Bewegungsart::drehen ? "drehen" : "heben")
+                    << ",\"steuerung\":" << json_text(b.ruderwinkel ? "ruderwinkel" : "stellung_prozent");
+                if (b.art == Bewegungsart::drehen) {
+                    out << ",\"achse_modell\":";
+                    zahlen(out, b.achse_modell);
+                    out << ",\"drehpunkt_modell_m\":";
+                    zahlen(out, b.drehpunkt_modell_m);
+                } else {
+                    out << ",\"richtung_modell\":";
+                    zahlen(out, b.richtung_modell);
+                    out << ",\"hubweg_m\":" << b.hubweg_m;
+                }
+                out << ",\"mitbewegte_elemente\":[";
+                for (std::size_t j = 0; j < b.mitbewegte_elemente.size(); ++j)
+                    out << (j ? "," : "") << json_text(b.mitbewegte_elemente[j]);
+                out << "]}";
+            }
+            out << '}';
         }
         out << "]}";
     }

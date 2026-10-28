@@ -191,12 +191,61 @@ void json_tests(Dateien& d)
     rolle = d.laden(modell(hydrokiel));
     pruefe(rolle.elemente.front().hydrodynamik_rolle == segelphysik::HydrodynamikRolle::kiel &&
         rolle.fassung != alte_fassung, "Hydrodynamikrolle fehlt in der Modellfassung");
+    const std::string bewegliches_ruder = R"({"id":"Ruder","Hydrostatik":{"masse":)" +
+        punkt() + R"(,"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"ruder"},"Bewegung":{"art":"drehen","achse_modell":[0,0,2],"drehpunkt_modell_m":[0,0,0]}})";
+    const auto mit_bewegung = d.laden(modell(bewegliches_ruder));
+    pruefe(mit_bewegung.elemente.front().bewegung.has_value() &&
+        mit_bewegung.elemente.front().bewegung->ruderwinkel &&
+        mit_bewegung.elemente.front().bewegung->achse_modell ==
+            segelphysik::Vektor3{0., 0., 1.},
+        "Bewegungsdefinition/Achsennormierung nicht importiert");
+    fehler([&] {
+        d.laden(modell(R"({"id":"Ruder","Hydrostatik":{"masse":)" + punkt() +
+            R"(,"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"ruder"},"Bewegung":{"art":"drehen","achse_modell":[0,0,0],"drehpunkt_modell_m":[0,0,0]}})"));
+    }, "CORE-MOD-0002", "achse_modell");
     fehler([&] { d.laden(modell(R"({"id":"e","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":1,"position_m":[0,0,0]}},"Hydrodynamik":{"rolle":"rumpf"}})")); },
         "CORE-MOD-0003", "Hydrodynamik");
     fehler([&] { d.laden(modell(R"({"id":"e","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":1,"position_m":[0,0,0]},"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"fluegel"}})")); },
         "CORE-MOD-0003", "Hydrodynamik.rolle");
     fehler([&] { d.laden(modell(R"({"id":"e","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":1,"position_m":[0,0,0]},"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"rumpf","extra":true}})")); },
-        "CORE-MOD-0002", "Hydrodynamik");
+        "CORE-MOD-0003", "Hydrodynamik");
+
+    const std::string hydrodaten = R"({"id":"Rumpf","Hydrostatik":{"masse":)" +
+        punkt() + R"(,"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"kiel","materialreferenz":"stahl","modelle":{"seitenkraft":{"methode":"polare_2d","gueltigkeit":"vollstaendiges Testkennfeld","quelle":"Annahme aus Testdaten","parameter":{"cd0":{"wert":0.02,"einheit":"1","status":"geschaetzt","quelle":"Annahme aus Testdaten","gueltigkeit":"Testbereich","unsicherheit":"hoch"}},"kennfeld":[{"anstellwinkel_rad":0,"reynolds_zahl":100000,"cl":0,"cd":0.02,"status":"geschaetzt","quelle":"Annahme aus Testdaten","gueltigkeit":"Testbereich","unsicherheit":"hoch"}],"widerstandsanteile":["profil"]}}}})";
+    auto mit_hydrodaten = d.laden(modell(hydrodaten));
+    const auto& daten = *mit_hydrodaten.elemente.front().hydrodynamik_daten;
+    pruefe(daten.materialreferenz == std::optional<std::string>("stahl"),
+        "Hydrodynamik-Materialreferenz nicht importiert");
+    pruefe(daten.modelle.at("seitenkraft").parameter.at("cd0").status == "geschaetzt" &&
+        daten.modelle.at("seitenkraft").kennfeld.size() == 1,
+        "Hydrodynamik-Parameter oder Kennfeld nicht importiert");
+    const auto kennfeldpunkt = [](int alpha, int reynolds) {
+        return R"({"anstellwinkel_rad":)" + std::to_string(alpha) +
+            R"(,"reynolds_zahl":)" + std::to_string(reynolds) +
+            R"(,"cl":0.2,"cd":0.03,"status":"validiert","quelle":"Testdaten","gueltigkeit":"Test","unsicherheit":"bekannt"})";
+    };
+    const std::string unvollstaendiges_kennfeld =
+        R"({"id":"e","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":1,"position_m":[0,0,0]},"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"kiel","modelle":{"seitenkraft":{"methode":"polare_2d","gueltigkeit":"Test","quelle":"Testdaten","parameter":{},"kennfeld":[)" +
+        kennfeldpunkt(0, 100000) + "," + kennfeldpunkt(0, 200000) + "," +
+        kennfeldpunkt(1, 100000) +
+        R"(],"widerstandsanteile":["profil"]}}}})";
+    fehler([&] { d.laden(modell(unvollstaendiges_kennfeld)); },
+        "CORE-MOD-0003", "kennfeld");
+    auto kennfeld_ohne_anteile = hydrodaten;
+    const std::string anteilsangabe = R"(,"widerstandsanteile":["profil"])";
+    const auto anteilsposition = kennfeld_ohne_anteile.find(anteilsangabe);
+    kennfeld_ohne_anteile.erase(anteilsposition, anteilsangabe.size());
+    fehler([&] { d.laden(modell(kennfeld_ohne_anteile)); },
+        "CORE-MOD-0003", "widerstandsanteile");
+    fehler([&] {
+        d.laden(modell(R"({"id":"e","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":1,"position_m":[0,0,0]},"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"rumpf","modelle":{"druckwiderstand":{"methode":"platten_normal_drag","gueltigkeit":"test","quelle":"Test","parameter":{"cd":{"wert":1,"einheit":"1","status":"geschaetzt","quelle":"unbelegt","gueltigkeit":"test","unsicherheit":"hoch"}},"kennfeld":[]}}}})"));
+    }, "CORE-MOD-0003", "Hydrodynamik");
+    fehler([&] {
+        d.laden(modell(R"({"id":"e","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":1,"position_m":[0,0,0]},"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"rumpf","modelle":{"druckwiderstand":{"methode":"platten_normal_drag","gueltigkeit":"test","quelle":"Test","parameter":{"cd":{"wert":1,"einheit":"m","status":"validiert","quelle":"Test","gueltigkeit":"test","unsicherheit":"keine"}},"kennfeld":[]}}}})"));
+    }, "CORE-MOD-0003", ".einheit");
+    fehler([&] {
+        d.laden(modell(R"({"id":"e","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":1,"position_m":[0,0,0]},"volumen":{"datei":"mesh.obj"}},"Hydrodynamik":{"rolle":"rumpf","modelle":{"seitenkraft":{"methode":"polare_2d","gueltigkeit":"test","quelle":"Test","parameter":{},"kennfeld":[{"anstellwinkel_rad":0,"reynolds_zahl":100000,"cl":0,"cd":-1,"status":"validiert","quelle":"Test","gueltigkeit":"test","unsicherheit":"keine"}],"widerstandsanteile":["profil"]}}}})"));
+    }, "CORE-MOD-0003", "Hydrodynamik");
     fehler([&] { d.laden(modell(R"({"id":"e","Darstellung":{"datei":"/absolut.obj"}})")); }, "CORE-MOD-0002");
     fehler([&] { d.laden(modell(R"({"id":"e","Darstellung":{"datei":"a\u0000.obj"}})")); }, "CORE-MOD-0002");
     fehler([&] { segelphysik::lade_modell(d.ordner / "fehlt.json"); }, "CORE-MOD-0005", "fehlt.json");

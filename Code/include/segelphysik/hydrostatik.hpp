@@ -39,6 +39,12 @@ struct Beitrag {
     Punktart punktart = Punktart::angriffspunkt;
     Datenzustand zustand = Datenzustand::gueltig;
     std::string fehler_id;
+    std::string modell_status;
+    std::string modell_methode;
+    std::string modell_quelle;
+    std::string modell_unsicherheit;
+    std::map<std::string, HydrodynamikParameter> modell_parameter;
+    std::vector<std::string> modell_widerstandsanteile;
     Vektor3 moment_s_nm{};  // moment about the current total centre of mass S
     bool punkt_bekannt = true;
 };
@@ -86,6 +92,22 @@ struct TestantriebEreignis {
     std::size_t kennung{};
     bool aktiv{};
 };
+struct Bewegungsstellung {
+    std::string element_id;
+    double wert{};
+};
+struct Bewegungsereignis {
+    std::size_t kennung{};
+    std::string element_id;
+    double wert{};
+};
+struct BewegungsUebergang {
+    std::size_t von_schritt{};
+    std::size_t nach_schritt{};
+    double startzeit_s{};
+    double dt_s{};
+    std::vector<Bewegungsereignis> ereignisse;
+};
 struct TestantriebBegrenzung {
     bool wirksam{};
     Vektor3 vorher_welt_m_s{};
@@ -124,6 +146,9 @@ struct Zustand {
     bool testantrieb_erforderlich = false;
     std::shared_ptr<const HydrodynamikKontext> hydrodynamik;
     bool hydrodynamik_erforderlich = false;
+    std::vector<Bewegungsstellung> bewegungsstellungen;
+    std::size_t letzte_bewegungsereigniskennung{};
+    std::optional<BewegungsUebergang> bewegungsuebergang;
 };
 
 // Returned states own an immutable historical context; no global live flag.
@@ -135,7 +160,11 @@ Kraefte kraefte(const Modell&, const Pose&, const TestantriebKontext*,
     double rho = 1000., double g = 9.81,
     const std::vector<std::string>& geflutet = {},
     const HydrodynamikKontext* hydrodynamik = nullptr,
-    const Vektor3& geschwindigkeit_welt_m_s = {});
+    const Vektor3& geschwindigkeit_welt_m_s = {},
+    const Vektor3& omega_modell_rad_s = {},
+    const std::vector<Bewegungsstellung>& bewegungsstellungen = {});
+std::array<double, 16> bewegungstransformation(const Modell&, const std::string& element_id,
+    const std::vector<Bewegungsstellung>& bewegungsstellungen = {});
 
 struct Gleichgewichtsangaben {
     double krafttoleranz_n{};
@@ -188,6 +217,10 @@ Zustand dynamikschritt(const Modell& modell, const Zustand& zustand,
     double dt_s, double rho = 1000., double g = 9.81);
 Zustand dynamikschritt(const Modell& modell, const Zustand& zustand,
     double dt_s, const std::vector<TestantriebEreignis>& ereignisse,
+    double rho = 1000., double g = 9.81);
+Zustand dynamikschritt(const Modell& modell, const Zustand& zustand,
+    double dt_s, const std::vector<TestantriebEreignis>& testantrieb_ereignisse,
+    const std::vector<Bewegungsereignis>& bewegungsereignisse,
     double rho = 1000., double g = 9.81);
 
 }

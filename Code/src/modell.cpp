@@ -318,6 +318,226 @@ double zahl(const Json& wert, const std::string& ort, bool positiv)
     return wert.zahl;
 }
 
+Vektor3 vektor3_lesen(const Json& wert, const std::string& ort)
+{
+    if (wert.typ != Json::Typ::liste || wert.liste.size() != 3)
+        fehler(2, ort, "Drei Zahlen erwartet");
+    Vektor3 result{};
+    for (std::size_t i = 0; i < result.size(); ++i)
+        result[i] = zahl(wert.liste[i], ort, false);
+    return result;
+}
+
+double norm(const Vektor3& wert)
+{
+    return std::sqrt(wert[0]*wert[0] + wert[1]*wert[1] + wert[2]*wert[2]);
+}
+
+Vektor3 normieren(Vektor3 wert, const std::string& ort)
+{
+    const double laenge = norm(wert);
+    if (!std::isfinite(laenge) || laenge <= 1e-12)
+        fehler(2, ort, "Vektor darf nicht null sein");
+    for (auto& anteil : wert) anteil /= laenge;
+    return wert;
+}
+
+Bewegungsdefinition bewegung_lesen(const Json& wert, const std::string& ort)
+{
+    if (wert.typ != Json::Typ::objekt) fehler(2, ort, "Objekt erwartet");
+    Bewegungsdefinition result;
+    const auto art = text(pflicht(wert, "art", ort), ort + ".art");
+    if (art == "drehen") {
+        objekt(wert, {"art", "achse_modell", "drehpunkt_modell_m", "mitbewegte_elemente"}, ort);
+        result.art = Bewegungsart::drehen;
+        result.achse_modell = normieren(
+            vektor3_lesen(pflicht(wert, "achse_modell", ort), ort + ".achse_modell"),
+            ort + ".achse_modell");
+        result.drehpunkt_modell_m =
+            vektor3_lesen(pflicht(wert, "drehpunkt_modell_m", ort), ort + ".drehpunkt_modell_m");
+    } else if (art == "heben") {
+        objekt(wert, {"art", "richtung_modell", "mitbewegte_elemente"}, ort);
+        result.art = Bewegungsart::heben;
+        result.richtung_modell = normieren(
+            vektor3_lesen(pflicht(wert, "richtung_modell", ort), ort + ".richtung_modell"),
+            ort + ".richtung_modell");
+    } else {
+        fehler(2, ort + ".art", "Erwartet: drehen oder heben");
+    }
+    if (const auto* elemente = optional(wert, "mitbewegte_elemente")) {
+        if (elemente->typ != Json::Typ::liste)
+            fehler(2, ort + ".mitbewegte_elemente", "Liste erwartet");
+        std::set<std::string> ids;
+        for (const auto& element : elemente->liste) {
+            const auto id = text(element, ort + ".mitbewegte_elemente");
+            if (!ids.insert(id).second)
+                fehler(2, ort + ".mitbewegte_elemente", "Element-ID mehrfach angegeben: " + id);
+            result.mitbewegte_elemente.push_back(id);
+        }
+    }
+    return result;
+}
+
+std::string status_lesen(const Json& wert, const std::string& ort)
+{
+    const auto status = text(wert, ort, 3);
+    if (status != "validiert" && status != "abgeleitet" && status != "geschaetzt")
+        fehler(3, ort, "Erwartet: validiert, abgeleitet oder geschaetzt");
+    return status;
+}
+
+HydrodynamikParameter parameter_lesen(const Json& wert, const std::string& ort)
+{
+    objekt(wert, {"wert", "einheit", "status", "quelle", "gueltigkeit", "unsicherheit"}, ort, 3);
+    HydrodynamikParameter result;
+    result.wert = zahl(pflicht(wert, "wert", ort, 3), ort + ".wert", false);
+    result.einheit = text(pflicht(wert, "einheit", ort, 3), ort + ".einheit", 3);
+    result.status = status_lesen(pflicht(wert, "status", ort, 3), ort + ".status");
+    result.quelle = text(pflicht(wert, "quelle", ort, 3), ort + ".quelle", 3);
+    result.gueltigkeit = text(pflicht(wert, "gueltigkeit", ort, 3), ort + ".gueltigkeit", 3);
+    result.unsicherheit = text(pflicht(wert, "unsicherheit", ort, 3), ort + ".unsicherheit", 3);
+    if (result.status == "geschaetzt" &&
+        (result.quelle.find("Annahme") == std::string::npos &&
+         result.quelle.find("Schaetzung") == std::string::npos &&
+         result.quelle.find("Schätzung") == std::string::npos))
+        fehler(3, ort + ".quelle", "Geschaetzte Werte muessen als Schaetzung/Annahme erkennbar belegt sein");
+    return result;
+}
+
+HydrodynamikKraftmodell kraftmodell_lesen(const Json& wert, const std::string& ort)
+{
+    objekt(wert, {"methode", "parameter", "kennfeld", "widerstandsanteile",
+        "gueltigkeit", "quelle"}, ort, 3);
+    HydrodynamikKraftmodell result;
+    result.methode = text(pflicht(wert, "methode", ort, 3), ort + ".methode", 3);
+    result.gueltigkeit = text(pflicht(wert, "gueltigkeit", ort, 3), ort + ".gueltigkeit", 3);
+    result.quelle = text(pflicht(wert, "quelle", ort, 3), ort + ".quelle", 3);
+    const auto& parameter = pflicht(wert, "parameter", ort, 3);
+    if (parameter.typ != Json::Typ::objekt) fehler(3, ort + ".parameter", "Objekt erwartet");
+    for (const auto& entry : parameter.objekt)
+        result.parameter.emplace(entry.first, parameter_lesen(entry.second, ort + ".parameter." + entry.first));
+    const auto& kennfeld = pflicht(wert, "kennfeld", ort, 3);
+    if (kennfeld.typ != Json::Typ::liste) fehler(3, ort + ".kennfeld", "Liste erwartet");
+    for (std::size_t i = 0; i < kennfeld.liste.size(); ++i) {
+        const auto& punkt = kennfeld.liste[i];
+        const auto punktort = ort + ".kennfeld[" + std::to_string(i) + "]";
+        objekt(punkt, {"anstellwinkel_rad", "reynolds_zahl", "cl", "cd", "status",
+            "quelle", "gueltigkeit", "unsicherheit"}, punktort, 3);
+        HydrodynamikKennfeldpunkt p;
+        p.anstellwinkel_rad = zahl(pflicht(punkt, "anstellwinkel_rad", punktort, 3),
+            punktort + ".anstellwinkel_rad", false);
+        p.reynolds_zahl = zahl(pflicht(punkt, "reynolds_zahl", punktort, 3),
+            punktort + ".reynolds_zahl", true);
+        p.cl = zahl(pflicht(punkt, "cl", punktort, 3), punktort + ".cl", false);
+        p.cd = zahl(pflicht(punkt, "cd", punktort, 3), punktort + ".cd", false);
+        if (p.cd < 0.) fehler(3, punktort + ".cd", "Widerstandsbeiwert darf nicht negativ sein");
+        p.status = status_lesen(pflicht(punkt, "status", punktort, 3), punktort + ".status");
+        p.quelle = text(pflicht(punkt, "quelle", punktort, 3), punktort + ".quelle", 3);
+        p.gueltigkeit = text(pflicht(punkt, "gueltigkeit", punktort, 3), punktort + ".gueltigkeit", 3);
+        p.unsicherheit = text(pflicht(punkt, "unsicherheit", punktort, 3), punktort + ".unsicherheit", 3);
+        if (p.status == "geschaetzt" &&
+            (p.quelle.find("Annahme") == std::string::npos &&
+             p.quelle.find("Schaetzung") == std::string::npos &&
+             p.quelle.find("Schätzung") == std::string::npos))
+            fehler(3, punktort + ".quelle", "Geschaetzte Kennfeldwerte muessen als Schaetzung/Annahme erkennbar belegt sein");
+        if (std::any_of(result.kennfeld.begin(), result.kennfeld.end(), [&](const auto& prior) {
+            return prior.anstellwinkel_rad == p.anstellwinkel_rad && prior.reynolds_zahl == p.reynolds_zahl;
+        }))
+            fehler(3, punktort, "Doppelter Kennfeldpunkt");
+        result.kennfeld.push_back(std::move(p));
+    }
+    if (!result.kennfeld.empty()) {
+        std::set<double> alpha_axis, reynolds_axis;
+        for (const auto& point : result.kennfeld) {
+            alpha_axis.insert(point.anstellwinkel_rad);
+            reynolds_axis.insert(point.reynolds_zahl);
+        }
+        if (alpha_axis.size() > std::numeric_limits<std::size_t>::max() / reynolds_axis.size() ||
+            alpha_axis.size() * reynolds_axis.size() != result.kennfeld.size())
+            fehler(3, ort + ".kennfeld", "Kennfeld muss ein vollstaendiges Rechteck bilden");
+        for (const double alpha : alpha_axis)
+            for (const double reynolds : reynolds_axis)
+                if (std::none_of(result.kennfeld.begin(), result.kennfeld.end(),
+                    [&](const auto& point) {
+                        return point.anstellwinkel_rad == alpha && point.reynolds_zahl == reynolds;
+                    }))
+                    fehler(3, ort + ".kennfeld", "Kennfeld muss ein vollstaendiges Rechteck bilden");
+    }
+    if (const auto* anteile = optional(wert, "widerstandsanteile")) {
+        if (anteile->typ != Json::Typ::liste) fehler(3, ort + ".widerstandsanteile", "Liste erwartet");
+        for (const auto& anteil : anteile->liste) {
+            const auto name = text(anteil, ort + ".widerstandsanteile", 3);
+            if (name != "gesamt" && name != "profil" && name != "druck" &&
+                name != "hautreibung" && name != "induzierter")
+                fehler(3, ort + ".widerstandsanteile", "Unbekannter Widerstandsanteil: " + name);
+            if (std::find(result.widerstandsanteile.begin(), result.widerstandsanteile.end(), name) !=
+                result.widerstandsanteile.end())
+                fehler(3, ort + ".widerstandsanteile", "Widerstandsanteil mehrfach angegeben: " + name);
+            result.widerstandsanteile.push_back(name);
+        }
+    }
+    if (std::find(result.widerstandsanteile.begin(), result.widerstandsanteile.end(), "gesamt") !=
+            result.widerstandsanteile.end() && result.widerstandsanteile.size() != 1)
+        fehler(3, ort + ".widerstandsanteile",
+            "Anteil gesamt darf nicht mit Teilanteilen kombiniert werden");
+    if (!result.kennfeld.empty() && result.widerstandsanteile.empty())
+        fehler(3, ort + ".widerstandsanteile",
+            "Kennfeld muss enthaltene Widerstandsanteile explizit benennen");
+    return result;
+}
+
+ElementHydrodynamikDaten hydrodynamikdaten_lesen(const Json& wert, const std::string& ort)
+{
+    objekt(wert, {"rolle", "modelle", "materialreferenz"}, ort, 3);
+    ElementHydrodynamikDaten result;
+    if (const auto* modelle = optional(wert, "modelle")) {
+        objekt(*modelle, {"hautreibung", "druckwiderstand", "seitenkraft"}, ort + ".modelle", 3);
+        for (const auto& entry : modelle->objekt) {
+            const auto model_ort = ort + ".modelle." + entry.first;
+            auto model = kraftmodell_lesen(entry.second, model_ort);
+            if (entry.first == "hautreibung" &&
+                model.methode != "ittc_1957_mit_laminarer_naeherung" &&
+                model.methode != "ittc_1957")
+                fehler(3, model_ort + ".methode", "Unbekannte Hautreibungs-Methode");
+            if (entry.first == "druckwiderstand" &&
+                model.methode != "geschaetzter_normaler_formwiderstand" &&
+                model.methode != "platten_normal_drag")
+                fehler(3, model_ort + ".methode", "Unbekannte Druckwiderstands-Methode");
+            if (entry.first == "seitenkraft" &&
+                model.methode != "geschaetzte_endliche_streckungspolare" &&
+                model.methode != "polare_2d")
+                fehler(3, model_ort + ".methode", "Unbekannte Seitenkraft-Methode");
+            if (entry.first != "seitenkraft" &&
+                (!model.kennfeld.empty() || !model.widerstandsanteile.empty()))
+                fehler(3, model_ort,
+                    "Kennfeld und Widerstandsanteile sind nur fuer seitenkraft zulaessig");
+            const std::vector<std::string> erlaubte_parameter = entry.first == "druckwiderstand" ?
+                std::vector<std::string>{"cd"} :
+                entry.first == "seitenkraft" ?
+                std::vector<std::string>{"streckung", "wirkungsgrad", "cd0", "cl_max"} :
+                std::vector<std::string>{};
+            for (const auto& parameter : model.parameter) {
+                if (std::find(erlaubte_parameter.begin(), erlaubte_parameter.end(), parameter.first) ==
+                    erlaubte_parameter.end())
+                    fehler(3, model_ort + ".parameter." + parameter.first,
+                        "Unbekannter oder nicht verwendeter Hydrodynamikparameter");
+                if (parameter.second.einheit != "1")
+                    fehler(3, model_ort + ".parameter." + parameter.first + ".einheit",
+                        "Dieser Parameter erwartet die dimensionslose Einheit 1");
+            }
+            if (entry.first == "seitenkraft" &&
+                ((model.methode == "polare_2d" && model.kennfeld.empty()) ||
+                 (!model.kennfeld.empty() && model.methode != "polare_2d")))
+                fehler(3, model_ort,
+                    "polare_2d und nichtleeres Kennfeld muessen gemeinsam verwendet werden");
+            result.modelle.emplace(entry.first, std::move(model));
+        }
+    }
+    if (const auto* material = optional(wert, "materialreferenz"))
+        result.materialreferenz = text(*material, ort + ".materialreferenz", 3);
+    return result;
+}
+
 using L = long double;
 using V = std::array<L, 3>;
 using Matrix = std::array<L, 9>;
@@ -897,7 +1117,7 @@ Modell lade_modell(const std::filesystem::path& datei)
         for (std::size_t index = 0; index < elemente.liste.size(); ++index) {
             const auto& element = elemente.liste[index];
             const std::string stelle = gruppenort + ", elemente[" + std::to_string(index) + "]";
-            objekt(element, {"id", "Darstellung", "Hydrostatik", "Hydrodynamik"}, stelle);
+            objekt(element, {"id", "Darstellung", "Hydrostatik", "Hydrodynamik", "Bewegung"}, stelle);
             Element e;
             e.id = text(pflicht(element, "id", stelle, 3), stelle + ".id", 3);
             const std::string elementort = stelle + ", Element " + e.id;
@@ -905,6 +1125,7 @@ Modell lade_modell(const std::filesystem::path& datei)
             const auto* darstellung = optional(element, "Darstellung");
             const auto* hydro = optional(element, "Hydrostatik");
             const auto* hydrodynamik = optional(element, "Hydrodynamik");
+            const auto* bewegung = optional(element, "Bewegung");
             if (!darstellung && !hydro) fehler(2, elementort, "Darstellung und/oder Hydrostatik erforderlich");
             if (darstellung) {
                 objekt(*darstellung, {"datei", "farbe", "oberflaeche"}, elementort + ".Darstellung");
@@ -935,7 +1156,8 @@ Modell lade_modell(const std::filesystem::path& datei)
                 if (!e.volumen) e.flutrand_m.clear();
             }
             if (hydrodynamik) {
-                objekt(*hydrodynamik, {"rolle"}, elementort + ".Hydrodynamik");
+                objekt(*hydrodynamik, {"rolle", "modelle", "materialreferenz"},
+                    elementort + ".Hydrodynamik", 3);
                 const auto rolle = text(pflicht(*hydrodynamik, "rolle", elementort, 3),
                     elementort + ".Hydrodynamik.rolle", 3);
                 if (rolle == "rumpf") e.hydrodynamik_rolle = HydrodynamikRolle::rumpf;
@@ -946,9 +1168,72 @@ Modell lade_modell(const std::filesystem::path& datei)
                 if (!e.volumen)
                     fehler(3, elementort + ".Hydrodynamik",
                         "Rolle benoetigt ein physisches Hydrostatik.volumen-Mesh");
+                e.hydrodynamik_daten = hydrodynamikdaten_lesen(*hydrodynamik,
+                    elementort + ".Hydrodynamik");
+            }
+            if (bewegung) {
+                if (!e.volumen)
+                    fehler(2, elementort + ".Bewegung",
+                        "Bewegliches Element benoetigt ein physisches Hydrostatik.volumen-Mesh");
+                e.bewegung = bewegung_lesen(*bewegung, elementort + ".Bewegung");
+                e.bewegung->ruderwinkel =
+                    e.hydrodynamik_rolle == HydrodynamikRolle::ruder;
+                if (e.bewegung->ruderwinkel && e.bewegung->art != Bewegungsart::drehen)
+                    fehler(2, elementort + ".Bewegung",
+                        "Ein Ruderwinkel erfordert die Bewegungsart drehen");
             }
             modell.elemente.push_back(std::move(e));
         }
+    }
+    std::map<std::string, std::string> bewegungseigentuemer;
+    for (auto& element : modell.elemente) {
+        if (!element.bewegung) continue;
+        const auto bewegungsort = ort + ", Element " + element.id + ".Bewegung";
+        for (const auto& mitbewegt : element.bewegung->mitbewegte_elemente) {
+            if (mitbewegt == element.id)
+                fehler(2, bewegungsort, "Steuerndes Element darf nicht selbst als mitbewegt gelistet sein");
+            const auto fund = std::find_if(modell.elemente.begin(), modell.elemente.end(),
+                [&](const Element& kandidat) { return kandidat.id == mitbewegt; });
+            if (fund == modell.elemente.end())
+                fehler(2, bewegungsort, "Unbekanntes mitbewegtes Element: " + mitbewegt);
+            if (fund->bewegung)
+                fehler(2, bewegungsort, "Mitbewegtes Element hat eine eigene Bewegungsdefinition: " + mitbewegt);
+            if (!bewegungseigentuemer.emplace(mitbewegt, element.id).second)
+                fehler(2, bewegungsort, "Mitbewegtes Element ist mehreren Bewegungen zugeordnet: " + mitbewegt);
+        }
+        if (element.bewegung->art != Bewegungsart::heben) continue;
+        double bewegtes_min = std::numeric_limits<double>::infinity();
+        for (const auto& punkt : element.volumen->punkte) {
+            const double wert = punkt[0]*element.bewegung->richtung_modell[0] +
+                punkt[1]*element.bewegung->richtung_modell[1] +
+                punkt[2]*element.bewegung->richtung_modell[2];
+            bewegtes_min = std::min(bewegtes_min, wert);
+        }
+        double rumpf_min = std::numeric_limits<double>::infinity();
+        for (const auto& rumpf : modell.elemente) {
+            if (rumpf.hydrodynamik_rolle != HydrodynamikRolle::rumpf || !rumpf.volumen) continue;
+            for (const auto& punkt : rumpf.volumen->punkte) {
+                const double wert = punkt[0]*element.bewegung->richtung_modell[0] +
+                    punkt[1]*element.bewegung->richtung_modell[1] +
+                    punkt[2]*element.bewegung->richtung_modell[2];
+                rumpf_min = std::min(rumpf_min, wert);
+            }
+        }
+        if (!std::isfinite(rumpf_min) || !std::isfinite(bewegtes_min))
+            fehler(2, bewegungsort, "Hubweg benoetigt bewegtes Mesh und hydrodynamisches Rumpfmesh");
+        element.bewegung->hubweg_m = std::max(0., rumpf_min - bewegtes_min);
+    }
+    static const std::set<std::string> einfache_rumpfmodelle{
+        "bleistift", "kegel", "kugel", "platte", "pyramide", "quader", "rolle", "unregelmaessig"};
+    if (einfache_rumpfmodelle.count(modell.id)) {
+        if (modell.elemente.size() != 1 || !modell.elemente.front().volumen)
+            fehler(3, ort, "Ein einfacher Referenzkoerper benoetigt genau ein physisches Volumenmesh");
+        auto& element = modell.elemente.front();
+        if (element.hydrodynamik_rolle &&
+            element.hydrodynamik_rolle != HydrodynamikRolle::rumpf)
+            fehler(3, ort + ", Element " + element.id + ".Hydrodynamik.rolle",
+                "Einfache Referenzkoerper muessen als rumpf hydrodynamisch behandelt werden");
+        element.hydrodynamik_rolle = HydrodynamikRolle::rumpf;
     }
     summieren(modell, ort);
     if (modell.masse_kg <= 0.)
@@ -1006,6 +1291,13 @@ ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei)
                     if (const auto* farbe = optional(*darstellung, "farbe")) e.farbe_rgb = farbe_hex(*farbe);
                     if (const auto* art = optional(*darstellung, "oberflaeche"))
                         e.oberflaeche = oberflaeche_text(*art);
+                }
+                if (const auto* bewegung = optional(element, "Bewegung"))
+                    e.bewegung = bewegung_lesen(*bewegung, ort + ", Element " + e.id + ".Bewegung");
+                if (e.bewegung) {
+                    const auto* hydrodynamik = optional(element, "Hydrodynamik");
+                    const auto* rolle = hydrodynamik ? text_feld(*hydrodynamik, "rolle") : nullptr;
+                    e.bewegung->ruderwinkel = rolle && rolle->text == "ruder";
                 }
             }
             if (const auto* hydro = optional(element, "Hydrostatik"))

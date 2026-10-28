@@ -217,6 +217,21 @@ ohne `Hydrodynamik` importieren weiterhin wie zuvor.
 **Herkunft:** Finalisierung und Implementierungsauftrag Hydrodynamik,
 27.10.2026; Entwurfspunkt IDEE-C-00033.
 
+### Zielerweiterung des Hydrodynamikblocks für den Folgeumfang
+
+A-C-00061 beschreibt den mit C-0.6 eingeführten Rollenvertrag. Für den
+fachlich finalisierten Hydrodynamik-Folgeumfang darf das optionale Feld
+`Hydrodynamik` am selben Modellelement zusätzlich `modelle` und eine optionale
+`materialreferenz` enthalten. Die verbindliche Struktur, Pflichtmetadaten,
+Herkunftsstatus, Gültigkeitsbereiche und Kennfeldregeln sind in
+[A-C-00076 der Hydrodynamik-Spezifikation](Spezifikation_Hydrodynamik.md#a-c-00076-objektparameter-provenienz-und-materialreferenzen)
+festgelegt. Sie ändert den C-0.6-Importvertrag nicht rückwirkend. Der
+Core-Importer unterstützt die optionalen Modellparameter, Kennfelder und
+Materialreferenz im C-0.7-Folgeumfang; Schema-, Provenienz- und
+Hydrodynamiktests decken die Implementierung ab. Die vollständige technische
+und fachliche Abnahme ist im zugehörigen Umsetzungsplan separat
+nachzuweisen.
+
 ## Quellen und Abgrenzung zur Historie
 
 Die historische Spezifikation vF1 in SegelPhysik3 beschreibt ein

@@ -3,8 +3,9 @@
   "thema": "Schrittweise CORE-Hydrodynamik",
   "spezifikation": "../Spezifikation_Hydrodynamik.md",
   "umsetzungsplan": "../../Umsetzungsplaene/Umsetzungsplan_Hydrodynamik.md",
-  "umsetzungsstand": "C-0.6: Rollenimport, ITTC-Rumpfreibung, Core-Dynamikintegration und additive Ergebnisbeiträge technisch umgesetzt. Rumpf-Restwiderstand und Kielpolaren wegen fehlender modellbezogener Referenzdaten blockiert; fachliche Bewegungsabnahme und Ruder/Interaktionen daher offen. Details und Tests siehe Umsetzungsplan.",
-  "hinweis": "Die Spezifikation wurde am 27.10.2026 auf ausdrücklichen Implementierungsauftrag für C-0.6 finalisiert. IDEE-Kennungen bleiben als Herkunft erhalten und sind den freigegebenen A-C-Anforderungen zugeordnet. Optimist und 420er sind die verfügbaren Jollen-Referenzen, das Folkeboot die Kielboot-Referenz. Keine bessere Geometrie wird vorausgesetzt. Ruder bleibt relativ zum Rumpf fest; spezielle GUI-Kraftdarstellungen folgen später.",
+  "umsetzungsplan_folgeumfang": "../../Umsetzungsplaene/Umsetzungsplan_C-0.7_Hydrodynamik.md",
+  "umsetzungsstand": "C-0.6: Rollenimport, ITTC-Rumpfreibung, Core-Dynamikintegration und additive Ergebnisbeiträge technisch umgesetzt und mit C-0.6 veröffentlicht. C-0.7: Modellvertrag, 3D-Panelkräfte, geschätzte Form-/Seitenkraftmodelle, Integratorverdrahtung und Parameter-/Provenienzserialisierung sind im Core umgesetzt; Release-Build und 16/16 Core-CTest-Prüfungen bestehen. Die technische Gesamt- und fachliche Abnahme ist noch offen. Der Core-Importer ordnet die acht einfachen Modell-IDs als Rümpfe zu; beim Folkeboot fehlt ein separates Bulb-Element. Der Materialkatalog ist nicht als Laufzeitvertrag verfügbar; Materialreferenzen werden daher nicht aufgelöst. Externe Messdaten und quantitative Toleranzen fehlen und sind als Validierungslücke dokumentiert.",
+  "hinweis": "Die Spezifikation für C-0.6 wurde am 27.10.2026 auf ausdrücklichen Implementierungsauftrag finalisiert. IDEE-Kennungen 00033 bis 00043 bleiben als Herkunft erhalten und sind den freigegebenen A-C-Anforderungen zugeordnet. Optimist und 420er sind die verfügbaren Jollen-Referenzen, das Folkeboot die Kielboot-Referenz. Keine bessere Geometrie wird vorausgesetzt. Die Festlegung des starren Ruders gilt für den abgegrenzten C-0.7-Umfang; Abschnitt 13 der Spezifikation beschreibt den späteren Bewegungsumfang. IDEE-C-00044 bis IDEE-C-00049 wurden am 28.10.2026 finalisiert und A-C-00073 bis A-C-00078 zugeordnet. IDEE-C-00050 wurde am 28.10.2026 finalisiert und A-C-00079 bis A-C-00085 zugeordnet. Die Finalisierung autorisiert keine Umsetzung.",
   "quellen": [
     "../../../Ideen/hydrodynamik_boot.pdf",
     "../../../Ideen/Berechnung_Hydrodynamik_2_2.md"
@@ -33,9 +34,9 @@
       "status": "finalisiert",
       "thema": "Erster Rumpfwiderstandsbaustein",
       "bezug": "../Spezifikation_Hydrodynamik.md#schritt-1-isolierter-rumpf-reibungsbeitrag",
-      "entscheidung": "Erster Rechenbaustein ist der isolierte ITTC-1957-Reibungsanteil ohne Formfaktor und ohne Wellen-/Restwiderstand. Vorläufiger Arbeitsbereich ist 10^6 <= Re <= 10^9. Bei positiver Geschwindigkeit außerhalb des Bereichs wird der dynamische Schritt mit konkreter Diagnose abgelehnt; es wird nicht extrapoliert. Bei V=0 wird Cf nicht ausgewertet und ein gültiger Nullbeitrag geliefert.",
+      "entscheidung": "Erster Rechenbaustein ist der isolierte ITTC-1957-Reibungsanteil ohne Formfaktor und ohne Wellen-/Restwiderstand. Vorläufiger Arbeitsbereich ist 10^6 <= Re <= 10^9. Bei positiver Geschwindigkeit außerhalb des Bereichs wird nicht extrapoliert; der Beitrag wird als nicht_berechnet diagnostiziert, der Lauf darf fortfahren und die Bilanz bleibt unvollständig. Bei V=0 wird Cf nicht ausgewertet und ein gültiger Nullbeitrag geliefert.",
       "anforderungen": ["A-C-00064"],
-      "restpunkt": "Formel, analytische Referenz, Nullfluss, Re-Grenzen, Vorzeichen und ungültige Parameter sind getestet. Positive Fahrt unter Re=1e6 wird derzeit abgelehnt und verhindert kleine Anfahrgeschwindigkeiten."
+      "restpunkt": "Formel, analytische Referenz, Nullfluss, Re-Grenzen, Vorzeichen und ungültige Parameter sind getestet. Bei positiver Fahrt außerhalb 10^6 <= Re <= 10^9 wird kein Reibungswert extrapoliert; der Beitrag wird als nicht_berechnet mit CORE-HYD-0001 ausgewiesen, der Lauf darf fortfahren und die Bilanz bleibt unvollständig. Niedrige-Re-Reibung bleibt eine offene fachliche Lücke."
     },
     {
       "id": "IDEE-C-00036",
@@ -62,7 +63,7 @@
       "bezug": "../Spezifikation_Hydrodynamik.md#schritt-4-beiträge-momente-und-solverintegration",
       "entscheidung": "Bestehende Beitragsfelder, Angriffspunkte, Frames und Momentenfelder werden additiv genutzt; vorhandene Pflichtfelder und Bedeutungen bleiben unverändert. Neue Quellen-/Gruppenwerte allein erfordern keine neue Ergebnisversion. Eine Versionserhöhung ist nur bei einer inkompatiblen Änderung an Pflichtfeldern oder deren Bedeutung notwendig. V3 für den Testantrieb bleibt separat.",
       "anforderungen": ["A-C-00067"],
-      "restpunkt": "Core serialisiert die additive Gruppe hydrodynamik unter Ergebnisversion 2; analytischer Core-Test besteht. GUI-Dateien blieben unverändert; ein GUI-Build und Ende-zu-Ende-Lauf wurden nicht ausgeführt."
+      "restpunkt": "Core serialisiert die additive Gruppe hydrodynamik unter Ergebnisversion 2; Core- und GUI/Core-Build sowie die 16 Core- und 29 GUI/Core-CTest-Prüfungen bestehen. Für Live-/Batch-Parität wurde der GUI-Core-Adapter angepasst; GUI-Oberfläche und Kraftdarstellung blieben unverändert."
     },
     {
       "id": "IDEE-C-00039",
@@ -98,7 +99,7 @@
       "bezug": "../Spezifikation_Hydrodynamik.md#75-ergebnisserialisierung-versionierung-und-gui-verwendung",
       "entscheidung": "Nutzerentscheidung 27.10.2026: Die erste Stufe konzentriert sich auf Core-Bewegung und vorbereitete Kraft-/Momentenschnittstelle. Es gibt keine neuen speziellen GUI-Kraftgruppen oder Darstellungen; die bestehende generische Anzeige bleibt unverändert.",
       "anforderungen": ["A-C-00071"],
-      "restpunkt": "Keine GUI-Dateien geändert. Die bestehende generische Vektoranzeige kann die neue Quelle als weitere Quelle lesen; GUI-Build und Ende-zu-Ende-Integration bleiben ungeprüft."
+      "restpunkt": "Keine GUI-Eingaben, Hydrodynamik-Physik oder spezielle Kraftdarstellung ergänzt. Der GUI-Core-Adapter wurde für denselben Laufkontext in Live- und Batch-Simulation angepasst; GUI/Core-Build und 29/29 CTest-Prüfungen bestehen."
     },
     {
       "id": "IDEE-C-00043",
@@ -108,6 +109,77 @@
       "entscheidung": "Dauerhafte Hydrodynamik- und Profilangaben werden im bestehenden modell.json-Vertrag geführt; zuverlässig aus physischen Meshes ableitbare Geometriewerte werden nicht dupliziert. Ein intern typisierter Core-Kontext transportiert Lauf-/Fluiddaten. Der bestehende Simulationsstart bleibt zunächst unverändert. Modellvertragsänderungen werden in die vorhandene Modellbeschreibungsspezifikation aufgenommen.",
       "anforderungen": ["A-C-00061", "A-C-00072"],
       "restpunkt": "Typen, API, Laufkontext, Fehlerfälle und Serialisierung sind umgesetzt und in Schnittstellendokumentation sowie CPPI-Register beschrieben."
+    },
+    {
+      "id": "IDEE-C-00044",
+      "status": "finalisiert",
+      "thema": "Körperumfang für dreidimensionale Hydrodynamik",
+      "bezug": "../Spezifikation_Hydrodynamik.md#121-geltungsbereich-der-körper",
+      "entscheidung": "Der Folgeumfang umfasst alle acht einfachen Referenzkörper als Rümpfe sowie bei Optimist und 420er Rumpf, Schwert und Ruderblatt und beim Folkeboot Rumpf, Kiel, separates Bulb-Teilobjekt und Ruderblatt. Besatzung, Cockpitinnenraum, Ruderkopf/Pinne und Rigg bleiben ausgeschlossen; das Ruder bleibt starr befestigt.",
+      "anforderungen": ["A-C-00073"],
+      "finalisiert_am": "2026-10-28",
+      "restpunkt": "Die acht kanonischen einfachen Modell-IDs erhalten ihre Rumpfrolle im Core-Importer und sind über die Modell-JSON-Dateien dynamisch getestet. Beim Folkeboot fehlt ein separates Bulb-Element mit eigenem Mesh; der Planumfang A-C-00073 ist deshalb noch nicht vollständig."
+    },
+    {
+      "id": "IDEE-C-00045",
+      "status": "finalisiert",
+      "thema": "Dreidimensionale Geschwindigkeit und Meshbenetzung",
+      "bezug": "../Spezifikation_Hydrodynamik.md#122-gemeinsamer-dreidimensionaler-zustands--und-geometrievertrag",
+      "entscheidung": "Kräfte werden als vollständige 3D-Vektoren in X, Y und Z berechnet. Für die lokale Körpergeschwindigkeit eines Angriffspunkts werden Translation und Rotation berücksichtigt; Benetzung und Angriffspunkte werden aus dem physischen Hydrostatik.volumen-Mesh je Integratorzustand bestimmt. Hydrostatik bleibt unverändert separat. Untergetauchter Z-Widerstand ist enthalten; kurzzeitiger Wasseraufprall am freien Spiegel und Wellenbildung sind ausgeschlossen.",
+      "anforderungen": ["A-C-00074"],
+      "finalisiert_am": "2026-10-28",
+      "restpunkt": "Lokale Rotationsgeschwindigkeit sowie wasserliniengeclippte Panelbenetzung sind implementiert und durch synthetische Tests geprüft. Eignung und Auflösung der Yachtmeshes benötigen weitere Prüfung. Wasseraufprall und Wellenbildung bleiben außerhalb dieses Folgeumfangs."
+    },
+    {
+      "id": "IDEE-C-00046",
+      "status": "finalisiert",
+      "thema": "Getrennte dreidimensionale Kraftmodelle",
+      "bezug": "../Spezifikation_Hydrodynamik.md#123-kraftarten-modelle-und-objektparameter",
+      "entscheidung": "Hautreibung, Form-/Druckwiderstand und Auftriebs-/Seitenkraft werden als getrennte physikalische Beiträge behandelt; Wellenwiderstand und Wasseraufprall beim freien Spiegel sind in diesem Folgeumfang ausgeschlossen. ITTC-1957 wird nicht ungeprüft auf Quer- oder Vertikalströmung extrapoliert. Endgeschwindigkeit entsteht aus Kräftegleichgewicht ohne künstlichen Geschwindigkeitsbegrenzer; Abdrifthemmung verlangt belegte Seitenkräfte von Kiel/Schwert und Ruderblatt.",
+      "anforderungen": ["A-C-00075"],
+      "finalisiert_am": "2026-10-28",
+      "restpunkt": "Geschätzte Modellansätze und Grenzen für Hautreibung, Rumpf-Formwiderstand und Anbauteil-Seitenkraft sind dokumentiert, implementiert und getestet. Ihre Übertragbarkeit auf konkrete Yachtmeshes sowie externe Referenzen und quantitative Toleranzen bleiben offen."
+    },
+    {
+      "id": "IDEE-C-00047",
+      "status": "finalisiert",
+      "thema": "Objektabhängige Hydrodynamikdaten im Modellvertrag",
+      "bezug": "../Spezifikation_Hydrodynamik.md#123-kraftarten-modelle-und-objektparameter",
+      "entscheidung": "Nicht mesh- oder laufzeitlich ableitbare, objektabhängige Parameter werden im jeweiligen modell.json-Element unter Hydrodynamik abgelegt. Parameter werden als Validiert, Abgeleitet oder Geschätzt gekennzeichnet und benötigen Einheit, Herkunft sowie Gültigkeits-/Unsicherheitsangabe. Eindeutig materialgebundene Stoffwerte dürfen im Materialkatalog liegen und vom Element referenziert werden; Bauteil-/Oberflächenzustandswerte bleiben am Hydrodynamik-Element. Nutzervorgaben und recherchierte Schätzwerte sind zulässig, bleiben aber als geschätzt/nicht fachlich validiert gekennzeichnet.",
+      "anforderungen": ["A-C-00076"],
+      "finalisiert_am": "2026-10-28",
+      "restpunkt": "Modellparameter, Provenienz, Kennfelder und Materialreferenz werden strikt eingelesen und getestet. Der Materialreferenztext wird mangels freigegebenem Materialkatalogvertrag noch nicht gegen einen Katalog aufgelöst."
+    },
+    {
+      "id": "IDEE-C-00048",
+      "status": "finalisiert",
+      "thema": "Isolierte Achsen- und Referenztests",
+      "bezug": "../Spezifikation_Hydrodynamik.md#124-sechs-umsetzungsschritte-und-abnahmekriterien",
+      "entscheidung": "Einfache Referenzkörper dienen als Rumpffälle für Geometrie-, Frame- und Richtungsregressionen; Rumpf, Schwert/Kiel und Ruderblatt werden anschließend getrennt geprüft. Tests decken X/Y/Z-Anströmung, Nullfluss, Kraftrichtung, Gültigkeitsgrenzen, Moment und Summenparität ab.",
+      "anforderungen": ["A-C-00077"],
+      "finalisiert_am": "2026-10-28",
+      "restpunkt": "Core-Tests decken Achsen, Rotation, Panelkräfte, Kennfeldinterpolation/-grenzen, Bilanz und einfache sowie Bootsmeshes ab. Unabhängige Mess- oder Referenzdaten für Yachtmodelle fehlen; quantitative Genauigkeit und externe Validierung bleiben offen."
+    },
+    {
+      "id": "IDEE-C-00049",
+      "status": "finalisiert",
+      "thema": "Dynamische Bewegungs- und Fachabnahme",
+      "bezug": "../Spezifikation_Hydrodynamik.md#124-sechs-umsetzungsschritte-und-abnahmekriterien",
+      "entscheidung": "Die validierten Beiträge werden je Bauteil in allen erforderlichen Integratorstufen additiv integriert. Bewegungsprüfungen umfassen freien Fall/Sinken mit aus Kräftegleichgewicht entstehender Endgeschwindigkeit sowie seitliche Fahrt mit durch validierte Kiel-/Ruder-Seitenkräfte gehemmter Abdrift.",
+      "anforderungen": ["A-C-00078"],
+      "finalisiert_am": "2026-10-28",
+      "restpunkt": "Synthetische Sinken- und Querfahrtfälle zeigen technische Widerstands- und Abdriftwirkung; Bootsmodelle werden im Batchpfad geprüft. Vollständige Abnahme bleibt wegen fehlender Bulb-/Modellrollen und Live-/Batch-Paritätsnachweis offen. Ohne unabhängige Referenzen wird keine quantitative Genauigkeit behauptet."
+    },
+    {
+      "id": "IDEE-C-00050",
+      "status": "finalisiert",
+      "thema": "Dynamische Verstellung von Ruder und Schwert",
+      "bezug": "../Spezifikation_Hydrodynamik.md#13-dynamische-verstellung-von-ruder-und-schwert",
+      "entscheidung": "Nutzerfreigabe zur Finalisierung am 28.10.2026: Während der dynamischen Simulation steuert ein Overlay Ruder kontinuierlich von -90 bis +90 Grad und bewegliche Schwerter von 0 bis 100 Prozent. Projektweite Vorzeichen-, Nullstellungs- und Vollausfahrkonventionen werden nicht im JSON wiederholt. Der JSON-Bewegungsblock definiert art drehen oder heben, modellfeste normierte Achse/Richtung, bei Drehung den Drehpunkt und optional mitbewegte sichtbare Element-IDs. Modellbasierte Startwerte: Ruderachse beider Jollen +Z; Optimist-Ruderpivot (-1.189895, 0, 0.182972) m als Mesh-Näherung; 420er-Ruderpivot (-2.279293, 0, 0.410047) m an der Ruderkopf-Stockachse. Das Optimist-Schwert wird entlang +Z gehoben; 100 Prozent ist die volle Mesh-Ausfahrt, 0 Prozent liegt die Unterkante an der unteren Rumpflinie, der Hubweg wird importseitig aus Mesh und Rumpf abgeleitet (derzeit ungefähr 0.523 m). Das 420er-Schwert dreht um +Y mit angenähertem Pivot (-0.359293, 0, 0.56) m; bei 100 Prozent steht es in der Mesh-Ausgangslage, bei 0 Prozent ist es 90 Grad nach achtern (-X) gedreht. Positive Ruderwinkel bedeuten Steuerbord, negative Backbord. Das Overlay zeigt nur für gültig bewegliche Elemente Bedienelemente. Eingaben gelten ab dem nächsten Simulationszeitschritt, werden bis zur nächsten Eingabe gehalten und als Simulationszeit, Bauteil-ID und Stellwert reproduzierbar aufgezeichnet. Die vollständige sichtbare Baugruppe bewegt sich gemeinsam; hydrodynamische Meshes dürfen auf benötigte benetzte Bereiche beschränkt und Rumpfdurchbrüche für die Hydrodynamik geschlossen werden. Wasserzutritt/Fluten, Kollisionen mit Rigg, Baum und Segeln, Aktuatordynamik und Nachlaufinteraktionen sind ausgeschlossen. Gesamtmasse, Schwerpunkt, Trägheit und Hydrostatik bleiben unverändert. Hub-Kiele werden nicht unterstützt. Diese Anforderungen sind fachlich freigegeben, aber nicht zur Umsetzung beauftragt.",
+      "anforderungen": ["A-C-00079", "A-C-00080", "A-C-00081", "A-C-00082", "A-C-00083", "A-C-00084", "A-C-00085"],
+      "finalisiert_am": "2026-10-28",
+      "restpunkt": "Technisch noch umzusetzen und nachzuweisen sind der JSON-Import/Validierung, visuelle Plausibilisierung der meshbasierten Pivot-Startwerte, verlässliche Hubwegableitung, Core- und GUI-Integration, reproduzierbares Ereignisprotokoll sowie Live-/Batch-Parität. Externe Messdaten für die Hydrodynamik und vermessene Lagerkoordinaten fehlen; die Achsen-/Pivotwerte sind geometrische Startnäherungen, keine extern validierten Bootsdaten. Die unveränderte Massenverteilung ist die freigegebene Näherung.",
+      "quellen": ["Nutzerfreigabe zur Finalisierung 2026-10-28"]
     }
   ]
 }

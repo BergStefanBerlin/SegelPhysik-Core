@@ -29,6 +29,61 @@ Vektor3 cross(const Vektor3& a, const Vektor3& b)
 {
     return {a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]};
 }
+const Element* bewegungseigentuemer(const Modell& modell, const std::string& element_id)
+{
+    for (const auto& element : modell.elemente) {
+        if (!element.bewegung) continue;
+        if (element.id == element_id ||
+            std::find(element.bewegung->mitbewegte_elemente.begin(),
+                element.bewegung->mitbewegte_elemente.end(), element_id) !=
+                element.bewegung->mitbewegte_elemente.end())
+            return &element;
+    }
+    return nullptr;
+}
+double bewegungswert(const Element& element,
+    const std::vector<Bewegungsstellung>& stellungen)
+{
+    const auto fund = std::find_if(stellungen.begin(), stellungen.end(),
+        [&](const Bewegungsstellung& stellung) { return stellung.element_id == element.id; });
+    if (fund != stellungen.end()) return fund->wert;
+    return element.bewegung->ruderwinkel ? 0. : 100.;
+}
+Vektor3 bewegungspunkt(const Vektor3& punkt, const Element& eigentuemer,
+    double wert)
+{
+    const auto& bewegung = *eigentuemer.bewegung;
+    if (bewegung.art == Bewegungsart::heben)
+        return plus(punkt, mal(bewegung.richtung_modell,
+            bewegung.hubweg_m * (100. - wert) / 100.));
+    const bool ruder=bewegung.ruderwinkel;
+    const double winkel = ruder ? wert * 3.14159265358979323846 / 180. :
+        (100. - wert) * 3.14159265358979323846 / 200.;
+    const auto achse = bewegung.achse_modell;
+    const auto rel = plus(punkt, mal(bewegung.drehpunkt_modell_m, -1.));
+    const auto gedreht = plus(plus(mal(rel, std::cos(winkel)),
+        mal(cross(achse, rel), std::sin(winkel))),
+        mal(achse, dot(achse, rel) * (1. - std::cos(winkel))));
+    return plus(bewegung.drehpunkt_modell_m, gedreht);
+}
+Mesh bewegtes_mesh(const Mesh& mesh, const Element& eigentuemer, double wert)
+{
+    Mesh result = mesh;
+    for (auto& punkt : result.punkte) punkt = bewegungspunkt(punkt, eigentuemer, wert);
+    return result;
+}
+Vektor3 bewegungsvektor(const Vektor3& vektor, const Element& eigentuemer, double wert)
+{
+    return plus(bewegungspunkt(vektor, eigentuemer, wert),
+        mal(bewegungspunkt({}, eigentuemer, wert), -1.));
+}
+Vektor3 einheitsvektor(Vektor3 vektor)
+{
+    const double laenge = std::sqrt(dot(vektor, vektor));
+    if (!std::isfinite(laenge) || laenge <= 1e-12)
+        throw std::invalid_argument("CORE-HYD-0001: Hydrodynamische Profilachse ist singulaer.");
+    return mal(vektor, 1. / laenge);
+}
 void positiv(double v)
 {
     if (!std::isfinite(v) || v <= 0.) throw std::invalid_argument("CORE-SIM-0001: Parameter muss endlich positiv sein.");
@@ -74,128 +129,548 @@ QuaternionXyzw produkt(const QuaternionXyzw& a,const QuaternionXyzw& b)
         a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],
         a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]};
 }
-struct Nassgeometrie {
-    double flaeche_m2{};
-    double wasserlinienlaenge_m{};
-    Vektor3 schwerpunkt_m{};
-    double minimum_z_m = std::numeric_limits<double>::infinity();
-    double maximum_z_m = -std::numeric_limits<double>::infinity();
-};
-Nassgeometrie nassgeometrie(const Mesh& mesh, const Pose& pose)
-{
-    Nassgeometrie result;
-    const auto laengsachse = pose.modellvektor_nach_welt({1., 0., 0.});
-    const double horizontal = std::hypot(laengsachse[0], laengsachse[1]);
-    if (!std::isfinite(horizontal) || horizontal <= 1e-10)
-        throw std::invalid_argument("CORE-HYD-0001: Modelllaengsachse hat keine horizontale Projektion.");
-    const Vektor3 axis{laengsachse[0] / horizontal, laengsachse[1] / horizontal, 0.};
-    double gewichteter_x_min = std::numeric_limits<double>::infinity();
-    double gewichteter_x_max = -std::numeric_limits<double>::infinity();
-    Vektor3 flaechenmoment{};
-    auto wasserlinie = [&](const Vektor3& point) {
-        const auto world = pose.modellpunkt_nach_welt(point);
-        const double along = world[0] * axis[0] + world[1] * axis[1];
-        gewichteter_x_min = std::min(gewichteter_x_min, along);
-        gewichteter_x_max = std::max(gewichteter_x_max, along);
-    };
-    for (const auto& triangle : mesh.dreiecke) {
-        std::array<Vektor3, 3> vertices{
-            mesh.punkte.at(triangle[0]), mesh.punkte.at(triangle[1]), mesh.punkte.at(triangle[2])};
-        std::array<double, 3> depth{};
-        for (std::size_t i = 0; i < vertices.size(); ++i) {
-            depth[i] = pose.modellpunkt_nach_welt(vertices[i])[2];
-            result.minimum_z_m = std::min(result.minimum_z_m, depth[i]);
-            result.maximum_z_m = std::max(result.maximum_z_m, depth[i]);
-            if (depth[i] == 0.) wasserlinie(vertices[i]);
-        }
-        if (std::none_of(depth.begin(), depth.end(), [](double value) { return value < 0.; }))
-            continue;
-        std::array<Vektor3, 4> clipped{};
-        std::size_t count = 0;
-        for (std::size_t i = 0; i < vertices.size(); ++i) {
-            const std::size_t previous = (i + vertices.size() - 1) % vertices.size();
-            const double da = depth[previous];
-            const double db = depth[i];
-            if ((da < 0. && db > 0.) || (da > 0. && db < 0.)) {
-                const double t = da / (da - db);
-                const auto point = plus(vertices[previous],
-                    mal(plus(vertices[i], mal(vertices[previous], -1.)), t));
-                clipped[count++] = point;
-                wasserlinie(point);
-            }
-            if (db <= 0.) clipped[count++] = vertices[i];
-        }
-        for (std::size_t i = 1; i + 1 < count; ++i) {
-            const auto ab = plus(clipped[i], mal(clipped[0], -1.));
-            const auto ac = plus(clipped[i + 1], mal(clipped[0], -1.));
-            const double area = .5 * std::sqrt(dot(cross(ab, ac), cross(ab, ac)));
-            if (!std::isfinite(area))
-                throw std::overflow_error("CORE-HYD-0001: Benetzte Meshflaeche nicht endlich.");
-            const auto centroid = mal(plus(plus(clipped[0], clipped[i]), clipped[i + 1]), 1. / 3.);
-            result.flaeche_m2 += area;
-            flaechenmoment = plus(flaechenmoment, mal(centroid, area));
-        }
-    }
-    if (result.flaeche_m2 > 0.)
-        result.schwerpunkt_m = mal(flaechenmoment, 1. / result.flaeche_m2);
-    if (std::isfinite(gewichteter_x_min) && std::isfinite(gewichteter_x_max))
-        result.wasserlinienlaenge_m = gewichteter_x_max - gewichteter_x_min;
-    return result;
-}
 bool endlich(const Vektor3& v)
 {
     return std::all_of(v.begin(), v.end(), [](double value) { return std::isfinite(value); });
 }
-Beitrag rumpfreibung(const Element& element, const Modell& modell, const Pose& pose,
-    const HydrodynamikKonfiguration& config, const Vektor3& bootgeschwindigkeit,
-    Vektor3& kraft_welt)
+
+struct Nasspanel {
+    Vektor3 punkt_welt{};
+    Vektor3 normale_welt{};
+    double flaeche_m2{};
+};
+
+std::vector<Nasspanel> nasspanels(const Mesh& mesh, const Pose& pose)
 {
-    if (!element.volumen)
-        throw std::invalid_argument("CORE-HYD-0001: Rumpfrolle ohne physisches Volumenmesh: " + element.id);
-    const Vektor3 relativ{
-        config.fluidgeschwindigkeit_welt_m_s[0] - bootgeschwindigkeit[0],
-        config.fluidgeschwindigkeit_welt_m_s[1] - bootgeschwindigkeit[1],
-        config.fluidgeschwindigkeit_welt_m_s[2] - bootgeschwindigkeit[2]};
-    const double speed = std::sqrt(dot(relativ, relativ));
-    if (!std::isfinite(speed))
-        throw std::overflow_error("CORE-HYD-0001: Relativgeschwindigkeit nicht endlich.");
-    Beitrag b;
-    b.id = element.id + ":hydrodynamik:reibung";
-    b.element_id = element.id;
-    b.art = "kraft";
-    b.quelle = Quelle::hydrodynamik;
-    b.gruppe = "hydrodynamik";
-    b.punkt_m = element.schwerpunkt_m;
-    b.punktart = Punktart::angriffspunkt;
-    if (speed == 0.) {
-        b.zustand = Datenzustand::null;
-        return b;
+    std::vector<Nasspanel> result;
+    for (const auto& triangle : mesh.dreiecke) {
+        std::array<Vektor3, 3> vertices{
+            pose.modellpunkt_nach_welt(mesh.punkte.at(triangle[0])),
+            pose.modellpunkt_nach_welt(mesh.punkte.at(triangle[1])),
+            pose.modellpunkt_nach_welt(mesh.punkte.at(triangle[2]))};
+        std::array<Vektor3, 4> clipped{};
+        std::size_t count = 0;
+        for (std::size_t i = 0; i < vertices.size(); ++i) {
+            const auto& a = vertices[i];
+            const auto& b = vertices[(i + 1) % vertices.size()];
+            const double da = a[2], db = b[2];
+            if (da <= 0.) clipped[count++] = a;
+            if ((da < 0. && db > 0.) || (da > 0. && db < 0.)) {
+                const double t = da / (da - db);
+                clipped[count++] = plus(a, mal(plus(b, mal(a, -1.)), t));
+            }
+        }
+        for (std::size_t i = 1; i + 1 < count; ++i) {
+            const auto ab = plus(clipped[i], mal(clipped[0], -1.));
+            const auto ac = plus(clipped[i + 1], mal(clipped[0], -1.));
+            const auto area_vector = cross(ab, ac);
+            const double twice_area = std::sqrt(dot(area_vector, area_vector));
+            if (!std::isfinite(twice_area))
+                throw std::overflow_error("CORE-HYD-0001: Benetztes Meshpanel nicht endlich.");
+            if (twice_area <= 1e-14) continue;
+            result.push_back({mal(plus(plus(clipped[0], clipped[i]), clipped[i + 1]), 1. / 3.),
+                mal(area_vector, 1. / twice_area), .5 * twice_area});
+        }
     }
-    const auto wett = nassgeometrie(*element.volumen, pose);
-    if (wett.flaeche_m2 == 0. && wett.minimum_z_m >= 0.) {
-        b.zustand = Datenzustand::null;
-        return b;
+    return result;
+}
+
+const HydrodynamikKraftmodell* kraftmodell(const Element& element, const std::string& art)
+{
+    if (!element.hydrodynamik_daten) return nullptr;
+    const auto found = element.hydrodynamik_daten->modelle.find(art);
+    return found == element.hydrodynamik_daten->modelle.end() ? nullptr : &found->second;
+}
+
+bool hat_widerstandsanteil(const HydrodynamikKraftmodell* model, const std::string& name)
+{
+    return model && std::find(model->widerstandsanteile.begin(),
+        model->widerstandsanteile.end(), name) != model->widerstandsanteile.end();
+}
+
+bool polare_enthaelt_hautreibung(const HydrodynamikKraftmodell* model)
+{
+    return model && !model->kennfeld.empty() &&
+        (hat_widerstandsanteil(model, "gesamt") ||
+         hat_widerstandsanteil(model, "profil") ||
+         hat_widerstandsanteil(model, "hautreibung"));
+}
+
+double parameterwert(const HydrodynamikKraftmodell* model, const std::string& key, double fallback)
+{
+    if (!model) return fallback;
+    const auto found = model->parameter.find(key);
+    return found == model->parameter.end() ? fallback : found->second.wert;
+}
+
+std::string parameterstatus(const HydrodynamikKraftmodell* model)
+{
+    if (!model) return "geschaetzt";
+    bool has_derived = false, has_validated = false;
+    for (const auto& parameter : model->parameter) {
+        if (parameter.second.status == "geschaetzt") return "geschaetzt";
+        if (parameter.second.status == "abgeleitet") has_derived = true;
+        if (parameter.second.status == "validiert") has_validated = true;
     }
-    if (!std::isfinite(wett.flaeche_m2) || wett.flaeche_m2 <= 0. ||
-        !std::isfinite(wett.wasserlinienlaenge_m) || wett.wasserlinienlaenge_m <= 0.)
-        throw std::invalid_argument("CORE-HYD-0001: Benetzte Rumpfflaeche oder Wasserlinienlaenge ungueltig: " +
-            element.id);
-    const double re = speed * wett.wasserlinienlaenge_m / config.nu_m2_s;
-    if (!std::isfinite(re) || re < 1e6 || re > 1e9) {
-        b.zustand = Datenzustand::nicht_berechnet;
-        b.fehler_id = "CORE-HYD-0001";
-        return b;
+    for (const auto& point : model->kennfeld) {
+        if (point.status == "geschaetzt") return "geschaetzt";
+        if (point.status == "abgeleitet") has_derived = true;
+        if (point.status == "validiert") has_validated = true;
     }
-    const double cf = .075 / std::pow(std::log10(re) - 2., 2.);
-    const double magnitude = .5 * config.rho_kg_m3 * speed * speed * wett.flaeche_m2 * cf;
-    if (!std::isfinite(magnitude))
-        throw std::overflow_error("CORE-HYD-0001: ITTC-Reibungskraft nicht endlich.");
-    kraft_welt = mal(relativ, magnitude / speed);
-    b.punkt_m = wett.schwerpunkt_m;
-    b.vektor = pose.weltvektor_nach_modell(kraft_welt);
-    b.moment_s_nm = moment_um(b.punkt_m, modell.schwerpunkt_m, b.vektor);
-    b.zustand = Datenzustand::gueltig;
-    return b;
+    if (has_derived) return "abgeleitet";
+    return has_validated ? "validiert" : "geschaetzt";
+}
+
+void provenance(Beitrag& beitrag, const HydrodynamikKraftmodell* model,
+    const std::string& fallback_method, const std::string& fallback_source,
+    const std::string& fallback_uncertainty)
+{
+    beitrag.modell_status = parameterstatus(model);
+    beitrag.modell_methode = model ? model->methode : fallback_method;
+    beitrag.modell_quelle = model ? model->quelle : fallback_source;
+    beitrag.modell_unsicherheit = fallback_uncertainty;
+    if (model) {
+        beitrag.modell_parameter = model->parameter;
+        beitrag.modell_widerstandsanteile = model->widerstandsanteile;
+    }
+    if (model) {
+        for (const auto& parameter : model->parameter) {
+            if (parameter.second.status == "geschaetzt") {
+                beitrag.modell_status = "geschaetzt";
+                beitrag.modell_quelle = parameter.second.quelle;
+                beitrag.modell_unsicherheit = parameter.second.unsicherheit;
+                break;
+            }
+        }
+        if (model->kennfeld.size() > 0) {
+            for (const auto& point : model->kennfeld) {
+                if (point.status == "geschaetzt") {
+                    beitrag.modell_status = "geschaetzt";
+                    beitrag.modell_quelle = point.quelle;
+                    beitrag.modell_unsicherheit = point.unsicherheit;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void verwendeten_parameter(Beitrag& beitrag, const std::string& key, double value,
+    const std::string& unit, const std::string& status, const std::string& source,
+    const std::string& validity, const std::string& uncertainty)
+{
+    const auto inserted = beitrag.modell_parameter.emplace(key,
+        HydrodynamikParameter{value, unit, status, source, validity, uncertainty});
+    const auto& effective = inserted.first->second;
+    if (effective.status == "geschaetzt") beitrag.modell_status = "geschaetzt";
+    else if (effective.status == "abgeleitet" && beitrag.modell_status == "validiert")
+        beitrag.modell_status = "abgeleitet";
+}
+
+Vektor3 lokale_relativgeschwindigkeit(const Vektor3& point_welt, const Vektor3& cg_welt,
+    const Vektor3& velocity_welt, const Vektor3& omega_welt,
+    const Vektor3& fluid_welt)
+{
+    const auto rotational = cross(omega_welt, plus(point_welt, mal(cg_welt, -1.)));
+    return plus(fluid_welt, mal(plus(velocity_welt, rotational), -1.));
+}
+
+double reibungsbeiwert(double reynolds)
+{
+    if (reynolds <= 0.) return 0.;
+    const double laminar = 1.328 / std::sqrt(reynolds);
+    if (reynolds < 5e5) return laminar;
+    const double turbulent = .075 / std::pow(std::log10(reynolds) - 2., 2.);
+    if (reynolds < 1e6) {
+        const double t = (reynolds - 5e5) / 5e5;
+        return laminar * (1. - t) + turbulent * t;
+    }
+    return turbulent;
+}
+
+Beitrag basisbeitrag(const Element& element, const std::string& art)
+{
+    Beitrag result;
+    result.id = element.id + ":hydrodynamik:" + art;
+    result.element_id = element.id;
+    result.art = "kraft";
+    result.quelle = Quelle::hydrodynamik;
+    result.gruppe = "hydrodynamik";
+    result.punkt_m = element.schwerpunkt_m;
+    result.punktart = Punktart::angriffspunkt;
+    return result;
+}
+
+Beitrag reibungsbeitrag(const Element& element, const Modell& modell, const Pose& pose,
+    const HydrodynamikKonfiguration& config, const Vektor3& velocity,
+    const Vektor3& omega, const std::vector<Nasspanel>& panels)
+{
+    const auto* model = kraftmodell(element, "hautreibung");
+    const auto* side_model = kraftmodell(element, "seitenkraft");
+    if (element.hydrodynamik_rolle != HydrodynamikRolle::rumpf &&
+        polare_enthaelt_hautreibung(side_model)) {
+        auto result = basisbeitrag(element, "reibung");
+        provenance(result, side_model, "reibungsanteil_im_polarenkennfeld",
+            "Im expliziten Seitenkraftkennfeld enthalten",
+            "Keine separate Hautreibung, um Doppelzählung des Kennfeldanteils zu vermeiden");
+        result.zustand = Datenzustand::null;
+        return result;
+    }
+    const auto method = model ? model->methode : "ittc_1957_mit_laminarer_naeherung";
+    if (method != "ittc_1957_mit_laminarer_naeherung" && method != "ittc_1957")
+        throw std::invalid_argument("CORE-HYD-0001: Unbekannte Hautreibungs-Methode '" + method + "'");
+    auto result = basisbeitrag(element, "reibung");
+    provenance(result, model, method,
+        "Geschaetzt: ITTC-1957-Reibungslinie plus laminare Plattennaeherung",
+        "Uebertragung der Plattenkorrelation auf lokale Meshpanels; Oberflaechenrauheit nicht modelliert");
+    if (panels.empty()) {
+        result.zustand = Datenzustand::null;
+        return result;
+    }
+    const auto omega_welt = pose.modellvektor_nach_welt(omega);
+    const auto cg_welt = pose.modellpunkt_nach_welt(modell.schwerpunkt_m);
+    Vektor3 total_force{}, total_moment{}, application_point{};
+    double point_weight = 0.;
+    double min_re = std::numeric_limits<double>::infinity(), max_re = 0.;
+    double min_cf = std::numeric_limits<double>::infinity(), max_cf = 0.;
+    for (const auto& panel : panels) {
+        const auto relative = lokale_relativgeschwindigkeit(panel.punkt_welt, cg_welt,
+            velocity, omega_welt, config.fluidgeschwindigkeit_welt_m_s);
+        const double normal_speed = dot(relative, panel.normale_welt);
+        const auto tangent = plus(relative, mal(panel.normale_welt, -normal_speed));
+        const double speed = std::sqrt(dot(tangent, tangent));
+        if (speed <= 1e-12) continue;
+        const double re = speed * std::sqrt(panel.flaeche_m2) / config.nu_m2_s;
+        if (!std::isfinite(re) || re > 1e9) {
+            result.zustand = Datenzustand::nicht_berechnet;
+            result.fehler_id = "CORE-HYD-0001";
+            return result;
+        }
+        const double cf = reibungsbeiwert(re);
+        min_re = std::min(min_re, re);
+        max_re = std::max(max_re, re);
+        min_cf = std::min(min_cf, cf);
+        max_cf = std::max(max_cf, cf);
+        const auto force_welt = mal(tangent, .5 * config.rho_kg_m3 * cf * panel.flaeche_m2 * speed);
+        const auto point_model = pose.weltpunkt_nach_modell(panel.punkt_welt);
+        const auto force_model = pose.weltvektor_nach_modell(force_welt);
+        total_force = plus(total_force, force_welt);
+        total_moment = plus(total_moment, moment_um(point_model, modell.schwerpunkt_m, force_model));
+        application_point = plus(application_point, mal(point_model, std::sqrt(dot(force_welt, force_welt))));
+        point_weight += std::sqrt(dot(force_welt, force_welt));
+    }
+    if (point_weight <= 0.) {
+        result.zustand = Datenzustand::null;
+        return result;
+    }
+    result.punkt_m = mal(application_point, 1. / point_weight);
+    result.vektor = pose.weltvektor_nach_modell(total_force);
+    result.moment_s_nm = total_moment;
+    verwendeten_parameter(result, "reynolds_zahl_min", min_re, "1", "abgeleitet",
+        "Aus lokaler Panelanstroemung berechnet", "0 < Re <= 1e9",
+        "Schaetzung der Panel-Langenskala durch Quadratwurzel der Panel-Flaeche");
+    verwendeten_parameter(result, "reynolds_zahl_max", max_re, "1", "abgeleitet",
+        "Aus lokaler Panelanstroemung berechnet", "0 < Re <= 1e9",
+        "Schaetzung der Panel-Langenskala durch Quadratwurzel der Panel-Flaeche");
+    verwendeten_parameter(result, "reibungsbeiwert_min", min_cf, "1", "abgeleitet",
+        "ITTC-1957 plus laminare Plattennaeherung", "0 < Re <= 1e9",
+        "Nicht fuer Rumpfrauheit oder lokale Ablösung kalibriert");
+    verwendeten_parameter(result, "reibungsbeiwert_max", max_cf, "1", "abgeleitet",
+        "ITTC-1957 plus laminare Plattennaeherung", "0 < Re <= 1e9",
+        "Nicht fuer Rumpfrauheit oder lokale Ablösung kalibriert");
+    result.zustand = Datenzustand::gueltig;
+    return result;
+}
+
+Beitrag druckbeitrag(const Element& element, const Modell& modell, const Pose& pose,
+    const HydrodynamikKonfiguration& config, const Vektor3& velocity,
+    const Vektor3& omega, const std::vector<Nasspanel>& panels)
+{
+    const auto* model = kraftmodell(element, "druckwiderstand");
+    const auto method = model ? model->methode : "geschaetzter_normaler_formwiderstand";
+    if (method != "geschaetzter_normaler_formwiderstand" && method != "platten_normal_drag")
+        throw std::invalid_argument("CORE-HYD-0001: Unbekannte Druckwiderstands-Methode '" + method + "'");
+    const double cd = parameterwert(model, "cd", 1.0);
+    if (!std::isfinite(cd) || cd < 0.)
+        throw std::invalid_argument("CORE-HYD-0001: Druckwiderstands-Cd muss endlich und nichtnegativ sein.");
+    auto result = basisbeitrag(element, "druck");
+    provenance(result, model, method,
+        "Geschaetzt: Cd=1.0 fuer den lokalen stumpfen Normalanteil",
+        "Richtungsabhaengige Panelnaeherung; Cd ist nicht fuer die konkrete Rumpfform kalibriert");
+    verwendeten_parameter(result, "cd", cd, "1",
+        model && model->parameter.count("cd") ? model->parameter.at("cd").status : "geschaetzt",
+        model && model->parameter.count("cd") ? model->parameter.at("cd").quelle :
+            "Annahme: Cd=1.0 fuer stumpfen Normalanteil",
+        model && model->parameter.count("cd") ? model->parameter.at("cd").gueltigkeit :
+            "Untergetauchte Rumpfpanels ohne Wellenwiderstand",
+        model && model->parameter.count("cd") ? model->parameter.at("cd").unsicherheit :
+            "Nicht fuer die konkrete Rumpfform kalibriert");
+    if (panels.empty() || cd == 0.) {
+        result.zustand = Datenzustand::null;
+        return result;
+    }
+    const auto omega_welt = pose.modellvektor_nach_welt(omega);
+    const auto cg_welt = pose.modellpunkt_nach_welt(modell.schwerpunkt_m);
+    Vektor3 total_force{}, total_moment{}, application_point{};
+    double point_weight = 0.;
+    for (const auto& panel : panels) {
+        const auto relative = lokale_relativgeschwindigkeit(panel.punkt_welt, cg_welt,
+            velocity, omega_welt, config.fluidgeschwindigkeit_welt_m_s);
+        const double normal_speed = dot(relative, panel.normale_welt);
+        if (normal_speed >= 0.) continue;
+        const auto force_welt = mal(panel.normale_welt,
+            .5 * config.rho_kg_m3 * cd * panel.flaeche_m2 * normal_speed * std::abs(normal_speed));
+        const auto point_model = pose.weltpunkt_nach_modell(panel.punkt_welt);
+        const auto force_model = pose.weltvektor_nach_modell(force_welt);
+        const double magnitude = std::sqrt(dot(force_welt, force_welt));
+        total_force = plus(total_force, force_welt);
+        total_moment = plus(total_moment, moment_um(point_model, modell.schwerpunkt_m, force_model));
+        application_point = plus(application_point, mal(point_model, magnitude));
+        point_weight += magnitude;
+    }
+    if (point_weight <= 0.) {
+        result.zustand = Datenzustand::null;
+        return result;
+    }
+    result.punkt_m = mal(application_point, 1. / point_weight);
+    result.vektor = pose.weltvektor_nach_modell(total_force);
+    result.moment_s_nm = total_moment;
+    result.zustand = Datenzustand::gueltig;
+    return result;
+}
+
+Beitrag seitenkraftbeitrag(const Element& element, const Modell& modell, const Pose& pose,
+    const HydrodynamikKonfiguration& config, const Vektor3& velocity,
+    const Vektor3& omega, const std::vector<Nasspanel>& panels,
+    const std::vector<Bewegungsstellung>& bewegungsstellungen)
+{
+    const auto* model = kraftmodell(element, "seitenkraft");
+    const auto method = model ? model->methode : "geschaetzte_endliche_streckungspolare";
+    if (method != "geschaetzte_endliche_streckungspolare" && method != "polare_2d")
+        throw std::invalid_argument("CORE-HYD-0001: Unbekannte Seitenkraft-Methode '" + method + "'");
+    if (model && method == "polare_2d" && model->kennfeld.empty())
+        throw std::invalid_argument("CORE-HYD-0001: polare_2d benoetigt ein Kennfeld.");
+    if (model && !model->kennfeld.empty() && model->widerstandsanteile.empty())
+        throw std::invalid_argument("CORE-HYD-0001: Kennfeld benoetigt explizite Widerstandsanteile.");
+    auto result = basisbeitrag(element, "seitenkraft");
+    provenance(result, model, method,
+        "Geschaetzt: endliche Fluegelstreckung nach a=2*pi*AR/(AR+2)",
+        "Lineares Auftriebsmodell mit begrenztem Cl; Profil-, Abloese- und Rumpfinteraktionen nicht modelliert");
+    if (panels.empty()) {
+        result.zustand = Datenzustand::null;
+        return result;
+    }
+    const auto omega_welt = pose.modellvektor_nach_welt(omega);
+    const auto cg_welt = pose.modellpunkt_nach_welt(modell.schwerpunkt_m);
+    double low_x = std::numeric_limits<double>::infinity();
+    double high_x = -low_x, low_y = low_x, high_y = -low_x, low_z = low_x, high_z = -low_x;
+    // Profilabmessungen stets am unverstellten Mesh bestimmen, sonst wird ein
+    // gedrehtes Ruder als dicker Koerper und damit als Nicht-Tragflaeche eingestuft.
+    const Mesh* reference_mesh = element.volumen ? &*element.volumen : nullptr;
+    for (const auto& candidate : modell.elemente)
+        if (candidate.id == element.id && candidate.volumen) reference_mesh = &*candidate.volumen;
+    if (!reference_mesh)
+        throw std::invalid_argument("CORE-HYD-0001: Seitenkraft ohne physisches Volumenmesh: " + element.id);
+    for (const auto& point : reference_mesh->punkte) {
+        low_x = std::min(low_x, point[0]); high_x = std::max(high_x, point[0]);
+        low_y = std::min(low_y, point[1]); high_y = std::max(high_y, point[1]);
+        low_z = std::min(low_z, point[2]); high_z = std::max(high_z, point[2]);
+    }
+    const double span = high_z - low_z;
+    const double thickness_ratio = (high_y - low_y) / std::max(high_x - low_x, high_z - low_z);
+    auto chord_axis = Vektor3{1., 0., 0.};
+    auto span_axis = Vektor3{0., 0., 1.};
+    if (const auto* owner = bewegungseigentuemer(modell, element.id)) {
+        const double setting = bewegungswert(*owner, bewegungsstellungen);
+        chord_axis = einheitsvektor(bewegungsvektor(chord_axis, *owner, setting));
+        span_axis = einheitsvektor(bewegungsvektor(span_axis, *owner, setting));
+    }
+    const auto lift_axis_model = einheitsvektor(cross(span_axis, chord_axis));
+    const auto lift_axis_world = pose.modellvektor_nach_welt(lift_axis_model);
+    double planform_area = 0.;
+    for (const auto& panel : panels) {
+        const auto normal_model = pose.weltvektor_nach_modell(panel.normale_welt);
+        planform_area += .5 * panel.flaeche_m2 * std::abs(dot(normal_model, lift_axis_model));
+    }
+    if (planform_area <= 1e-12 || span <= 1e-12 || thickness_ratio > .35) {
+        result.zustand = Datenzustand::null;
+        result.modell_methode += ":geometrisch_als_nicht_tragflaeche_eingestuft";
+        return result;
+    }
+    const double aspect_ratio = parameterwert(model, "streckung", span * span / planform_area);
+    const double efficiency = parameterwert(model, "wirkungsgrad", .8);
+    const double cd0 = parameterwert(model, "cd0", .02);
+    const double cl_max = parameterwert(model, "cl_max", 1.0);
+    if (!std::isfinite(aspect_ratio) || aspect_ratio <= 0. ||
+        !std::isfinite(efficiency) || efficiency <= 0. || efficiency > 1. ||
+        !std::isfinite(cd0) || cd0 < 0. || !std::isfinite(cl_max) || cl_max <= 0.)
+        throw std::invalid_argument("CORE-HYD-0001: Ungueltige Seitenkraftparameter.");
+    verwendeten_parameter(result, "streckung", aspect_ratio, "1",
+        model && model->parameter.count("streckung") ?
+            model->parameter.at("streckung").status : "abgeleitet",
+        model && model->parameter.count("streckung") ?
+            model->parameter.at("streckung").quelle : "Aus physischem Mesh und benetzter Planform abgeleitet",
+        model && model->parameter.count("streckung") ?
+            model->parameter.at("streckung").gueltigkeit : "Geometrisch als Tragflaeche eingestufte Kiel-/Rudermeshes",
+        model && model->parameter.count("streckung") ?
+            model->parameter.at("streckung").unsicherheit : "Meshauflösung und benetzte Kontur beeinflussen den Wert");
+    verwendeten_parameter(result, "wirkungsgrad", efficiency, "1",
+        model && model->parameter.count("wirkungsgrad") ?
+            model->parameter.at("wirkungsgrad").status : "geschaetzt",
+        model && model->parameter.count("wirkungsgrad") ?
+            model->parameter.at("wirkungsgrad").quelle : "Annahme: Oswald-Wirkungsgrad 0.8",
+        model && model->parameter.count("wirkungsgrad") ?
+            model->parameter.at("wirkungsgrad").gueltigkeit : "Endliche Streckung; keine Interaktion",
+        model && model->parameter.count("wirkungsgrad") ?
+            model->parameter.at("wirkungsgrad").unsicherheit : "Nicht fuer konkrete Profile kalibriert");
+    verwendeten_parameter(result, "cd0", cd0, "1",
+        model && model->parameter.count("cd0") ?
+            model->parameter.at("cd0").status : "geschaetzt",
+        model && model->parameter.count("cd0") ?
+            model->parameter.at("cd0").quelle : "Annahme: Nullauftriebswiderstand 0.02",
+        model && model->parameter.count("cd0") ?
+            model->parameter.at("cd0").gueltigkeit : "Geschaetztes Profilmodell",
+        model && model->parameter.count("cd0") ?
+            model->parameter.at("cd0").unsicherheit : "Nicht fuer konkrete Profile kalibriert");
+    verwendeten_parameter(result, "cl_max", cl_max, "1",
+        model && model->parameter.count("cl_max") ?
+            model->parameter.at("cl_max").status : "geschaetzt",
+        model && model->parameter.count("cl_max") ?
+            model->parameter.at("cl_max").quelle : "Annahme: begrenzter Auftriebsbeiwert 1.0",
+        model && model->parameter.count("cl_max") ?
+            model->parameter.at("cl_max").gueltigkeit : "Keine explizite Ablösepolare vorhanden",
+        model && model->parameter.count("cl_max") ?
+            model->parameter.at("cl_max").unsicherheit : "Nicht fuer konkrete Profile kalibriert");
+    const double lift_slope = 2. * std::acos(-1.) * aspect_ratio / (aspect_ratio + 2.);
+    Vektor3 total_force{}, total_moment{}, application_point{};
+    double point_weight = 0.;
+    for (const auto& panel : panels) {
+        const auto relative = lokale_relativgeschwindigkeit(panel.punkt_welt, cg_welt,
+            velocity, omega_welt, config.fluidgeschwindigkeit_welt_m_s);
+        const auto relative_model = pose.weltvektor_nach_modell(relative);
+        const double speed = std::sqrt(dot(relative, relative));
+        if (speed <= 1e-12) continue;
+        const double normal_speed = dot(relative_model, lift_axis_model);
+        const double chord_speed = dot(relative_model, chord_axis);
+        const double alpha = std::atan2(std::abs(normal_speed),
+            std::max(std::abs(chord_speed), 1e-12));
+        const double cl = std::min(cl_max, lift_slope * alpha);
+        const double reynolds = speed * std::max(high_x - low_x, high_z - low_z) / config.nu_m2_s;
+        double cd = cd0;
+        if (model && !model->kennfeld.empty()) {
+            const double positive_alpha = alpha;
+            std::vector<double> alpha_axis, reynolds_axis;
+            for (const auto& point : model->kennfeld) {
+                alpha_axis.push_back(point.anstellwinkel_rad);
+                reynolds_axis.push_back(point.reynolds_zahl);
+            }
+            std::sort(alpha_axis.begin(), alpha_axis.end());
+            alpha_axis.erase(std::unique(alpha_axis.begin(), alpha_axis.end()), alpha_axis.end());
+            std::sort(reynolds_axis.begin(), reynolds_axis.end());
+            reynolds_axis.erase(std::unique(reynolds_axis.begin(), reynolds_axis.end()), reynolds_axis.end());
+            if (positive_alpha < alpha_axis.front() || positive_alpha > alpha_axis.back() ||
+                reynolds < reynolds_axis.front() || reynolds > reynolds_axis.back()) {
+                result.zustand = Datenzustand::nicht_berechnet;
+                result.fehler_id = "CORE-HYD-0001";
+                return result;
+            }
+            auto bracket = [](const std::vector<double>& axis, double value) {
+                auto upper = std::lower_bound(axis.begin(), axis.end(), value);
+                if (upper == axis.begin()) return std::pair<std::size_t, std::size_t>{0, 0};
+                if (upper == axis.end()) return std::pair<std::size_t, std::size_t>{axis.size()-1, axis.size()-1};
+                const auto hi = static_cast<std::size_t>(upper-axis.begin());
+                if (*upper == value) return std::pair<std::size_t, std::size_t>{hi, hi};
+                return std::pair<std::size_t, std::size_t>{hi-1, hi};
+            };
+            const auto [a0,a1] = bracket(alpha_axis, positive_alpha);
+            const auto [r0,r1] = bracket(reynolds_axis, reynolds);
+            auto value_at = [&](double a, double r, bool lift) {
+                const auto found = std::find_if(model->kennfeld.begin(), model->kennfeld.end(),
+                    [&](const auto& point) {return point.anstellwinkel_rad == a && point.reynolds_zahl == r;});
+                if (found == model->kennfeld.end())
+                    throw std::invalid_argument("CORE-HYD-0001: Kennfeld ist kein vollstaendiges Rechteck.");
+                return lift ? found->cl : found->cd;
+            };
+            auto interp = [&](bool lift) {
+                const double va0r0 = value_at(alpha_axis[a0], reynolds_axis[r0], lift);
+                const double va1r0 = value_at(alpha_axis[a1], reynolds_axis[r0], lift);
+                const double va0r1 = value_at(alpha_axis[a0], reynolds_axis[r1], lift);
+                const double va1r1 = value_at(alpha_axis[a1], reynolds_axis[r1], lift);
+                const double ta = a0 == a1 ? 0. : (positive_alpha-alpha_axis[a0])/(alpha_axis[a1]-alpha_axis[a0]);
+                const double tr = r0 == r1 ? 0. : (reynolds-reynolds_axis[r0])/(reynolds_axis[r1]-reynolds_axis[r0]);
+                const double low = va0r0*(1.-ta)+va1r0*ta;
+                const double high = va0r1*(1.-ta)+va1r1*ta;
+                return low*(1.-tr)+high*tr;
+            };
+            const double polar_cl = interp(true);
+            cd = interp(false);
+            if (polar_cl < 0. || cd < 0.)
+                throw std::invalid_argument("CORE-HYD-0001: Kennfeld-Cl und Cd muessen fuer den positiven Anstellwinkel nichtnegativ sein.");
+            const double induced_cd = hat_widerstandsanteil(model, "gesamt") ||
+                hat_widerstandsanteil(model, "induzierter") ? 0. :
+                polar_cl * polar_cl / (std::acos(-1.) * efficiency * aspect_ratio);
+            cd += induced_cd;
+            verwendeten_parameter(result, "kennfeld_cl", polar_cl, "1",
+                parameterstatus(model), model->quelle, model->gueltigkeit,
+                result.modell_unsicherheit);
+            verwendeten_parameter(result, "kennfeld_cd", cd, "1",
+                parameterstatus(model), model->quelle, model->gueltigkeit,
+                result.modell_unsicherheit);
+            const double side_sign = normal_speed < 0. ? -1. : 1.;
+            const double kennfeld_area = .5 * panel.flaeche_m2 *
+                std::abs(dot(pose.weltvektor_nach_modell(panel.normale_welt), lift_axis_model));
+            const double lift = .5 * config.rho_kg_m3 * speed * speed *
+                kennfeld_area * polar_cl * side_sign;
+            const double drag = .5 * config.rho_kg_m3 * speed * speed *
+                kennfeld_area * cd;
+            const auto force_welt = plus(mal(lift_axis_world, lift),
+                mal(relative, drag / speed));
+            const auto point_model = pose.weltpunkt_nach_modell(panel.punkt_welt);
+            const auto force_model = pose.weltvektor_nach_modell(force_welt);
+            const double magnitude = std::sqrt(dot(force_welt, force_welt));
+            total_force = plus(total_force, force_welt);
+            total_moment = plus(total_moment, moment_um(point_model, modell.schwerpunkt_m, force_model));
+            application_point = plus(application_point, mal(point_model, magnitude));
+            point_weight += magnitude;
+            continue;
+        }
+        const double side_sign = normal_speed < 0. ? -1. : 1.;
+        const double projected_area = .5 * panel.flaeche_m2 *
+            std::abs(dot(pose.weltvektor_nach_modell(panel.normale_welt), lift_axis_model));
+        const double dynamic = .5 * config.rho_kg_m3 * speed * speed * projected_area;
+        const double lift_attached = cl;
+        const double cd_attached = cd + cl * cl / (std::acos(-1.) * efficiency * aspect_ratio);
+        // Oberhalb des Ablösewinkels geht die Kraft in die Normalkraft einer
+        // angestroemten Platte (cn = cn_platte*sin(alpha)) ueber.
+        const double alpha_stall = std::min(cl_max / lift_slope, std::acos(-1.) / 4.);
+        const double blend_width = 10. * std::acos(-1.) / 180.;
+        const double t = std::clamp((alpha - alpha_stall) / blend_width, 0., 1.);
+        const double weight = t * t * (3. - 2. * t);
+        const double cn_plate = 1.1 + .018 * std::min(aspect_ratio, 10.);
+        const double cl_plate = cn_plate * std::sin(alpha) * std::cos(alpha);
+        const double cd_plate = cd + cn_plate * std::sin(alpha) * std::sin(alpha);
+        const double cl_total = lift_attached * (1. - weight) + cl_plate * weight;
+        const double cd_total = cd_attached * (1. - weight) + cd_plate * weight;
+        const double lift = dynamic * cl_total * side_sign;
+        const double drag = dynamic * cd_total;
+        const auto force_welt = plus(mal(lift_axis_world, lift), mal(relative, drag / speed));
+        const auto point_model = pose.weltpunkt_nach_modell(panel.punkt_welt);
+        const auto force_model = pose.weltvektor_nach_modell(force_welt);
+        const double magnitude = std::sqrt(dot(force_welt, force_welt));
+        total_force = plus(total_force, force_welt);
+        total_moment = plus(total_moment, moment_um(point_model, modell.schwerpunkt_m, force_model));
+        application_point = plus(application_point, mal(point_model, magnitude));
+        point_weight += magnitude;
+    }
+    if (point_weight <= 0.) {
+        result.zustand = Datenzustand::null;
+        return result;
+    }
+    result.punkt_m = mal(application_point, 1. / point_weight);
+    result.vektor = pose.weltvektor_nach_modell(total_force);
+    result.moment_s_nm = total_moment;
+    result.zustand = Datenzustand::gueltig;
+    return result;
 }
 }
 
@@ -354,8 +829,13 @@ Bilanz bilanz(const Modell& modell,std::vector<Beitrag>& beitraege,bool hydrodyn
     for (const auto& e : modell.elemente) {
         result.erwartete_beitraege.push_back(e.id+":gewicht");
         if (e.volumen) result.erwartete_beitraege.push_back(e.id+":auftrieb");
-        if (hydrodynamik_aktiv && e.hydrodynamik_rolle == HydrodynamikRolle::rumpf)
+        if (hydrodynamik_aktiv && e.hydrodynamik_rolle) {
             result.erwartete_beitraege.push_back(e.id+":hydrodynamik:reibung");
+            if (*e.hydrodynamik_rolle == HydrodynamikRolle::rumpf)
+                result.erwartete_beitraege.push_back(e.id+":hydrodynamik:druck");
+            else
+                result.erwartete_beitraege.push_back(e.id+":hydrodynamik:seitenkraft");
+        }
     }
     auto endlich=[](const Vektor3& v) {return std::isfinite(v[0])&&std::isfinite(v[1])&&std::isfinite(v[2]);};
     for (auto& b : beitraege) {
@@ -588,16 +1068,16 @@ Zustand hydrodynamik_start(const Modell& m,const Zustand& s,
     if(s.hydrodynamik || s.hydrodynamik_erforderlich || !std::isfinite(s.zeit_s))
         throw std::invalid_argument("CORE-HYD-0001: Hydrodynamikstart benoetigt einen gueltigen Zustand ohne Hydrokontext.");
     if(std::none_of(m.elemente.begin(),m.elemente.end(),[](const Element& e) {
-        return e.hydrodynamik_rolle == HydrodynamikRolle::rumpf;
+        return e.hydrodynamik_rolle.has_value();
     }))
-        throw std::invalid_argument("CORE-HYD-0001: Modell enthaelt kein Hydrodynamik-Rumpfelement.");
+        throw std::invalid_argument("CORE-HYD-0001: Modell enthaelt kein Hydrodynamik-Element.");
     auto context=std::make_shared<HydrodynamikKontext>();
     context->konfiguration=config;
     context->modell_fassung=m.fassung;
     context->auswertung_schritt=s.schritt;
     context->auswertung_zeit_s=s.zeit_s;
     kraefte(m,s.pose,s.testantrieb.get(),1000.,9.81,s.geflutet,context.get(),
-        s.geschwindigkeit_welt_m_s);
+        s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s);
     auto result=s;
     result.hydrodynamik=context;
     result.hydrodynamik_erforderlich=true;
@@ -606,7 +1086,8 @@ Zustand hydrodynamik_start(const Modell& m,const Zustand& s,
 
 Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
     double rho,double g,const std::vector<std::string>& geflutet,
-    const HydrodynamikKontext* hydro,const Vektor3& geschwindigkeit)
+    const HydrodynamikKontext* hydro,const Vektor3& geschwindigkeit,
+    const Vektor3& omega,const std::vector<Bewegungsstellung>& bewegungsstellungen)
 {
     auto k=hydrostatik(m,p,rho,g,geflutet);
     if(c) {
@@ -638,15 +1119,31 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
         hydrodynamikparameter(hydro->konfiguration);
         if(hydro->modell_fassung!=m.fassung)
             throw std::invalid_argument("CORE-HYD-0001: Falsche Hydrodynamik-Modellfassung.");
-        if(!endlich(geschwindigkeit))
-            throw std::invalid_argument("CORE-HYD-0001: Bootsgeschwindigkeit muss endlich sein.");
+        if(!endlich(geschwindigkeit) || !endlich(omega))
+            throw std::invalid_argument("CORE-HYD-0001: Lineare und Winkelgeschwindigkeit muessen endlich sein.");
         for(const auto& e:m.elemente) {
-            if(e.hydrodynamik_rolle != HydrodynamikRolle::rumpf) continue;
-            Vektor3 kraft_welt{};
-            auto b=rumpfreibung(e,m,p,hydro->konfiguration,geschwindigkeit,kraft_welt);
-            k.kraft_welt_n=plus(k.kraft_welt_n,kraft_welt);
-            k.moment_modell_nm=plus(k.moment_modell_nm,b.moment_s_nm);
-            k.beitraege.push_back(std::move(b));
+            if(!e.hydrodynamik_rolle) continue;
+            if(!e.volumen)
+                throw std::invalid_argument("CORE-HYD-0001: Hydrodynamikrolle ohne physisches Volumenmesh: " + e.id);
+            Element hydrodynamik_element=e;
+            if(const auto* eigentuemer=bewegungseigentuemer(m,e.id)) {
+                hydrodynamik_element.volumen=bewegtes_mesh(*e.volumen,*eigentuemer,
+                    bewegungswert(*eigentuemer,bewegungsstellungen));
+            }
+            const auto panels=nasspanels(*hydrodynamik_element.volumen,p);
+            auto add=[&](Beitrag b) {
+                if(b.zustand==Datenzustand::gueltig) {
+                    k.kraft_welt_n=plus(k.kraft_welt_n,p.modellvektor_nach_welt(b.vektor));
+                    k.moment_modell_nm=plus(k.moment_modell_nm,b.moment_s_nm);
+                }
+                k.beitraege.push_back(std::move(b));
+            };
+            add(reibungsbeitrag(hydrodynamik_element,m,p,hydro->konfiguration,geschwindigkeit,omega,panels));
+            if(*e.hydrodynamik_rolle==HydrodynamikRolle::rumpf)
+                add(druckbeitrag(hydrodynamik_element,m,p,hydro->konfiguration,geschwindigkeit,omega,panels));
+            else
+                add(seitenkraftbeitrag(hydrodynamik_element,m,p,hydro->konfiguration,
+                    geschwindigkeit,omega,panels,bewegungsstellungen));
         }
     }
     for(auto& sum:k.beitraege) if(sum.rolle==Rolle::gesamtsumme) {
@@ -655,12 +1152,34 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
     return k;
 }
 
+std::array<double,16> bewegungstransformation(const Modell& modell,
+    const std::string& element_id,const std::vector<Bewegungsstellung>& stellungen)
+{
+    const auto* eigentuemer=bewegungseigentuemer(modell,element_id);
+    if(!eigentuemer) return {1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.};
+    const double wert=bewegungswert(*eigentuemer,stellungen);
+    const Vektor3 ursprung=bewegungspunkt({},*eigentuemer,wert);
+    const auto x=plus(bewegungspunkt({1.,0.,0.},*eigentuemer,wert),mal(ursprung,-1.));
+    const auto y=plus(bewegungspunkt({0.,1.,0.},*eigentuemer,wert),mal(ursprung,-1.));
+    const auto z=plus(bewegungspunkt({0.,0.,1.},*eigentuemer,wert),mal(ursprung,-1.));
+    return {x[0],y[0],z[0],ursprung[0],
+        x[1],y[1],z[1],ursprung[1],
+        x[2],y[2],z[2],ursprung[2],
+        0.,0.,0.,1.};
+}
+
 Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,double rho,double g)
 {
     return dynamikschritt(modell,s,dt,std::vector<TestantriebEreignis>{},rho,g);
 }
 Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
     const std::vector<TestantriebEreignis>& ereignisse,double rho,double g)
+{
+    return dynamikschritt(modell,s,dt,ereignisse,std::vector<Bewegungsereignis>{},rho,g);
+}
+Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
+    const std::vector<TestantriebEreignis>& ereignisse,
+    const std::vector<Bewegungsereignis>& bewegungsereignisse,double rho,double g)
 {
     SEGEL_MESSUNG("dynamischer_zeitschritt");
     positiv(dt);
@@ -677,6 +1196,38 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         }
         context->uebergang=TestantriebUebergang{s.schritt,s.schritt+1,s.zeit_s,dt,ereignisse,{}};
     }
+    auto bewegungsstellungen=s.bewegungsstellungen;
+    for (const auto& element : modell.elemente) {
+        if (!element.bewegung) continue;
+        const auto fund=std::find_if(bewegungsstellungen.begin(),bewegungsstellungen.end(),
+            [&](const Bewegungsstellung& stellung) { return stellung.element_id==element.id; });
+        if (fund==bewegungsstellungen.end())
+            bewegungsstellungen.push_back({element.id,
+                element.bewegung->ruderwinkel?0.:100.});
+    }
+    auto wert_pruefen=[&](const std::string& id,double wert) {
+        const auto fund=std::find_if(modell.elemente.begin(),modell.elemente.end(),
+            [&](const Element& element) { return element.id==id; });
+        if(fund==modell.elemente.end() || !fund->bewegung)
+            throw std::invalid_argument("CORE-MOD-0002: Element ohne Bewegungsdefinition: "+id);
+        const double minimum=fund->bewegung->ruderwinkel?-90.:0.;
+        const double maximum=fund->bewegung->ruderwinkel?90.:100.;
+        if(!std::isfinite(wert)||wert<minimum||wert>maximum)
+            throw std::invalid_argument("CORE-MOD-0002: Bewegungsstellung ausserhalb des zulaessigen Bereichs: "+id);
+    };
+    for(const auto& stellung:bewegungsstellungen) wert_pruefen(stellung.element_id,stellung.wert);
+    auto letzte_bewegungskennung=s.letzte_bewegungsereigniskennung;
+    for(const auto& ereignis:bewegungsereignisse) {
+        if(ereignis.kennung<=letzte_bewegungskennung)
+            throw std::invalid_argument("CORE-SIM-0001: Bewegungsereigniskennungen nicht streng aufsteigend.");
+        letzte_bewegungskennung=ereignis.kennung;
+        wert_pruefen(ereignis.element_id,ereignis.wert);
+        const auto fund=std::find_if(bewegungsstellungen.begin(),bewegungsstellungen.end(),
+            [&](const Bewegungsstellung& stellung) { return stellung.element_id==ereignis.element_id; });
+        if(fund==bewegungsstellungen.end())
+            throw std::invalid_argument("CORE-MOD-0002: Fehlende Bewegungsstellung: "+ereignis.element_id);
+        fund->wert=ereignis.wert;
+    }
     std::shared_ptr<HydrodynamikKontext> hydro_context;
     if(s.hydrodynamik)
         hydro_context=std::make_shared<HydrodynamikKontext>(*s.hydrodynamik);
@@ -692,7 +1243,7 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         throw std::invalid_argument("CORE-SIM-0002: Dynamiktraegheit nicht positiv definit.");
     const auto geflutet=flutung(modell,s.pose,s.geflutet);
     const auto k=kraefte(modell,s.pose,context.get(),rho,g,geflutet,
-        hydro_context.get(),s.geschwindigkeit_welt_m_s);
+        hydro_context.get(),s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s,bewegungsstellungen);
     const auto a=mal(k.kraft_welt_n,1./modell.masse_kg);
     Vektor3 impuls{};
     for (std::size_t i=0;i<3;++i)
@@ -714,7 +1265,7 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
     const Pose midpose{plus(midcg,mal(midrotation.modellvektor_nach_welt(modell.schwerpunkt_m),-1.)),midq};
     const auto midvelocity=plus(s.geschwindigkeit_welt_m_s,mal(a,dt/2));
     const auto midforce=kraefte(modell,midpose,context.get(),rho,g,geflutet,
-        hydro_context.get(),midvelocity);
+        hydro_context.get(),midvelocity,omega_mid,bewegungsstellungen);
     Vektor3 midimpuls{};
     for(std::size_t i=0;i<3;++i)
         for(std::size_t j=0;j<3;++j) midimpuls[i]+=I[3*i+j]*omega_mid[j];
@@ -729,13 +1280,17 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
     result.omega_modell_rad_s=plus(s.omega_modell_rad_s,mal(midalpha,dt));
     result.zeit_s=s.zeit_s+dt;result.schritt=s.schritt+1;
     result.geflutet=flutung(modell,result.pose,geflutet);
+    result.bewegungsstellungen=std::move(bewegungsstellungen);
+    result.letzte_bewegungsereigniskennung=letzte_bewegungskennung;
+    result.bewegungsuebergang=BewegungsUebergang{
+        s.schritt,s.schritt+1,s.zeit_s,dt,bewegungsereignisse};
     if(hydro_context) {
         hydro_context->auswertung_schritt=result.schritt;
         hydro_context->auswertung_zeit_s=result.zeit_s;
         result.hydrodynamik=hydro_context;
         result.hydrodynamik_erforderlich=true;
         kraefte(modell,result.pose,context.get(),rho,g,result.geflutet,
-            hydro_context.get(),result.geschwindigkeit_welt_m_s);
+            hydro_context.get(),result.geschwindigkeit_welt_m_s,result.omega_modell_rad_s);
     } else result.hydrodynamik_erforderlich=false;
     if(context) {
         auto& b=context->uebergang->begrenzung;

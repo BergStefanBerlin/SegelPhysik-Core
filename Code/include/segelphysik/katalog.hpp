@@ -61,6 +61,7 @@ struct StrukturElement {
     std::string name;
     bool darstellung = false;
     bool hydrostatik_volumen = false;
+    std::optional<Bewegungsdefinition> bewegung;
 };
 struct StrukturGruppe {
     std::string id;

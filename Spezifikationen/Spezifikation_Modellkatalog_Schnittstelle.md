@@ -88,7 +88,7 @@ Reihenfolge; ein fehlerhaftes Modell und ein ID-Duplikat erscheinen als
 
 | Aufruf | Liefert |
 |---|---|
-| `modellstruktur(modell_id)` | Gruppen und Elemente mit IDs und Namen, Gesamtmasse, Hüllquader im Modellbezug |
+| `modellstruktur(modell_id)` | Gruppen und Elemente mit IDs und Namen, optionalen Bewegungsdefinitionen, Gesamtmasse, Hüllquader im Modellbezug |
 | `darstellungsgeometrie(modell_id[, element_id])` | Je Element Eckpunkte und Dreiecke im Modellbezug in Metern, Farbe sofern im Modell angegeben, Herkunft `darstellung` oder `volumen_ersatz` |
 | `modelldiagnose(modell_id)` | Diagnosen mit Fehler-ID, Text und Fundstelle |
 
@@ -99,6 +99,12 @@ Darstellungsgeometrie hat keinen Einfluss auf die Physik (A-C-00017).
 Die Daten stehen als C++-Strukturen für die Desktop-GUI und als
 JSON-Serialisierung für Web und Tests bereit; eine Binärform folgt erst bei
 gemessenem Bedarf.
+
+Für Modelle mit `Bewegung`-Definition liefert jedes Element den optionalen
+Katalogblock `bewegung` mit Bewegungsart und Bediensemantik. Drehungen
+liefern Achse und Drehpunkt; Hubdefinitionen liefern Richtung und den beim
+Core-Import abgeleiteten Hubweg. Die Modellstruktur bleibt damit die
+GUI-Quelle für passende Stellregler; sie enthält keine Darstellungspfade.
 
 **Abnahme:** Die Geometrie der Referenzmodelle stimmt mit der heutigen
 GUI-Darstellung überein (gleiche Eckpunkt- und Dreieckszahl, gleiche Lage).

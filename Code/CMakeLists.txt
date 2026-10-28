@@ -81,7 +81,15 @@ if(BUILD_TESTING)
     add_test(NAME hydrodynamik_referenzmodelle COMMAND hydrodynamik_tests
         "${SEGELPHYSIK_MODELLE_DIR}/optimist/modell.json"
         "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/folkeboot/modell.json")
+        "${SEGELPHYSIK_MODELLE_DIR}/folkeboot/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/bleistift/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/kegel/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/kugel/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/platte/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/pyramide/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/rolle/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/unregelmaessig/modell.json")
     add_executable(simulation_tests tests/simulation_tests.cpp)
     target_link_libraries(simulation_tests PRIVATE segelphysik_core)
     list(APPEND core_targets simulation_tests)

@@ -88,6 +88,37 @@ Bilanz-/Simulations-/CLI-Tests; reproduzierbare vierzeilige 420er-Aufzeichnung
 Testziels. Sie enthält unveränderten Start mit 6 m/s, aktive Begrenzung,
 Ausschalten und erneutes Einschalten. Keine grafische Abnahme.
 
+## C-0.8: Dynamische Ruder-/Schwertbewegung, Ergebnisversion 4
+
+Eine Elementdefinition kann optional `Bewegung` enthalten:
+`art: "drehen"` mit `achse_modell` und `drehpunkt_modell_m` oder
+`art: "heben"` mit `richtung_modell`. `mitbewegte_elemente` nennt
+zusätzliche Darstellungs-Elemente. Achsen werden beim Import normiert;
+Hubwege werden aus dem bewegten Netz und der unteren Rumpfreferenz
+abgeleitet. Unbewegliche Bestandsmodelle bleiben unverändert gültig.
+
+Für Modelle mit mindestens einer Bewegungsdefinition liefert
+`zustand_json` Ergebnisversion `"4"` und ergänzt:
+
+| Feld | Inhalt |
+|---|---|
+| `bewegungen` | Bestätigter Winkel in Grad für Ruderlagerung bzw. Stellwert in Prozent für Schwerter |
+| `letzte_bewegungsereigniskennung` | Zuletzt übernommene, streng aufsteigende Stellereigniskennung |
+| `bewegungsuebergang` | `null` am Laufstart, sonst Schritt, Zeit, `dt_s` und übernommene Stellereignisse |
+| `elementtransformationen_modell` | Pro Modellelement eine zeilenweise 4×4-Matrix, die lokale Modellpunkte für die Darstellung transformiert |
+
+Stellereignisse werden vor sämtlichen Kraftauswertungen des nächsten
+Zeitschritts übernommen. Der Core wendet sie auf alle Integratorstufen
+an. Die verstellten Volumennetze wirken ausschließlich auf
+Hydrodynamikbeiträge; Hydrostatik, Masse, Schwerpunkt und Trägheit
+verwenden unveränderte Modelldaten. Live- und Batchpfad teilen denselben
+Integrator und dasselbe Ereignismodell. Bei gleichzeitiger Nutzung des
+Testantriebs bleibt dessen Kontext optional in Version 4 enthalten.
+
+Version 4 ist für das Core- und GUI-Bewegungspaket C-0.8/G-0.7 bestimmt;
+das unterstützt weder Hub-Kiele noch Stellgeschwindigkeit,
+Betätigungskräfte oder Kollisionen.
+
 ## Status und Geltungsbereich
 
 ### Exakte V3-Form des Zusatzblocks (Schrittzustand)
@@ -281,7 +312,7 @@ Die folgenden Felder beschreiben den implementierten Vertrag.
 
 | Feld | Typ / Einheit / Bedeutung |
 |---|---|
-| `vertragsversion` | String `"2"` (seit C-0.2; Version 1 siehe unten) |
+| `vertragsversion` | String `"2"` (seit C-0.2), `"3"` mit Testantrieb oder `"4"` mit Bewegungsdaten |
 | `modell_id`, `modell_fassung` | Strings; Fassung ist ein FNV-1a-Inhaltsfingerprint des Imports, keine Sicherheitsprüfung |
 | `status`, `diagnose` | Strings; leere Diagnose bei regulärem Erfolg |
 | `zeit_s`, `schritt` | Simulationszeit in s, nicht negative laufende Ganzzahl |
@@ -426,7 +457,7 @@ Zustand. Die GUI wählt und überwacht den Ordner; der Core liest ihn.
 |---|---|
 | `modellkatalog(ordner)` | Katalog über `ordner/modell.json` und `ordner/*/modell.json`, sortiert nach Ordnername |
 | `katalog_json(kat)` | `katalogversion`, `modelle[]` mit `modell_id`, `name`, `beschreibung`, `modell_fassung`, `status` (`verwendbar`/`fehlerhaft`), `fehleranzahl` |
-| `modellstruktur(kat, id, fassung)` | Gruppen und Elemente (`darstellung`, `hydrostatik_volumen`), `gesamtmasse_kg`, `huellquader_m{min,max}` |
+| `modellstruktur(kat, id, fassung)` | Gruppen und Elemente (`darstellung`, `hydrostatik_volumen`, optional `bewegung`), `gesamtmasse_kg`, `huellquader_m{min,max}` |
 | `darstellungsgeometrie(kat, id, fassung[, element])` | `teile[]` mit `element_id`, `gruppe`, `herkunft` (`darstellung`/`volumen_ersatz`), `farbe_rgb`, `oberflaeche`, `punkte_m`, `dreiecke`; dazu `diagnosen` |
 | `modelldiagnose(kat, id, fassung)` | Diagnosen mit `fehler_id`, `text`, `fundstelle` |
 | `katalogmodell(kat, id, fassung)` | Geladenes `Modell` für Prüfung/Simulation |

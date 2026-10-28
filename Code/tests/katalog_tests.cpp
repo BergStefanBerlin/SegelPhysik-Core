@@ -115,7 +115,9 @@ void details(const fs::path& quelle, const fs::path& tmp)
         "Struktur falsch");
     pruefe(struktur.gesamtmasse_kg && *struktur.gesamtmasse_kg > 0. && struktur.huellquader_m, "Masse/Huelle fehlt");
     nur_felder(modellstruktur_json(struktur), {"katalogversion", "modell_id", "modell_fassung", "gruppen", "id",
-        "name", "elemente", "darstellung", "hydrostatik_volumen", "gesamtmasse_kg", "huellquader_m", "min", "max"},
+        "name", "elemente", "darstellung", "hydrostatik_volumen", "bewegung", "art",
+        "steuerung", "achse_modell", "drehpunkt_modell_m", "richtung_modell", "hubweg_m",
+        "mitbewegte_elemente", "gesamtmasse_kg", "huellquader_m", "min", "max"},
         ordner);
     const auto geometrie = darstellungsgeometrie(katalog, "quader", fassung);
     const auto erwartet = obj_zahlen(ordner / "q" / "meshes" / "gui" / "rumpf.obj");
