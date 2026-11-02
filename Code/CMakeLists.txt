@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(SegelPhysikCore LANGUAGES CXX)
 
 include(CTest)
+find_package(nlohmann_json CONFIG REQUIRED)
 set(SEGELPHYSIK_MODELLE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../Modelle"
     CACHE PATH "Model folder (sibling of the CORE and GUI checkouts)")
 option(SEGELPHYSIK_TEST_INSTRUMENTATION "Prepare instrumentation for explicit test runs" OFF)
@@ -46,9 +47,11 @@ endif()
 configure_file(src/fehlerkatalog.hpp.in generated/fehlerkatalog.hpp @ONLY)
 
 add_library(segelphysik_core STATIC src/core.cpp src/pose.cpp src/modell.cpp
-    src/hydrostatik.cpp src/hydrotraegheit.cpp src/messung.cpp src/simulation.cpp src/katalog.cpp)
+    src/hydrostatik.cpp src/hydrotraegheit.cpp src/messung.cpp src/simulation.cpp src/katalog.cpp
+    src/inspektion.cpp)
 target_include_directories(segelphysik_core PUBLIC include)
 target_include_directories(segelphysik_core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_link_libraries(segelphysik_core PUBLIC nlohmann_json::nlohmann_json)
 target_compile_features(segelphysik_core PUBLIC cxx_std_17)
 set_target_properties(segelphysik_core PROPERTIES CXX_EXTENSIONS OFF)
 if(SEGELPHYSIK_TEST_INSTRUMENTATION)
@@ -57,8 +60,10 @@ endif()
 
 add_executable(segelphysik_cli src/cli.cpp)
 target_link_libraries(segelphysik_cli PRIVATE segelphysik_core)
+add_executable(segelphysik_konvertieren src/konvertieren.cpp)
+target_link_libraries(segelphysik_konvertieren PRIVATE segelphysik_core)
 
-set(core_targets segelphysik_core segelphysik_cli)
+set(core_targets segelphysik_core segelphysik_cli segelphysik_konvertieren)
 if(BUILD_TESTING)
     add_executable(core_tests tests/core_tests.cpp)
     target_link_libraries(core_tests PRIVATE segelphysik_core)
@@ -106,6 +111,9 @@ if(BUILD_TESTING)
     add_executable(simulation_tests tests/simulation_tests.cpp)
     target_link_libraries(simulation_tests PRIVATE segelphysik_core)
     list(APPEND core_targets simulation_tests)
+    add_executable(stationaere_kurvenfahrt_tests tests/stationaere_kurvenfahrt_tests.cpp)
+    target_link_libraries(stationaere_kurvenfahrt_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets stationaere_kurvenfahrt_tests)
     add_executable(testantrieb_tests tests/testantrieb_tests.cpp)
     target_link_libraries(testantrieb_tests PRIVATE segelphysik_core)
     list(APPEND core_targets testantrieb_tests)
@@ -113,7 +121,12 @@ if(BUILD_TESTING)
         "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json"
         "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json")
     add_test(NAME simulation_gesamtlauf COMMAND simulation_tests
-        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json")
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/testdata/stationaere_referenz/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json")
+    add_test(NAME stationaere_kurvenfahrt COMMAND stationaere_kurvenfahrt_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/testdata/stationaere_kurvenreferenz/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json")
     add_executable(core_benchmark tests/benchmark.cpp)
     target_link_libraries(core_benchmark PRIVATE segelphysik_core)
     list(APPEND core_targets core_benchmark)
@@ -133,6 +146,16 @@ if(BUILD_TESTING)
     list(APPEND core_targets katalog_tests)
     add_test(NAME modellkatalog_schnittstelle COMMAND katalog_tests
         "${SEGELPHYSIK_MODELLE_DIR}")
+    add_executable(inspektion_tests tests/inspektion_tests.cpp)
+    target_link_libraries(inspektion_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets inspektion_tests)
+    add_test(NAME modellinspektion_c08 COMMAND inspektion_tests
+        "${SEGELPHYSIK_MODELLE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}")
+    add_executable(modell_v2_tests tests/modell_v2_tests.cpp)
+    target_link_libraries(modell_v2_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets modell_v2_tests)
+    add_test(NAME modell_geometrie_v2 COMMAND modell_v2_tests
+        "${SEGELPHYSIK_MODELLE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}")
     foreach(scenario help build_info error_catalog no_arguments invalid_argument extra_argument)
         add_test(NAME cli_${scenario}
             COMMAND "${CMAKE_COMMAND}"

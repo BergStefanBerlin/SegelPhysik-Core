@@ -1,5 +1,6 @@
 #include "segelphysik/modell.hpp"
 #include "segelphysik/messung.hpp"
+#include "modell_intern.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -61,6 +62,7 @@ std::string lesen(const std::filesystem::path& datei, const std::string& ort)
 struct Json {
     enum class Typ { null, boolesch, zahl, text, liste, objekt };
     Typ typ = Typ::null;
+    bool bool_wert{};
     double zahl = 0.;
     std::string text;
     std::vector<Json> liste;
@@ -237,7 +239,7 @@ private:
                 if (text_.compare(pos_, text.size(), text) != 0) ungueltig("Unbekannter JSON-Wert");
                 pos_ += text.size();
             };
-            if (text_[pos_] == 't') { literal("true"); wert.typ = Json::Typ::boolesch; }
+            if (text_[pos_] == 't') { literal("true"); wert.typ = Json::Typ::boolesch; wert.bool_wert = true; }
             else if (text_[pos_] == 'f') { literal("false"); wert.typ = Json::Typ::boolesch; }
             else if (text_[pos_] == 'n') literal("null");
             else ungueltig("Unbekannter JSON-Wert");
@@ -251,6 +253,34 @@ private:
         if (pos_ == start) ungueltig("Ziffer erwartet");
     }
 };
+
+nlohmann::json json_wert(const Json& wert, bool pfade_ausblenden = true)
+{
+    switch (wert.typ) {
+    case Json::Typ::null: return nullptr;
+    case Json::Typ::boolesch: return wert.bool_wert;
+    case Json::Typ::zahl:
+        if (std::trunc(wert.zahl) == wert.zahl &&
+            wert.zahl >= static_cast<double>(std::numeric_limits<std::int64_t>::min()) &&
+            wert.zahl < static_cast<double>(std::numeric_limits<std::int64_t>::max()))
+            return static_cast<std::int64_t>(wert.zahl);
+        return wert.zahl;
+    case Json::Typ::text:
+        return !pfade_ausblenden || wert.text.find_first_of("\\/") == std::string::npos
+            ? nlohmann::json(wert.text) : nlohmann::json("[Pfadreferenz ausgeblendet]");
+    case Json::Typ::liste: {
+        auto result = nlohmann::json::array();
+        for (const auto& element : wert.liste) result.push_back(json_wert(element, pfade_ausblenden));
+        return result;
+    }
+    case Json::Typ::objekt: {
+        auto result = nlohmann::json::object();
+        for (const auto& feld : wert.objekt) result[feld.first] = json_wert(feld.second, pfade_ausblenden);
+        return result;
+    }
+    }
+    return nullptr;
+}
 
 const Json* optional(const Json& wert, const std::string& feld)
 {
@@ -611,13 +641,21 @@ std::size_t obj_index(std::string_view token, std::size_t anzahl, const std::str
     fehler(6, ort, "OBJ-Index ausserhalb des gueltigen Bereichs");
 }
 
-Mesh obj_lesen(const std::filesystem::path& datei, const std::string& kontext, Fingerabdruck& fassung)
+Mesh obj_lesen(const std::filesystem::path& datei, const std::string& kontext, Fingerabdruck& fassung,
+              const std::optional<std::string>& auswahl = std::nullopt,
+              std::vector<QuellMesh>* objekte = nullptr, bool darstellung = false)
 {
     const std::string ort = kontext + ", Mesh " + datei.u8string();
     const auto inhalt = lesen(datei, ort);
     fassung.datei(inhalt);
     std::istringstream strom(inhalt);
     Mesh mesh;
+    struct Objekt {
+        std::set<std::size_t> punkte;
+        std::vector<std::array<std::size_t, 3>> dreiecke;
+    };
+    std::map<std::string, Objekt> teile;
+    std::string aktuell;
     std::string zeile;
     std::size_t nummer = 0, texturen = 0, normalen = 0;
     while (std::getline(strom, zeile)) {
@@ -628,13 +666,18 @@ Mesh obj_lesen(const std::filesystem::path& datei, const std::string& kontext, F
         tokens.imbue(std::locale::classic());
         std::string art, token;
         if (!(tokens >> art)) continue;
+        if (darstellung && (art == "vt" || art == "vn")) continue;
         if (art == "v" || art == "vt" || art == "vn") {
             std::vector<double> werte;
-            while (tokens >> token) werte.push_back(obj_zahl(token, stelle));
+            while ((!darstellung || werte.size() < 3) && (tokens >> token))
+                werte.push_back(obj_zahl(token, stelle));
             if ((art != "vt" && werte.size() != 3) ||
                 (art == "vt" && (werte.empty() || werte.size() > 3)))
                 fehler(6, stelle, "OBJ-Koordinatenzahl nicht unterstuetzt (v/vn: 3, vt: 1..3)");
-            if (art == "v") mesh.punkte.push_back({werte[0], werte[1], werte[2]});
+            if (art == "v") {
+                if (!aktuell.empty()) teile.at(aktuell).punkte.insert(mesh.punkte.size());
+                mesh.punkte.push_back({werte[0], werte[1], werte[2]});
+            }
             else if (art == "vt") ++texturen;
             else ++normalen;
         } else if (art == "f") {
@@ -642,7 +685,7 @@ Mesh obj_lesen(const std::filesystem::path& datei, const std::string& kontext, F
             while (tokens >> token) {
                 const std::size_t slash = token.find('/');
                 indizes.push_back(obj_index(std::string_view(token).substr(0, slash), mesh.punkte.size(), stelle));
-                if (slash != std::string::npos) {
+                if (slash != std::string::npos && !darstellung) {
                     const auto zweiter = token.find('/', slash + 1);
                     const auto uv = std::string_view(token).substr(slash + 1,
                         zweiter == std::string::npos ? zweiter : zweiter - slash - 1);
@@ -652,14 +695,48 @@ Mesh obj_lesen(const std::filesystem::path& datei, const std::string& kontext, F
                         obj_index(std::string_view(token).substr(zweiter + 1), normalen, stelle);
                 }
             }
-            if (indizes.size() != 3)
+            if (indizes.size() < 3 || (!darstellung && indizes.size() != 3))
                 fehler(6, stelle, "Nur OBJ-Dreiecke erlaubt; Polygone vorher explizit triangulieren");
-            mesh.dreiecke.push_back({indizes[0], indizes[1], indizes[2]});
+            for (std::size_t i = 1; i + 1 < indizes.size(); ++i) {
+                const std::array<std::size_t, 3> dreieck{indizes[0], indizes[i], indizes[i+1]};
+                mesh.dreiecke.push_back(dreieck);
+                if (!aktuell.empty()) {
+                    auto& teil = teile.at(aktuell);
+                    teil.dreiecke.push_back(dreieck);
+                    teil.punkte.insert(dreieck.begin(), dreieck.end());
+                } else if (objekte || auswahl) fehler(6, stelle, "Flaeche ohne explizites o-Objekt");
+            }
+        } else if (art == "o" && (objekte || auswahl)) {
+            std::string extra;
+            if (!(tokens >> aktuell) || (tokens >> extra))
+                fehler(6, stelle, "Genau eine nichtleere o-Mesh-ID erwartet");
+            if (!teile.emplace(aktuell, Objekt{}).second)
+                fehler(6, stelle, "Mesh-ID mehrfach vergeben: " + aktuell);
         } else if (art != "o" && art != "g" && art != "s" && art != "usemtl" && art != "mtllib") {
-            fehler(6, stelle, "Nicht unterstuetzter OBJ-Datensatz: " + art);
+            if (!darstellung) fehler(6, stelle, "Nicht unterstuetzter OBJ-Datensatz: " + art);
         }
     }
     if (mesh.punkte.empty() || mesh.dreiecke.empty()) fehler(6, ort, "Leeres Mesh");
+    if (auswahl || objekte) {
+        std::optional<Mesh> gewaehlt;
+        for (const auto& [id, teil] : teile) {
+            if (teil.dreiecke.empty()) fehler(6, ort, "Leeres o-Mesh: " + id);
+            Mesh lokal;
+            std::map<std::size_t, std::size_t> indizes;
+            for (const auto index : teil.punkte) {
+                indizes[index] = lokal.punkte.size();
+                lokal.punkte.push_back(mesh.punkte[index]);
+            }
+            for (const auto& t : teil.dreiecke)
+                lokal.dreiecke.push_back({indizes.at(t[0]), indizes.at(t[1]), indizes.at(t[2])});
+            if (auswahl && id == *auswahl) gewaehlt = lokal;
+            if (objekte) objekte->push_back({id, "OBJ.o:" + id, std::move(lokal)});
+        }
+        if (auswahl) {
+            if (!gewaehlt) fehler(6, ort, "Mesh-ID fehlt: " + *auswahl);
+            return std::move(*gewaehlt);
+        }
+    }
     return mesh;
 }
 
@@ -1019,11 +1096,165 @@ void masseneigenschaften(Element& e, const Mesh& mesh, bool solid, L dichte,
     }
 }
 
+Mesh kompakt(const Mesh& mesh)
+{
+    Mesh result;
+    std::map<std::size_t, std::size_t> indices;
+    for (const auto& face : mesh.dreiecke) {
+        std::array<std::size_t, 3> output{};
+        for (std::size_t i = 0; i < 3; ++i) {
+            const auto entry = indices.emplace(face[i], result.punkte.size());
+            if (entry.second) result.punkte.push_back(mesh.punkte.at(face[i]));
+            output[i] = entry.first->second;
+        }
+        result.dreiecke.push_back(output);
+    }
+    return result;
+}
+
+Mesh geometrie_ableiten(const Mesh& source, const Json& definition, const std::string& ort)
+{
+    objekt(definition, {"art", "z_m", "steigung_x", "steigung_y"}, ort, 9);
+    const auto art = text(pflicht(definition, "art", ort, 9), ort, 9);
+    const auto& height = pflicht(definition, "z_m", ort, 9);
+    if (height.typ != Json::Typ::zahl || !std::isfinite(height.zahl))
+        fehler(9, ort, "Endliche Schnitthoehe z_m erforderlich");
+    const double z = height.zahl;
+    const auto slope = [&](const char* field) {
+        const auto* value = optional(definition, field);
+        if (!value) return 0.;
+        if (value->typ != Json::Typ::zahl || !std::isfinite(value->zahl))
+            fehler(9, ort, "Endliche Ebenensteigung erforderlich");
+        return value->zahl;
+    };
+    const double sx = slope("steigung_x"), sy = slope("steigung_y");
+    const auto distance = [&](const Vektor3& p) { return p[2]-z-sx*p[0]-sy*p[1]; };
+    const auto bounds = box(source);
+    const double epsilon = 1e-9 * static_cast<double>(
+        std::max<L>(1., bounds.oben[2] - bounds.unten[2]));
+    Mesh result;
+    result.punkte = source.punkte;
+    if (art == "ohne_deckflaeche") {
+        if (sx != 0. || sy != 0.) fehler(9, ort, "Deckflaechen muessen horizontal sein");
+        for (const auto& face : source.dreiecke)
+            if (!std::all_of(face.begin(), face.end(), [&](std::size_t i) {
+                return std::abs(source.punkte[i][2] - z) <= epsilon;
+            })) result.dreiecke.push_back(face);
+        if (result.dreiecke.empty() || result.dreiecke.size() == source.dreiecke.size())
+            fehler(9, ort, "Deckflaechenauswahl entfernt keine oder alle Flaechen");
+        return kompakt(result);
+    }
+    if (art != "z_schnitt") fehler(9, ort, "Unbekannte Geometrieableitung: " + art);
+    validieren(source, true, ort + ".quelle");
+    if (std::none_of(source.punkte.begin(), source.punkte.end(),
+            [&](const Vektor3& p) { return distance(p) < -epsilon; }) ||
+        std::none_of(source.punkte.begin(), source.punkte.end(),
+            [&](const Vektor3& p) { return distance(p) > epsilon; }))
+        fehler(9, ort, "Schnittebene muss das Quellvolumen tatsaechlich teilen");
+    std::map<std::pair<std::size_t, std::size_t>, std::size_t> intersections;
+    const auto intersection = [&](std::size_t a, std::size_t b) {
+        if (std::abs(distance(source.punkte[a])) <= epsilon) return a;
+        if (std::abs(distance(source.punkte[b])) <= epsilon) return b;
+        const auto key = std::minmax(a, b);
+        const auto found = intersections.find(key);
+        if (found != intersections.end()) return found->second;
+        const auto& p = source.punkte[key.first];
+        const auto& q = source.punkte[key.second];
+        const double t = distance(p) / (distance(p) - distance(q));
+        const auto index = result.punkte.size();
+        Vektor3 point{p[0] + t*(q[0]-p[0]), p[1] + t*(q[1]-p[1]), 0.};
+        point[2] = z + sx*point[0] + sy*point[1];
+        result.punkte.push_back(point);
+        intersections.emplace(key, index);
+        return index;
+    };
+    for (std::size_t i = 0; i < source.punkte.size(); ++i)
+        if (std::abs(distance(source.punkte[i])) <= epsilon)
+            result.punkte[i][2] = z + sx*source.punkte[i][0] + sy*source.punkte[i][1];
+    for (const auto& face : source.dreiecke) {
+        std::vector<std::size_t> polygon;
+        for (std::size_t i = 0; i < 3; ++i) {
+            const auto a = face[i], b = face[(i+1)%3];
+            const bool inside_a = distance(source.punkte[a]) <= epsilon;
+            const bool inside_b = distance(source.punkte[b]) <= epsilon;
+            if (inside_a) polygon.push_back(a);
+            if (inside_a != inside_b) polygon.push_back(intersection(a, b));
+        }
+        polygon.erase(std::unique(polygon.begin(), polygon.end()), polygon.end());
+        if (polygon.size() > 1 && polygon.front() == polygon.back()) polygon.pop_back();
+        for (std::size_t i = 1; i+1 < polygon.size(); ++i)
+            result.dreiecke.push_back({polygon[0], polygon[i], polygon[i+1]});
+    }
+    struct Edge { std::size_t a{}, b{}, count{}; };
+    std::map<std::pair<std::size_t, std::size_t>, Edge> edges;
+    for (const auto& face : result.dreiecke)
+        for (std::size_t i = 0; i < 3; ++i) {
+            const auto a = face[i], b = face[(i+1)%3];
+            auto& edge = edges[std::minmax(a, b)];
+            edge.a = a; edge.b = b; ++edge.count;
+        }
+    std::map<std::size_t, std::size_t> next;
+    for (const auto& [key, edge] : edges) if (edge.count == 1) {
+        if (std::abs(distance(result.punkte[edge.a])) > epsilon ||
+            std::abs(distance(result.punkte[edge.b])) > epsilon ||
+            !next.emplace(edge.b, edge.a).second)
+            fehler(9, ort, "Schnittrand ist kein eindeutiger ebener Ring");
+    }
+    if (next.empty()) fehler(9, ort, "Kein Schnittrand vorhanden");
+    std::vector<std::size_t> ring;
+    auto current = next.begin()->first;
+    const auto start = current;
+    do {
+        ring.push_back(current);
+        const auto found = next.find(current);
+        if (found == next.end()) fehler(9, ort, "Offener Schnittrand");
+        current = found->second;
+        next.erase(found);
+    } while (current != start);
+    if (!next.empty()) fehler(9, ort, "Mehrere Schnittringe oder Loecher nicht unterstuetzt");
+    const auto cross2 = [&](std::size_t a, std::size_t b, std::size_t c) {
+        const auto& p = result.punkte[a];
+        const auto& q = result.punkte[b];
+        const auto& r = result.punkte[c];
+        return (q[0]-p[0])*(r[1]-p[1]) - (q[1]-p[1])*(r[0]-p[0]);
+    };
+    // Ear clipping retains boundary vertices, including collinear intersections.
+    while (ring.size() > 3) {
+        bool clipped = false;
+        for (std::size_t i = 0; i < ring.size(); ++i) {
+            const auto a = ring[(i+ring.size()-1)%ring.size()];
+            const auto b = ring[i], c = ring[(i+1)%ring.size()];
+            if (cross2(a,b,c) <= epsilon*epsilon) continue;
+            bool contains = false;
+            for (const auto p : ring)
+                if (p != a && p != b && p != c &&
+                    cross2(a,b,p) >= -epsilon*epsilon &&
+                    cross2(b,c,p) >= -epsilon*epsilon &&
+                    cross2(c,a,p) >= -epsilon*epsilon) { contains = true; break; }
+            if (contains) continue;
+            result.dreiecke.push_back({a,b,c});
+            ring.erase(ring.begin() + static_cast<std::ptrdiff_t>(i));
+            clipped = true;
+            break;
+        }
+        if (!clipped) fehler(9, ort, "Schnittdeckel nicht eindeutig triangulierbar");
+    }
+    if (ring.size() != 3 || cross2(ring[0],ring[1],ring[2]) <= epsilon*epsilon)
+        fehler(9, ort, "Ungueltiger Schnittdeckel");
+    result.dreiecke.push_back({ring[0],ring[1],ring[2]});
+    result = kompakt(result);
+    validieren(result, true, ort + ".ergebnis");
+    return result;
+}
+
 void masse_lesen(Element& e, const Json& masse, const std::filesystem::path& basis,
-                 const std::string& ort, Fingerabdruck& fassung)
+                 const std::string& ort, Fingerabdruck& fassung,
+                 const std::map<std::string, Mesh>* quellen = nullptr,
+                 bool ableitungen = false)
 {
     if (masse.typ != Json::Typ::objekt) fehler(4, ort, "Massenobjekt erwartet");
     const auto art = text(pflicht(masse, "art", ort, 4), ort, 4);
+    e.massenart = art;
     if (art == "punktmasse") {
         objekt(masse, {"art", "masse_kg", "position_m"}, ort, 4);
         e.masse_kg = zahl(pflicht(masse, "masse_kg", ort, 4), ort, true);
@@ -1034,15 +1265,44 @@ void masse_lesen(Element& e, const Json& masse, const std::filesystem::path& bas
         e.massenpunkte_m.push_back(e.schwerpunkt_m);
     } else if (art == "vollkoerper" || art == "schale") {
         const bool solid = art == "vollkoerper";
-        if (solid) objekt(masse, {"art", "dichte_kg_pro_m3", "datei"}, ort, 4);
-        else objekt(masse, {"art", "dichte_kg_pro_m3", "wanddicke_m", "datei"}, ort, 4);
-        L dichte = zahl(pflicht(masse, "dichte_kg_pro_m3", ort, 4), ort, true);
-        if (!solid) dichte *= zahl(pflicht(masse, "wanddicke_m", ort, 4), ort, true);
-        const auto datei = referenz(pflicht(masse, "datei", ort, 4), basis, ort, 4);
-        const auto mesh = obj_lesen(datei, ort + ".masse", fassung);
-        const std::string mesh_ort = ort + ".masse, Mesh " + datei.u8string();
+        if (solid) {
+            if (ableitungen) objekt(masse, {"art", "dichte_kg_pro_m3", "mesh", "ableitung"}, ort, 4);
+            else if (quellen) objekt(masse, {"art", "dichte_kg_pro_m3", "mesh"}, ort, 4);
+            else objekt(masse, {"art", "dichte_kg_pro_m3", "datei"}, ort, 4);
+        } else {
+            if (ableitungen) objekt(masse, {"art", "dichte_kg_pro_m3", "wanddicke_m", "mesh", "ableitung"}, ort, 4);
+            else if (quellen) objekt(masse, {"art", "dichte_kg_pro_m3", "wanddicke_m", "mesh"}, ort, 4);
+            else objekt(masse, {"art", "dichte_kg_pro_m3", "wanddicke_m", "datei"}, ort, 4);
+        }
+        const double materialdichte = zahl(pflicht(masse, "dichte_kg_pro_m3", ort, 4), ort, true);
+        e.dichte_kg_pro_m3 = materialdichte;
+        L dichte = materialdichte;
+        if (!solid) {
+            e.wanddicke_m = zahl(pflicht(masse, "wanddicke_m", ort, 4), ort, true);
+            dichte *= *e.wanddicke_m;
+        }
+        Mesh mesh;
+        std::string mesh_ort = ort + ".masse";
+        if (quellen) {
+            const auto id = text(pflicht(masse, "mesh", ort, 4), ort, 4);
+            const auto fund = quellen->find(id);
+            if (fund == quellen->end()) fehler(6, ort, "Mesh-ID fehlt: " + id);
+            mesh = fund->second;
+            mesh_ort += ", Mesh " + id;
+        } else {
+            const auto datei = referenz(pflicht(masse, "datei", ort, 4), basis, ort, 4);
+            mesh = obj_lesen(datei, ort + ".masse", fassung);
+            mesh_ort += ", Mesh " + datei.u8string();
+        }
+        if (ableitungen)
+            if (const auto* definition = optional(masse, "ableitung")) {
+                if (solid && text(pflicht(*definition, "art", ort, 9), ort, 9) == "ohne_deckflaeche")
+                    fehler(9, ort, "Offene Schalenableitung nicht fuer Vollkoerpermasse");
+                mesh = geometrie_ableiten(mesh, *definition, mesh_ort + ".ableitung");
+            }
         validieren(mesh, solid, mesh_ort);
         e.massenpunkte_m = mesh.punkte;
+        e.massen_mesh = mesh;
         masseneigenschaften(e, mesh, solid, dichte, mesh_ort);
         if (!solid) {
             std::map<std::pair<std::size_t, std::size_t>, int> kanten;
@@ -1089,18 +1349,46 @@ void summieren(Modell& modell, const std::string& ort)
 
 }
 
-Modell lade_modell(const std::filesystem::path& datei)
+namespace {
+
+Modell lade_modell_aus_json(const std::filesystem::path& datei, const Json& root,
+                            Fingerabdruck fassung,
+                            const std::map<std::string, Mesh>* vorbereitet = nullptr)
 {
     SEGEL_MESSUNG("modellvorbereitung");
     const std::string ort = datei.u8string();
-    const auto inhalt = lesen(datei, ort);
-    Fingerabdruck fassung;
-    fassung.datei(inhalt);
-    const auto root = Parser(inhalt, ort).lesen();
-    objekt(root, {"schema_version", "id", "name", "status", "entwurf", "gruppen",
-        "Hydrodynamische_Traegheit"}, ort);
-    if (text(pflicht(root, "schema_version", ort), ort) != "0.1-entwurf")
-        fehler(2, ort, "Unterstuetzte schema_version: 0.1-entwurf");
+    const auto version = text(pflicht(root, "schema_version", ort), ort);
+    const bool gemeinsames_obj = version == "2" || version == "3";
+    const bool einzelnnetz = version == "3";
+    if (gemeinsames_obj) objekt(root, {"schema_version", "id", "name", "status", "entwurf", "gruppen",
+        "Hydrodynamische_Traegheit", "geometrie"}, ort);
+    else {
+        objekt(root, {"schema_version", "id", "name", "status", "entwurf", "gruppen",
+            "Hydrodynamische_Traegheit"}, ort);
+        if (version != "0.1-entwurf")
+            fehler(2, ort, "Unterstuetzte schema_version: 0.1-entwurf, 2, 3");
+    }
+    std::map<std::string, Mesh> quellen;
+    if (gemeinsames_obj) {
+        const auto& geometrie = pflicht(root, "geometrie", ort);
+        objekt(geometrie, {"datei", "laengeneinheit"}, ort + ".geometrie");
+        if (text(pflicht(geometrie, "laengeneinheit", ort), ort) != "m")
+            fehler(2, ort, "geometrie.laengeneinheit muss m sein");
+        const auto pfad = referenz(pflicht(geometrie, "datei", ort), datei.parent_path(), ort);
+        if (pfad.extension() != ".obj") fehler(2, ort, "Eine OBJ-Datei erforderlich");
+        if (vorbereitet) quellen = *vorbereitet;
+        else {
+            std::vector<QuellMesh> teile;
+            obj_lesen(pfad, ort, fassung, std::nullopt, &teile);
+            for (auto& teil : teile) quellen.emplace(teil.id, std::move(teil.mesh));
+        }
+    }
+    auto quellmesh = [&](const Json& block, const std::string& stelle) -> Mesh {
+        const auto id = text(pflicht(block, "mesh", stelle), stelle);
+        const auto fund = quellen.find(id);
+        if (fund == quellen.end()) fehler(6, stelle, "Mesh-ID fehlt: " + id);
+        return fund->second;
+    };
     for (const auto* feld : {"name", "status"})
         if (const auto* wert = optional(root, feld)) text(*wert, ort + "." + feld);
     if (const auto* entwurf = optional(root, "entwurf"))
@@ -1133,6 +1421,8 @@ Modell lade_modell(const std::filesystem::path& datei)
     const auto& gruppen = pflicht(root, "gruppen", ort);
     if (gruppen.typ != Json::Typ::objekt) fehler(2, ort, "gruppen muss ein Objekt sein");
     std::set<std::string> ids;
+    std::set<std::string> verwendete_meshes;
+    std::map<std::string, std::string> mesh_eigentuemer;
     for (const auto& gruppe : gruppen.objekt) {
         const std::string gruppenort = ort + ", Gruppe " + gruppe.first;
         objekt(gruppe.second, {"elemente"}, gruppenort);
@@ -1150,10 +1440,25 @@ Modell lade_modell(const std::filesystem::path& datei)
             const auto* hydro = optional(element, "Hydrostatik");
             const auto* hydrodynamik = optional(element, "Hydrodynamik");
             const auto* bewegung = optional(element, "Bewegung");
+            std::vector<std::string> element_meshes;
+            const auto register_mesh = [&](const Json& block, const std::string& location) {
+                const auto mesh_id = text(pflicht(block, "mesh", location), location);
+                element_meshes.push_back(mesh_id);
+            };
             if (!darstellung && !hydro) fehler(2, elementort, "Darstellung und/oder Hydrostatik erforderlich");
             if (darstellung) {
-                objekt(*darstellung, {"datei", "farbe", "oberflaeche"}, elementort + ".Darstellung");
-                referenz(pflicht(*darstellung, "datei", elementort), datei.parent_path(), elementort);
+                if (gemeinsames_obj) {
+                    if (einzelnnetz) objekt(*darstellung, {"mesh", "farbe", "oberflaeche", "ableitung"}, elementort + ".Darstellung");
+                    else objekt(*darstellung, {"mesh", "farbe", "oberflaeche"}, elementort + ".Darstellung");
+                    const auto source = quellmesh(*darstellung, elementort + ".Darstellung");
+                    if (einzelnnetz)
+                        if (const auto* definition = optional(*darstellung, "ableitung"))
+                            geometrie_ableiten(source, *definition, elementort + ".Darstellung.ableitung");
+                    if (einzelnnetz) register_mesh(*darstellung, elementort + ".Darstellung");
+                } else {
+                    objekt(*darstellung, {"datei", "farbe", "oberflaeche"}, elementort + ".Darstellung");
+                    referenz(pflicht(*darstellung, "datei", elementort), datei.parent_path(), elementort);
+                }
                 if (const auto* farbe = optional(*darstellung, "farbe"); farbe && !farbe_hex(*farbe))
                     fehler(2, elementort + ".Darstellung.farbe", "Farbe als \"#rrggbb\" erwartet");
                 if (const auto* art = optional(*darstellung, "oberflaeche"); art && !oberflaeche_text(*art))
@@ -1164,12 +1469,31 @@ Modell lade_modell(const std::filesystem::path& datei)
             }
             if (hydro) {
                 objekt(*hydro, {"masse", "volumen"}, elementort + ".Hydrostatik");
-                masse_lesen(e, pflicht(*hydro, "masse", elementort, 4), datei.parent_path(), elementort, fassung);
+                const auto& mass_block = pflicht(*hydro, "masse", elementort, 4);
+                masse_lesen(e, mass_block, datei.parent_path(), elementort, fassung,
+                    gemeinsames_obj ? &quellen : nullptr, einzelnnetz);
+                if (einzelnnetz && optional(mass_block, "mesh"))
+                    register_mesh(mass_block, elementort + ".Hydrostatik.masse");
                 if (const auto* volumen = optional(*hydro, "volumen")) {
-                    objekt(*volumen, {"datei"}, elementort + ".volumen");
-                    const auto pfad = referenz(pflicht(*volumen, "datei", elementort), datei.parent_path(), elementort);
-                    e.volumen = obj_lesen(pfad, elementort + ".volumen", fassung);
-                    validieren(*e.volumen, true, elementort + ".volumen, Mesh " + pfad.u8string());
+                    std::string volumenort = elementort + ".volumen";
+                    if (gemeinsames_obj) {
+                        if (einzelnnetz) objekt(*volumen, {"mesh", "ableitung"}, elementort + ".volumen");
+                        else objekt(*volumen, {"mesh"}, elementort + ".volumen");
+                        e.volumen = quellmesh(*volumen, elementort + ".volumen");
+                        if (einzelnnetz)
+                            if (const auto* definition = optional(*volumen, "ableitung")) {
+                                if (text(pflicht(*definition, "art", volumenort, 9), volumenort, 9) != "z_schnitt")
+                                    fehler(9, volumenort, "Volumenableitung muss ein geschlossener z_schnitt sein");
+                                e.volumen = geometrie_ableiten(*e.volumen, *definition, volumenort + ".ableitung");
+                            }
+                        if (einzelnnetz) register_mesh(*volumen, volumenort);
+                    } else {
+                        objekt(*volumen, {"datei"}, elementort + ".volumen");
+                        const auto pfad = referenz(pflicht(*volumen, "datei", elementort), datei.parent_path(), elementort);
+                        e.volumen = obj_lesen(pfad, elementort + ".volumen", fassung);
+                        volumenort += ", Mesh " + pfad.u8string();
+                    }
+                    validieren(*e.volumen, true, volumenort);
                     // A-C-00050: nested hulls/air bodies are legal unless they intersect or contain each other.
                     for (const auto& andere : modell.elemente)
                         if (andere.volumen && volumen_durchdringen(*e.volumen, *andere.volumen))
@@ -1178,6 +1502,17 @@ Modell lade_modell(const std::filesystem::path& datei)
                                 "; Vergleich mit Element " + andere.id);
                 }
                 if (!e.volumen) e.flutrand_m.clear();
+            }
+            if (einzelnnetz && !element_meshes.empty()) {
+                const auto& source_id = element_meshes.front();
+                if (std::any_of(element_meshes.begin(), element_meshes.end(),
+                    [&](const std::string& id) { return id != source_id; }))
+                    fehler(9, elementort,
+                        "Schema 3 verlangt dieselbe Mesh-ID fuer alle Geometrieverwendungen");
+                const auto owner = mesh_eigentuemer.emplace(source_id, e.id);
+                if (!owner.second && owner.first->second != e.id)
+                    fehler(9, elementort, "Ein Quellmesh darf nicht mehreren Elementen gehoeren");
+                verwendete_meshes.insert(source_id);
             }
             if (hydrodynamik) {
                 objekt(*hydrodynamik, {"rolle", "modelle", "materialreferenz"},
@@ -1209,6 +1544,8 @@ Modell lade_modell(const std::filesystem::path& datei)
             modell.elemente.push_back(std::move(e));
         }
     }
+    if (einzelnnetz && verwendete_meshes.size() != quellen.size())
+        fehler(9, ort, "Schema 3 enthaelt nicht verwendete oder keinem Element zugeordnete OBJ-Netze");
     std::map<std::string, std::string> bewegungseigentuemer;
     for (auto& element : modell.elemente) {
         if (!element.bewegung) continue;
@@ -1249,7 +1586,7 @@ Modell lade_modell(const std::filesystem::path& datei)
     }
     static const std::set<std::string> einfache_rumpfmodelle{
         "bleistift", "kegel", "kugel", "platte", "pyramide", "quader", "rolle", "unregelmaessig"};
-    if (einfache_rumpfmodelle.count(modell.id)) {
+    if (!gemeinsames_obj && einfache_rumpfmodelle.count(modell.id)) {
         if (modell.elemente.size() != 1 || !modell.elemente.front().volumen)
             fehler(3, ort, "Ein einfacher Referenzkoerper benoetigt genau ein physisches Volumenmesh");
         auto& element = modell.elemente.front();
@@ -1265,6 +1602,54 @@ Modell lade_modell(const std::filesystem::path& datei)
             "reine Darstellungsmodelle sind nicht simulierbar");
     modell.fassung = fassung.text();
     return modell;
+}
+
+}
+
+Modell lade_modell(const std::filesystem::path& datei)
+{
+    const std::string ort = datei.u8string();
+    const auto inhalt = lesen(datei, ort);
+    Fingerabdruck fassung;
+    fassung.datei(inhalt);
+    const auto root = Parser(inhalt, ort).lesen();
+    return lade_modell_aus_json(datei, root, std::move(fassung));
+}
+
+Mesh lade_quellmesh(const std::filesystem::path& datei,
+                   const std::optional<std::string>& objekt, bool darstellung)
+{
+    Fingerabdruck fassung;
+    return obj_lesen(datei, "Quellgeometrie", fassung, objekt, nullptr, darstellung);
+}
+
+const nlohmann::json* geometrieableitung(const ModellBeschreibung& beschreibung,
+    const std::string& element_id, const std::string& verwendung)
+{
+    const auto& document = beschreibung.dokument;
+    if (document.value("schema_version", "") != "3") return nullptr;
+    for (const auto& group : document.at("gruppen"))
+        for (const auto& element : group.at("elemente")) {
+            if (element.at("id") != element_id) continue;
+            const auto* block = &element;
+            if (verwendung == "Darstellung") {
+                if (!block->contains("Darstellung")) return nullptr;
+                block = &block->at("Darstellung");
+            } else {
+                if (!block->contains("Hydrostatik") ||
+                    !block->at("Hydrostatik").contains(verwendung)) return nullptr;
+                block = &block->at("Hydrostatik").at(verwendung);
+            }
+            return block->contains("ableitung") ? &block->at("ableitung") : nullptr;
+        }
+    return nullptr;
+}
+
+Mesh abgeleitetes_mesh(const Mesh& quelle, const nlohmann::json& definition)
+{
+    const auto encoded = definition.dump();
+    return geometrie_ableiten(quelle, Parser(encoded, "Geometrieableitung").lesen(),
+        "Geometrieableitung");
 }
 
 namespace {
@@ -1286,12 +1671,14 @@ std::optional<std::filesystem::path> relativ(const Json& objekt_wert, const char
 }
 }
 
-ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei)
+namespace {
+
+ModellBeschreibung beschreibung_aus_json(const std::filesystem::path& datei, const Json& root)
 {
     const std::string ort = datei.u8string();
-    const auto root = Parser(lesen(datei, ort), ort).lesen();
     if (root.typ != Json::Typ::objekt) fehler(2, ort, "Objekt erwartet");
     ModellBeschreibung result;
+    result.dokument = json_wert(root);
     result.id = text(pflicht(root, "id", ort), ort + ".id");
     if (const auto* name = text_feld(root, "name")) result.name = name->text;
     else result.name = result.id;
@@ -1299,6 +1686,38 @@ ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei)
     const auto* gruppen = optional(root, "gruppen");
     if (!gruppen || gruppen->typ != Json::Typ::objekt) return result;
     const auto basis = datei.parent_path();
+    const auto* version = text_feld(root, "schema_version");
+    const bool shared_geometry_schema = version &&
+        (version->text == "2" || version->text == "3");
+    std::optional<std::filesystem::path> gemeinsame_datei;
+    if (shared_geometry_schema) {
+        if (const auto* geometrie = optional(root, "geometrie"))
+            gemeinsame_datei = relativ(*geometrie, "datei", basis);
+        if (gemeinsame_datei) {
+            Fingerabdruck fassung;
+            try { obj_lesen(*gemeinsame_datei, ort, fassung, std::nullopt, &result.quellmeshes); }
+            catch (const std::exception&) { result.quellmeshes.clear(); }
+        }
+    }
+    std::map<std::filesystem::path, std::string> alte_quellen;
+    auto quelle_lesen = [&](const Json& block, bool darstellung) -> std::optional<std::string> {
+        if (shared_geometry_schema) {
+            const auto* mesh = text_feld(block, "mesh");
+            return mesh ? std::optional<std::string>(mesh->text) : std::nullopt;
+        }
+        const auto pfad = relativ(block, "datei", basis);
+        if (!pfad) return std::nullopt;
+        const auto key = pfad->lexically_normal();
+        const auto fund = alte_quellen.find(key);
+        if (fund != alte_quellen.end()) return fund->second;
+        const auto id = "quelle-" + std::to_string(alte_quellen.size() + 1);
+        alte_quellen.emplace(key, id);
+        try {
+            result.quellmeshes.push_back({id, "OBJ:" + pfad->filename().u8string(),
+                lade_quellmesh(*pfad, std::nullopt, darstellung)});
+        } catch (const std::exception&) {}
+        return id;
+    };
     for (const auto& gruppe : gruppen->objekt) {
         result.gruppen.push_back(gruppe.first);
         const auto* elemente = optional(gruppe.second, "elemente");
@@ -1310,7 +1729,8 @@ ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei)
             e.id = id->text;
             e.gruppe = gruppe.first;
             if (const auto* darstellung = optional(element, "Darstellung")) {
-                e.darstellung = relativ(*darstellung, "datei", basis);
+                e.darstellung = shared_geometry_schema ? gemeinsame_datei : relativ(*darstellung, "datei", basis);
+                e.darstellung_mesh = quelle_lesen(*darstellung, true);
                 if (darstellung->typ == Json::Typ::objekt) {
                     if (const auto* farbe = optional(*darstellung, "farbe")) e.farbe_rgb = farbe_hex(*farbe);
                     if (const auto* art = optional(*darstellung, "oberflaeche"))
@@ -1324,12 +1744,45 @@ ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei)
                     e.bewegung->ruderwinkel = rolle && rolle->text == "ruder";
                 }
             }
-            if (const auto* hydro = optional(element, "Hydrostatik"))
-                if (hydro->typ == Json::Typ::objekt)
-                    if (const auto* volumen = optional(*hydro, "volumen"))
-                        e.volumen = relativ(*volumen, "datei", basis);
+            if (const auto* hydro = optional(element, "Hydrostatik")) {
+                if (hydro->typ == Json::Typ::objekt) {
+                    if (const auto* volumen = optional(*hydro, "volumen")) {
+                        e.volumen = shared_geometry_schema ? gemeinsame_datei : relativ(*volumen, "datei", basis);
+                        e.volumen_mesh = quelle_lesen(*volumen, false);
+                    }
+                    if (const auto* masse = optional(*hydro, "masse"))
+                        e.masse_mesh = quelle_lesen(*masse, false);
+                }
+            }
             result.elemente.push_back(std::move(e));
         }
+    }
+    return result;
+}
+
+}
+
+ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei)
+{
+    const std::string ort = datei.u8string();
+    const auto inhalt = lesen(datei, ort);
+    const auto root = Parser(inhalt, ort).lesen();
+    return beschreibung_aus_json(datei, root);
+}
+
+ModellInspektionsImport lade_inspektionsimport(const std::filesystem::path& datei)
+{
+    const std::string ort = datei.u8string();
+    const auto inhalt = lesen(datei, ort);
+    auto root = Parser(inhalt, ort).lesen();
+    ModellInspektionsImport result;
+    result.beschreibung = beschreibung_aus_json(datei, root);
+    Fingerabdruck fassung;
+    fassung.datei(inhalt);
+    try {
+        result.modell = lade_modell_aus_json(datei, root, std::move(fassung));
+    } catch (const std::exception& error) {
+        result.import_fehler = error.what();
     }
     return result;
 }
@@ -1353,6 +1806,12 @@ std::string modell_fassung(const std::filesystem::path& datei)
     const auto* gruppen = root.typ == Json::Typ::objekt ? optional(root, "gruppen") : nullptr;
     if (!gruppen || gruppen->typ != Json::Typ::objekt) return fassung.text();
     const auto basis = datei.parent_path();
+    const auto* version = text_feld(root, "schema_version");
+    if (version && (version->text == "2" || version->text == "3")) {
+        if (const auto* geometrie = optional(root, "geometrie"))
+            hashen(relativ(*geometrie, "datei", basis));
+        return fassung.text();
+    }
     for (const auto& gruppe : gruppen->objekt) {
         const auto* elemente = gruppe.second.typ == Json::Typ::objekt ? optional(gruppe.second, "elemente") : nullptr;
         if (!elemente || elemente->typ != Json::Typ::liste) continue;
@@ -1368,6 +1827,293 @@ std::string modell_fassung(const std::filesystem::path& datei)
         }
     }
     return fassung.text();
+}
+
+void konvertiere_modell_v2(const std::filesystem::path& quelle,
+                          const std::filesystem::path& zielordner)
+{
+    const auto modell = lade_modell(quelle);
+    auto beschreibung = lies_beschreibung(quelle);
+    if (std::filesystem::exists(zielordner))
+        throw std::runtime_error("CORE-MOD-0005: Zielordner existiert bereits");
+    const auto inhalt = lesen(quelle, quelle.u8string());
+    auto dokument = json_wert(Parser(inhalt, quelle.u8string()).lesen(), false);
+    std::ostringstream obj;
+    obj.imbue(std::locale::classic());
+    obj << std::setprecision(std::numeric_limits<double>::max_digits10);
+    std::size_t offset = 1;
+    for (const auto& q : beschreibung.quellmeshes) {
+        obj << "o " << q.id << '\n';
+        for (const auto& p : q.mesh.punkte) obj << "v " << p[0] << ' ' << p[1] << ' ' << p[2] << '\n';
+        for (const auto& t : q.mesh.dreiecke)
+            obj << "f " << t[0]+offset << ' ' << t[1]+offset << ' ' << t[2]+offset << '\n';
+        offset += q.mesh.punkte.size();
+    }
+    for (auto& gruppe : dokument["gruppen"]) for (auto& element : gruppe["elemente"]) {
+        const auto id = element.at("id").get<std::string>();
+        const auto e = std::find_if(beschreibung.elemente.begin(), beschreibung.elemente.end(),
+            [&](const ElementBeschreibung& kandidat) { return kandidat.id == id; });
+        auto referenz_ersetzen = [&](nlohmann::json& block, const std::optional<std::string>& mesh_id) {
+            if (!mesh_id || std::none_of(beschreibung.quellmeshes.begin(), beschreibung.quellmeshes.end(),
+                [&](const QuellMesh& q) { return q.id == *mesh_id; }))
+                throw std::runtime_error("CORE-MOD-0006: Quellmesh nicht lesbar: " + id);
+            block.erase("datei");
+            block["mesh"] = *mesh_id;
+        };
+        if (element.contains("Darstellung")) referenz_ersetzen(element["Darstellung"], e->darstellung_mesh);
+        if (element.contains("Hydrostatik")) {
+            auto& hydro = element["Hydrostatik"];
+            if (hydro.contains("volumen")) referenz_ersetzen(hydro["volumen"], e->volumen_mesh);
+            if (hydro.contains("masse") && hydro["masse"].value("art", "") != "punktmasse")
+                referenz_ersetzen(hydro["masse"], e->masse_mesh);
+        }
+        const auto physik = std::find_if(modell.elemente.begin(), modell.elemente.end(),
+            [&](const Element& kandidat) { return kandidat.id == id; });
+        if (!element.contains("Hydrodynamik") && physik->hydrodynamik_rolle) {
+            const auto rolle = *physik->hydrodynamik_rolle;
+            element["Hydrodynamik"] = {{"rolle", rolle == HydrodynamikRolle::rumpf ? "rumpf" :
+                rolle == HydrodynamikRolle::kiel ? "kiel" : "ruder"}};
+        }
+    }
+    dokument["schema_version"] = "2";
+    dokument["geometrie"] = {{"datei", "boot.obj"}, {"laengeneinheit", "m"}};
+    const auto json = dokument.dump(2) + "\n";
+    if (!std::filesystem::create_directory(zielordner))
+        throw std::runtime_error("CORE-MOD-0005: Neuer Zielordner kann nicht erstellt werden");
+    auto schreiben = [&](const char* name, const std::string& inhalt) {
+        std::ofstream out(zielordner / name, std::ios::binary);
+        out << inhalt;
+        out.close();
+        if (!out) throw std::runtime_error("CORE-MOD-0005: Konvertiertes Modell nicht schreibbar");
+    };
+    schreiben("boot.obj", obj.str());
+    schreiben("modell.json", json);
+    lade_modell(zielordner / "modell.json");
+}
+
+namespace {
+
+bool gleiche_geometrie(const Mesh& left, const Mesh& right)
+{
+    auto points = [](const Mesh& mesh) {
+        auto result = mesh.punkte;
+        std::sort(result.begin(), result.end());
+        return result;
+    };
+    using Triangle = std::array<Vektor3, 3>;
+    auto triangles = [](const Mesh& mesh) {
+        std::vector<Triangle> result;
+        result.reserve(mesh.dreiecke.size());
+        for (const auto& face : mesh.dreiecke) {
+            const Triangle triangle{mesh.punkte.at(face[0]), mesh.punkte.at(face[1]),
+                mesh.punkte.at(face[2])};
+            result.push_back(std::min({triangle,
+                Triangle{triangle[1], triangle[2], triangle[0]},
+                Triangle{triangle[2], triangle[0], triangle[1]}}));
+        }
+        std::sort(result.begin(), result.end());
+        return result;
+    };
+    return points(left) == points(right) && triangles(left) == triangles(right);
+}
+
+bool offene_kanten(const Mesh& mesh)
+{
+    std::map<std::pair<std::size_t, std::size_t>, unsigned> edges;
+    for (const auto& face : mesh.dreiecke)
+        for (std::size_t i = 0; i < 3; ++i) ++edges[std::minmax(face[i], face[(i+1)%3])];
+    return std::any_of(edges.begin(), edges.end(), [](const auto& edge) {
+        return edge.second == 1;
+    });
+}
+
+bool ausreichend_gleich(const Mesh& candidate, const Mesh& reference, bool solid)
+{
+    const auto a = box(candidate), b = box(reference);
+    for (std::size_t i = 0; i < 3; ++i)
+        if (std::abs(a.unten[i]-b.unten[i]) > 1e-6 ||
+            std::abs(a.oben[i]-b.oben[i]) > 1e-6) return false;
+    Element x, y;
+    masseneigenschaften(x, candidate, solid, 1., "Migrationsvergleich Kandidat");
+    masseneigenschaften(y, reference, solid, 1., "Migrationsvergleich Bestand");
+    const double relative = .001;
+    if (std::abs(x.masse_kg-y.masse_kg) > relative*y.masse_kg) return false;
+    for (std::size_t i = 0; i < 3; ++i)
+        if (std::abs(x.schwerpunkt_m[i]-y.schwerpunkt_m[i]) > (solid ? .0001 : .001)) return false;
+    const auto scale = *std::max_element(y.traegheit_kg_m2.begin(), y.traegheit_kg_m2.end(),
+        [](double p, double q) { return std::abs(p) < std::abs(q); });
+    for (std::size_t i = 0; i < 9; ++i)
+        if (std::abs(x.traegheit_kg_m2[i]-y.traegheit_kg_m2[i]) >
+            (solid ? .001 : .01)*std::max(std::abs(scale), 1e-12)) return false;
+    return true;
+}
+
+std::optional<nlohmann::json> schnittebene(const Mesh& source, const Mesh& reference)
+{
+    for (const auto& face : reference.dreiecke) {
+        const auto p = vektor(reference.punkte[face[0]]);
+        const auto normal = kreuz(minus(vektor(reference.punkte[face[1]]), p),
+            minus(vektor(reference.punkte[face[2]]), p));
+        if (normal[2] <= 1e-12L) continue;
+        const double sx = static_cast<double>(-normal[0]/normal[2]);
+        const double sy = static_cast<double>(-normal[1]/normal[2]);
+        const double z = static_cast<double>(p[2]-sx*p[0]-sy*p[1]);
+        const auto distance = [&](const Vektor3& point) {
+            return point[2]-z-sx*point[0]-sy*point[1];
+        };
+        if (std::any_of(reference.punkte.begin(), reference.punkte.end(),
+                [&](const Vektor3& point) { return distance(point) > 1e-8; }) ||
+            std::none_of(source.punkte.begin(), source.punkte.end(),
+                [&](const Vektor3& point) { return distance(point) > 1e-8; })) continue;
+        return nlohmann::json{{"art", "z_schnitt"}, {"z_m", z},
+            {"steigung_x", sx}, {"steigung_y", sy}};
+    }
+    return std::nullopt;
+}
+
+}
+
+void konvertiere_modell_v3(const std::filesystem::path& quelle,
+                          const std::filesystem::path& zielordner,
+                          bool ableitungen_zulassen)
+{
+    if (std::filesystem::exists(zielordner))
+        throw std::runtime_error("CORE-MOD-0005: Zielordner existiert bereits");
+    const auto modell = lade_modell(quelle);
+    const auto beschreibung = lies_beschreibung(quelle);
+    std::map<std::string, const QuellMesh*> meshes_by_id;
+    for (const auto& mesh : beschreibung.quellmeshes)
+        meshes_by_id.emplace(mesh.id, &mesh);
+
+    std::map<std::string, std::string> source_id_by_element;
+    std::map<std::pair<std::string, std::string>, nlohmann::json> derivations;
+    std::vector<std::pair<std::string, Mesh>> canonical_meshes;
+    for (const auto& element : beschreibung.elemente) {
+        std::vector<std::optional<std::string>> source_ids{
+            element.darstellung_mesh, element.masse_mesh, element.volumen_mesh};
+        std::vector<const QuellMesh*> uses;
+        for (const auto& source_id : source_ids) {
+            if (!source_id) continue;
+            const auto found = meshes_by_id.find(*source_id);
+            if (found == meshes_by_id.end())
+                fehler(6, quelle.u8string() + ", Element " + element.id,
+                    "Quellmesh nicht lesbar: " + *source_id);
+            uses.push_back(found->second);
+        }
+        if (uses.empty()) continue;
+        const QuellMesh* canonical = uses.front();
+        if (ableitungen_zulassen && element.masse_mesh) {
+            canonical = meshes_by_id.at(*element.masse_mesh);
+            if (offene_kanten(canonical->mesh) && element.volumen_mesh)
+                canonical = meshes_by_id.at(*element.volumen_mesh);
+        }
+        const std::array<std::pair<const char*, std::optional<std::string>>, 3> roles{{
+            {"Darstellung", element.darstellung_mesh}, {"masse", element.masse_mesh},
+            {"volumen", element.volumen_mesh}}};
+        for (const auto& [role, id] : roles) {
+            if (!id) continue;
+            const auto& reference = meshes_by_id.at(*id)->mesh;
+            if (gleiche_geometrie(canonical->mesh, reference)) continue;
+            const auto location = quelle.u8string() + ", Element " + element.id + "." + role;
+            if (!ableitungen_zulassen)
+                fehler(9, location, "Abweichende Geometriequellen verhindern die Schema-3-Migration: " +
+                    canonical->id + " und " + *id);
+            if (std::string(role) == "Darstellung" && !offene_kanten(reference)) {
+                if (!ausreichend_gleich(canonical->mesh, reference, false))
+                    fehler(9, location, "Darstellung weicht ueber die Migrationsgrenzen hinaus ab");
+                continue;
+            }
+            const bool shell = offene_kanten(reference);
+            auto definition = shell ?
+                std::optional<nlohmann::json>({{"art", "ohne_deckflaeche"},
+                    {"z_m", static_cast<double>(box(reference).oben[2])}}) :
+                schnittebene(canonical->mesh, reference);
+            if (!definition) fehler(9, location, "Keine reproduzierbare Schnittebene gefunden");
+            const auto encoded = definition->dump();
+            const auto derived = geometrie_ableiten(canonical->mesh,
+                Parser(encoded, location).lesen(), location);
+            if (shell ? !gleiche_geometrie(derived, reference) :
+                !ausreichend_gleich(derived, reference, true))
+                fehler(9, location, "Ableitung erhaelt Geometrie oder Physik nicht ausreichend");
+            derivations.emplace(std::make_pair(element.id, role), std::move(*definition));
+        }
+
+        const auto mesh_id = "element_mesh_" + std::to_string(canonical_meshes.size() + 1);
+        source_id_by_element.emplace(element.id, mesh_id);
+        canonical_meshes.emplace_back(mesh_id, canonical->mesh);
+    }
+
+    const auto source_text = lesen(quelle, quelle.u8string());
+    auto document = json_wert(Parser(source_text, quelle.u8string()).lesen(), false);
+    std::ostringstream obj;
+    obj.imbue(std::locale::classic());
+    obj << std::setprecision(std::numeric_limits<double>::max_digits10);
+    std::size_t offset = 1;
+    for (const auto& [mesh_id, mesh] : canonical_meshes) {
+        obj << "o " << mesh_id << '\n';
+        for (const auto& point : mesh.punkte)
+            obj << "v " << point[0] << ' ' << point[1] << ' ' << point[2] << '\n';
+        for (const auto& face : mesh.dreiecke)
+            obj << "f " << face[0] + offset << ' ' << face[1] + offset << ' '
+                << face[2] + offset << '\n';
+        offset += mesh.punkte.size();
+    }
+
+    for (auto& group : document["gruppen"]) for (auto& json_element : group["elemente"]) {
+        const auto id = json_element.at("id").get<std::string>();
+        const auto described = std::find_if(beschreibung.elemente.begin(), beschreibung.elemente.end(),
+            [&](const ElementBeschreibung& candidate) { return candidate.id == id; });
+        if (described == beschreibung.elemente.end())
+            fehler(6, quelle.u8string() + ", Element " + id, "Elementbeschreibung fehlt");
+        const auto canonical = source_id_by_element.find(id);
+        auto replace_reference = [&](nlohmann::json& block,
+                                     const std::optional<std::string>& source_id,
+                                     const char* role) {
+            if (!source_id || canonical == source_id_by_element.end())
+                fehler(6, quelle.u8string() + ", Element " + id,
+                    "Geometrieverwendung ohne lesbare gemeinsame Quelle");
+            block.erase("datei");
+            block["mesh"] = canonical->second;
+            const auto derived = derivations.find({id, role});
+            if (derived != derivations.end()) block["ableitung"] = derived->second;
+        };
+        if (json_element.contains("Darstellung"))
+            replace_reference(json_element["Darstellung"], described->darstellung_mesh, "Darstellung");
+        if (json_element.contains("Hydrostatik")) {
+            auto& hydro = json_element["Hydrostatik"];
+            if (hydro.contains("volumen"))
+                replace_reference(hydro["volumen"], described->volumen_mesh, "volumen");
+            if (hydro.contains("masse") &&
+                hydro["masse"].value("art", "") != "punktmasse")
+                replace_reference(hydro["masse"], described->masse_mesh, "masse");
+        }
+        const auto physical = std::find_if(modell.elemente.begin(), modell.elemente.end(),
+            [&](const Element& candidate) { return candidate.id == id; });
+        if (!json_element.contains("Hydrodynamik") && physical->hydrodynamik_rolle) {
+            const auto role = *physical->hydrodynamik_rolle;
+            json_element["Hydrodynamik"] = {{"rolle",
+                role == HydrodynamikRolle::rumpf ? "rumpf" :
+                role == HydrodynamikRolle::kiel ? "kiel" : "ruder"}};
+        }
+    }
+    document["schema_version"] = "3";
+    document["geometrie"] = {{"datei", "boot.obj"}, {"laengeneinheit", "m"}};
+    const auto json = document.dump(2) + "\n";
+    std::map<std::string, Mesh> prepared;
+    for (const auto& [id, mesh] : canonical_meshes) prepared.emplace(id, mesh);
+    lade_modell_aus_json(zielordner / "modell.json",
+        Parser(json, zielordner.u8string()).lesen(), Fingerabdruck{}, &prepared);
+    if (!std::filesystem::create_directory(zielordner))
+        throw std::runtime_error("CORE-MOD-0005: Neuer Zielordner kann nicht erstellt werden");
+    auto write_file = [&](const char* name, const std::string& contents) {
+        std::ofstream output(zielordner / name, std::ios::binary);
+        output << contents;
+        output.close();
+        if (!output) throw std::runtime_error("CORE-MOD-0005: Konvertiertes Modell nicht schreibbar");
+    };
+    write_file("boot.obj", obj.str());
+    write_file("modell.json", json);
+    lade_modell(zielordner / "modell.json");
 }
 
 }

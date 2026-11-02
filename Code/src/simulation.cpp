@@ -39,6 +39,31 @@ void array(std::ostream& out,const std::array<double,N>& values)
     }
     out<<']';
 }
+Vektor3 add(const Vektor3& a, const Vektor3& b)
+{
+    return {a[0] + b[0], a[1] + b[1], a[2] + b[2]};
+}
+Vektor3 cross(const Vektor3& a, const Vektor3& b)
+{
+    return {a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]};
+}
+bool gleicher_stationaerer_snapshot(const Zustand& zustand, const Zustand& snapshot)
+{
+    if (zustand.schritt != snapshot.schritt || zustand.zeit_s != snapshot.zeit_s ||
+        zustand.pose.position_m() != snapshot.pose.position_m() ||
+        zustand.pose.orientierung_xyzw() != snapshot.pose.orientierung_xyzw() ||
+        zustand.geschwindigkeit_welt_m_s != snapshot.geschwindigkeit_welt_m_s ||
+        zustand.omega_modell_rad_s != snapshot.omega_modell_rad_s ||
+        zustand.geflutet != snapshot.geflutet ||
+        zustand.bewegungsstellungen.size() != snapshot.bewegungsstellungen.size())
+        return false;
+    for (std::size_t i = 0; i < zustand.bewegungsstellungen.size(); ++i) {
+        const auto& a = zustand.bewegungsstellungen[i];
+        const auto& b = snapshot.bewegungsstellungen[i];
+        if (a.element_id != b.element_id || a.wert != b.wert) return false;
+    }
+    return true;
+}
 }
 std::string pruefung_json(const std::filesystem::path& path,bool& gueltig)
 {
@@ -57,8 +82,12 @@ std::string pruefung_json(const std::filesystem::path& path,bool& gueltig)
     }
 }
 std::string zustand_json(const Modell& m,const Zustand& s,const std::string& status,
-    const std::string& diagnose,const Gleichgewichtsangaben* gg)
+    const std::string& diagnose,const Gleichgewichtsangaben* gg,
+    const StationaeresGleichgewichtErgebnis* stationaer, ErgebnisJsonFormat format)
 {
+    if (format == ErgebnisJsonFormat::Kompatibel && stationaer &&
+        (stationaer->kurvenfahrt || stationaer->konfiguration.kurvenfahrt))
+        throw std::invalid_argument("CORE-SIM-0001: Stationaere Kurvenfahrt benoetigt ErgebnisJsonFormat::V6.");
     if(!std::isfinite(s.zeit_s))
         throw std::invalid_argument("CORE-SIM-0001: Simulationszeit nicht endlich.");
     if(s.testantrieb_erforderlich&&!s.testantrieb)
@@ -72,6 +101,8 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
         s.hydrodynamik->auswertung_schritt!=s.schritt ||
         s.hydrodynamik->auswertung_zeit_s!=s.zeit_s))
         throw std::invalid_argument("CORE-HYD-0001: Historischer Hydrodynamikkontext passt nicht zum Zustand.");
+    if(stationaer && !gleicher_stationaerer_snapshot(s, stationaer->zustand))
+        throw std::invalid_argument("CORE-SIM-0001: Stationaerer Druckpunktsnapshot passt nicht zum serialisierten Zustand.");
     std::set<std::string> bewegte_ids;
     for (const auto& stellung : s.bewegungsstellungen) {
         const auto element = std::find_if(m.elemente.begin(), m.elemente.end(),
@@ -87,11 +118,48 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
     auto k=kraefte(m,s.pose,s.testantrieb.get(),1000.,9.81,s.geflutet,
         s.hydrodynamik.get(),s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s,
         s.bewegungsstellungen);
+    if (stationaer && stationaer->status != "ungueltig") {
+        const auto force_world = !stationaer->konfiguration.aktiv ? Vektor3{} :
+            stationaer->konfiguration.modellfest
+            ? s.pose.modellvektor_nach_welt(stationaer->konfiguration.kraft_welt_n)
+            : stationaer->konfiguration.kraft_welt_n;
+        const auto force_model = s.pose.weltvektor_nach_modell(force_world);
+        Beitrag contribution;
+        contribution.id = "stationaer.fremdkraft";
+        contribution.art = "kraft";
+        contribution.quelle = Quelle::externe_kraft;
+        contribution.gruppe = "stationaer";
+        contribution.punkt_m = stationaer->konfiguration.angriffspunkt_modell_m;
+        contribution.vektor = force_model;
+        contribution.moment_s_nm = moment_um(contribution.punkt_m,
+            stationaer->schwerpunkt_modell_m, force_model);
+        contribution.zustand = std::hypot(force_world[0], force_world[1], force_world[2]) == 0.
+            ? Datenzustand::null : Datenzustand::gueltig;
+        k.kraft_welt_n = add(k.kraft_welt_n, force_world);
+        k.moment_modell_nm = add(k.moment_modell_nm, contribution.moment_s_nm);
+        k.beitraege.push_back(std::move(contribution));
+    }
     const auto b2=bilanz(m,k.beitraege,static_cast<bool>(s.hydrodynamik));
     std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(17);
     const bool beweglich=std::any_of(m.elemente.begin(),m.elemente.end(),
         [](const Element& element) { return element.bewegung.has_value(); });
-    out<<"{\"vertragsversion\":"<<text(beweglich?"4":s.testantrieb?"3":"2")<<",\"modell_id\":"<<text(m.id)
+    const Vektor3 forward = s.pose.modellvektor_nach_welt({1.,0.,0.});
+    const Vektor3 omega_world = s.pose.modellvektor_nach_welt(s.omega_modell_rad_s);
+    const Vektor3 forward_derivative = cross(omega_world, forward);
+    const double forward_horizontal_squared = forward[0]*forward[0] + forward[1]*forward[1];
+    std::optional<double> heading_rate;
+    std::string heading_rate_status = "nicht_bestimmbar";
+    if (std::isfinite(forward_horizontal_squared) && forward_horizontal_squared > 1e-16) {
+        const double value = (forward[0]*forward_derivative[1] - forward[1]*forward_derivative[0]) /
+            forward_horizontal_squared;
+        if (std::isfinite(value)) { heading_rate = value; heading_rate_status = "gueltig"; }
+    }
+    if (format == ErgebnisJsonFormat::V6 && stationaer && heading_rate_status == "gueltig") {
+        heading_rate = stationaer->kursdrehrate_rad_s;
+    }
+    const char* contract = format == ErgebnisJsonFormat::V6 ? "6" :
+        stationaer ? "5" : beweglich ? "4" : s.testantrieb ? "3" : "2";
+    out<<"{\"vertragsversion\":"<<text(contract)<<",\"modell_id\":"<<text(m.id)
        <<",\"modell_fassung\":"<<text(m.fassung)
        <<",\"status\":"<<text(status)<<",\"diagnose\":"<<text(diagnose)<<",\"zeit_s\":"<<s.zeit_s
        <<",\"schritt\":"<<s.schritt<<",\"position_m\":";
@@ -99,6 +167,11 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
     array(out,s.pose.orientierung_xyzw());out<<",\"geschwindigkeit_welt_m_s\":";
     array(out,s.geschwindigkeit_welt_m_s);out<<",\"omega_modell_rad_s\":";
     array(out,s.omega_modell_rad_s);
+    if (format == ErgebnisJsonFormat::V6) {
+        out << ",\"kursdrehrate_rad_s\":";
+        if (heading_rate) out << *heading_rate; else out << "null";
+        out << ",\"kursdrehrate_status\":" << text(heading_rate_status);
+    }
     out<<",\"volumen_m3\":"<<k.volumen_m3<<",\"geflutete_elemente\":[";
     for(std::size_t i=0;i<s.geflutet.size();++i) out<<(i?",":"")<<text(s.geflutet[i]);
     out<<"],\"vektoren\":[";
@@ -157,7 +230,9 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
         out<<'}';
     }
     out<<"],\"moment_modell_nm\":";array(out,k.moment_modell_nm);
-    out<<",\"moment_bezug_modell_m\":";array(out,m.schwerpunkt_m);
+    out<<",\"moment_bezug_modell_m\":";
+    if (stationaer) array(out, stationaer->schwerpunkt_modell_m);
+    else array(out,m.schwerpunkt_m);
     if(beweglich) {
         out<<",\"bewegungen\":[";
         bool erste_bewegung=true;
@@ -226,6 +301,81 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
         for(std::size_t i=0;i<gg->freiheitsgrade.size();++i) out<<(i?",":"")<<text(gg->freiheitsgrade[i]);
         out<<"],\"iterationen\":"<<gg->iterationen<<'}';
     } else out<<"null";
+    if (stationaer) {
+        const auto& config = stationaer->konfiguration;
+        const auto& fluid = stationaer->zustand.hydrodynamik
+            ? stationaer->zustand.hydrodynamik->konfiguration.fluidgeschwindigkeit_welt_m_s
+            : Vektor3{};
+        const Vektor3 relative{
+            s.geschwindigkeit_welt_m_s[0] - fluid[0],
+            s.geschwindigkeit_welt_m_s[1] - fluid[1],
+            s.geschwindigkeit_welt_m_s[2] - fluid[2]};
+        const double relative_speed = std::sqrt(relative[0]*relative[0] +
+            relative[1]*relative[1] + relative[2]*relative[2]);
+        out << ",\"stationaer\":{\"aktiv\":" << (config.aktiv ? "true" : "false")
+            << ",\"status\":" << text(stationaer->status)
+            << ",\"diagnose\":" << text(stationaer->diagnose)
+            << ",\"konvergiert\":" << (stationaer->status == "konvergiert" ? "true" : "false")
+            << ",\"modellfest\":" << (config.modellfest ? "true" : "false")
+            << ",\"kraft_n\":";
+        const bool input_finite = std::all_of(config.kraft_welt_n.begin(),
+            config.kraft_welt_n.end(), [](double value) { return std::isfinite(value); }) &&
+            std::all_of(config.angriffspunkt_modell_m.begin(),
+                config.angriffspunkt_modell_m.end(),
+                [](double value) { return std::isfinite(value); });
+        if (input_finite) array(out, config.kraft_welt_n); else out << "null";
+        out << ",\"kraft_bezugssystem\":" << text(config.modellfest ? "modell" : "welt")
+            << ",\"angriffspunkt_modell_m\":";
+        if (input_finite) array(out, config.angriffspunkt_modell_m); else out << "null";
+        out << ",\"stellungen\":[";
+        for (std::size_t i = 0; i < config.stellungen.size(); ++i) {
+            const auto& setting = config.stellungen[i];
+            out << (i ? "," : "") << "{\"element_id\":" << text(setting.element_id)
+                << ",\"wert\":";
+            if (std::isfinite(setting.wert)) out << setting.wert; else out << "null";
+            out << '}';
+        }
+        out << "],\"iterationen\":" << stationaer->iterationen
+            << ",\"flutungswiederholungen\":" << stationaer->flutungswiederholungen
+            << ",\"residuum_kraft_welt_n\":";
+        array(out, stationaer->residuum_kraft_welt_n);
+        out << ",\"residuum_moment_modell_nm\":";
+        array(out, stationaer->residuum_moment_modell_nm);
+        out << ",\"krafttoleranz_n\":" << stationaer->krafttoleranz_n
+            << ",\"momenttoleranz_nm\":" << stationaer->momenttoleranz_nm
+            << ",\"referenzkurs_verwendet\":"
+            << (stationaer->referenzkurs_verwendet ? "true" : "false")
+            << ",\"geschwindigkeit_relativ_wasser_m_s\":";
+        array(out, relative);
+        out << ",\"geschwindigkeit_relativ_wasser_betrag_m_s\":" << relative_speed
+            << ",\"abdriftwinkel_rad\":";
+        if (relative_speed > 0.) out << std::atan2(relative[1], relative[0]);
+        else if (format == ErgebnisJsonFormat::V6) out << "null";
+        else out << 0.;
+        if (format == ErgebnisJsonFormat::V6) {
+            out << ",\"kurvenfahrt\":" << ((stationaer->kurvenfahrt || config.kurvenfahrt) ? "true" : "false")
+                << ",\"loesungstyp\":" << text(stationaer->loesungstyp)
+                << ",\"omega_modell_rad_s\":";
+            array(out, stationaer->omega_modell_rad_s);
+            out << ",\"aeussere_kraft_welt_n\":";
+            array(out, stationaer->aeussere_kraft_welt_n);
+            out << ",\"aeusseres_moment_modell_nm\":";
+            array(out, stationaer->aeusseres_moment_modell_nm);
+            out << ",\"residuum_kraft_bewegung_welt_n\":";
+            array(out, stationaer->residuum_bewegung_kraft_welt_n);
+            out << ",\"residuum_moment_bewegung_modell_nm\":";
+            array(out, stationaer->residuum_bewegung_moment_modell_nm);
+            out << ",\"radius_m\":";
+            if (stationaer->radius_m && std::isfinite(*stationaer->radius_m)) out << *stationaer->radius_m;
+            else out << "null";
+            const char* radius_status = stationaer->radius_m ? "gueltig" :
+                stationaer->loesungstyp == "geradeaus" ? "geradeaus" :
+                stationaer->loesungstyp == "reine_drehung" ? "reine_drehung" : "nicht_bestimmbar";
+            out << ",\"radius_status\":" << text(radius_status) << "}";
+        } else {
+            out << ",\"nullen\":{\"vz_m_s\":0,\"omega_modell_rad_s\":[0,0,0]}}";
+        }
+    }
     if(s.testantrieb) {
         const auto& c=*s.testantrieb;
         out<<",\"testantrieb\":{\"modus\":\"temporaerer_bugtest\",\"konfiguration\":{\"kraft_n\":"
@@ -302,19 +452,47 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
         }
     }
     const auto ldp=lateraldruckpunkt(m,s.pose,k,s.bewegungsstellungen);
-    if(ldp.vorhanden) {
-        out<<",\"druckpunkte\":{\"lateral\":{\"status\":"<<text(ldp.status)
-           <<",\"querkraft_modell_n\":"<<ldp.querkraft_modell_n
-           <<",\"lateralflaeche_m2\":"<<ldp.lateralflaeche_m2;
-        if(ldp.position_modell_m) {
-            out<<",\"position_modell_m\":";array(out,*ldp.position_modell_m);
+    if(ldp.vorhanden || stationaer) {
+        out<<",\"druckpunkte\":{";
+        bool has_pressure_point = false;
+        if(ldp.vorhanden) {
+            out<<"\"lateral\":{\"auswertung_version\":2,\"status\":"<<text(ldp.status)
+               <<",\"querkraft_modell_n\":"<<ldp.querkraft_modell_n
+               <<",\"lateralflaeche_m2\":"<<ldp.lateralflaeche_m2;
+            if(ldp.position_modell_m) {
+                out<<",\"position_modell_m\":";array(out,*ldp.position_modell_m);
+            }
+            out<<",\"quellen\":[";
+            for(std::size_t i=0;i<ldp.quellen.size();++i) {
+                if(i) out<<',';
+                out<<text(ldp.quellen[i]);
+            }
+            out<<"]}";
+            has_pressure_point = true;
         }
-        out<<",\"quellen\":[";
-        for(std::size_t i=0;i<ldp.quellen.size();++i) {
-            if(i) out<<',';
-            out<<text(ldp.quellen[i]);
+        if(stationaer) {
+            const auto& config = stationaer->konfiguration;
+            const bool finite_force = std::all_of(config.kraft_welt_n.begin(),
+                config.kraft_welt_n.end(), [](double value) { return std::isfinite(value); });
+            const bool finite_point = std::all_of(config.angriffspunkt_modell_m.begin(),
+                config.angriffspunkt_modell_m.end(),
+                [](double value) { return std::isfinite(value); });
+            if (!finite_force || !finite_point)
+                throw std::invalid_argument("CORE-SIM-0001: Stationaerer Fremdkraft-Snapshot ist nicht endlich.");
+            const bool force_null = std::all_of(config.kraft_welt_n.begin(),
+                config.kraft_welt_n.end(), [](double value) { return value == 0.; });
+            const char* ersatz_status = !config.aktiv ? "inaktiv" :
+                force_null ? "kraft_null" : "gueltig";
+            if (has_pressure_point) out<<',';
+            out<<"\"ersatz_segel\":{\"status\":"<<text(ersatz_status)
+               <<",\"quelle\":\"fremdkraft\"";
+            if (std::string(ersatz_status) == "gueltig") {
+                out<<",\"position_modell_m\":";
+                array(out,config.angriffspunkt_modell_m);
+            }
+            out<<'}';
         }
-        out<<"]}}";
+        out<<'}';
     }
     out<<'}';return out.str();
 }
@@ -346,17 +524,20 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
                     element.bewegung->ruderwinkel?0.:100.});
         }
         if(o.testantrieb) s=testantrieb_start(m,s,*o.testantrieb,o.testantrieb_aktiv);
-        if(o.hydrodynamik && !o.dynamisch)
+        const bool stationaer_aktiv = o.stationaer.has_value();
+        if(o.hydrodynamik && !o.dynamisch && !stationaer_aktiv)
             throw std::invalid_argument("CORE-HYD-0001: Hydrodynamik ist nur fuer dynamische Laeufe verfuegbar.");
+        if(stationaer_aktiv && o.dynamisch)
+            throw std::invalid_argument("CORE-SIM-0001: Stationaerer Gleichgewichtslauf ist nicht dynamisch.");
         const bool hydrodynamikvorhanden=std::any_of(m.elemente.begin(),m.elemente.end(),
             [](const Element& e) {return e.hydrodynamik_rolle.has_value();});
-        if(o.hydrodynamik) s=hydrodynamik_start(m,s,*o.hydrodynamik);
+        if(o.hydrodynamik && o.dynamisch) s=hydrodynamik_start(m,s,*o.hydrodynamik);
         else if(o.dynamisch && hydrodynamikvorhanden && !s.hydrodynamik &&
             !s.hydrodynamik_erforderlich) {
             HydrodynamikKonfiguration standardwasser;
             s=hydrodynamik_start(m,s,standardwasser);
         }
-        if(!o.dynamisch && (s.hydrodynamik || s.hydrodynamik_erforderlich))
+        if(!o.dynamisch && !stationaer_aktiv && (s.hydrodynamik || s.hydrodynamik_erforderlich))
             throw std::invalid_argument("CORE-HYD-0001: Hydrodynamikkontext in statischem Lauf.");
         if((!o.testantrieb&&!s.testantrieb) &&
             (o.testantrieb_aktiv||!o.testantrieb_ereignisse.empty()))
@@ -403,10 +584,11 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
         if(!out) throw std::runtime_error("CORE-IO-0001: Ergebnisdatei nicht schreibbar.");
         if(!o.jsonl) out<<'[';
         auto schreiben=[&](const Zustand& s,const std::string& status,
-            const Gleichgewichtsangaben* gg=nullptr) {
+            const Gleichgewichtsangaben* gg=nullptr,
+            const StationaeresGleichgewichtErgebnis* stationaer=nullptr) {
             SEGEL_MESSUNG("ergebnisaufzeichnung");
             if(!o.jsonl && result.zustaende) out<<',';
-            out<<zustand_json(m,s,status,result.diagnose,gg);
+            out<<zustand_json(m,s,status,result.diagnose,gg,stationaer,o.ergebnis_json_format);
             if(o.jsonl) out<<'\n';
             if(!out) throw std::runtime_error("CORE-IO-0001: Ergebnis konnte nicht geschrieben werden.");
             ++result.zustaende;
@@ -442,9 +624,18 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
             }
             schreiben(s,result.status);
         } else {
-            const auto r=gleichgewicht(m,s,.001,.001,200,o.abbruch);
-            result.status=r.status;result.diagnose=r.diagnose;
-            schreiben(r.zustand,r.status,r.gleichgewicht?&*r.gleichgewicht:nullptr);
+            if (stationaer_aktiv) {
+                const auto hydro = o.hydrodynamik.value_or(HydrodynamikKonfiguration{});
+                const auto r = stationaeres_gleichgewicht(m, s, *o.stationaer,
+                    hydro, .05, .05, 100, o.abbruch);
+                result.status = r.status;
+                result.diagnose = r.diagnose;
+                schreiben(r.zustand, r.status, nullptr, &r);
+            } else {
+                const auto r=gleichgewicht(m,s,.001,.001,200,o.abbruch);
+                result.status=r.status;result.diagnose=r.diagnose;
+                schreiben(r.zustand,r.status,r.gleichgewicht?&*r.gleichgewicht:nullptr);
+            }
         }
         if(!o.jsonl) out<<"]\n";
         out.flush();

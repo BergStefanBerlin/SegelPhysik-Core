@@ -108,7 +108,8 @@ void bewegung_test()
         modell.traegheit_kg_m2 != traegheit_start ||
         hydrostatik(modell, start.pose).volumen_m3 != hydrostatik_startwerte.volumen_m3)
         throw std::runtime_error("Ruder-/Schwertbewegung veraenderte Masse oder Hydrostatik");
-    const auto output = zustand_json(modell, next, "laufend");
+    const auto output = zustand_json(modell, next, "laufend", {}, nullptr, nullptr,
+        ErgebnisJsonFormat::Kompatibel);
     if (output.find("\"vertragsversion\":\"4\"") == std::string::npos ||
         output.find("\"elementtransformationen_modell\"") == std::string::npos ||
         output.find("\"bewegungsuebergang\"") == std::string::npos ||
@@ -150,6 +151,79 @@ segelphysik::Modell schwertmodell()
         {-.5,-.01,-1.},{.5,-.01,-1.},{.5,.01,-1.},{-.5,.01,-1.},
         {-.5,-.01,1.},{.5,-.01,1.},{.5,.01,1.},{-.5,.01,1.}};
     return model;
+}
+
+void analytische_seitenkraft_panelbilanz()
+{
+    using namespace segelphysik;
+    for (const auto rolle : {HydrodynamikRolle::kiel, HydrodynamikRolle::ruder}) {
+        for (const bool kennfeld : {false, true}) {
+            auto model = schwertmodell();
+            auto& foil = model.elemente.front();
+            foil.hydrodynamik_rolle = rolle;
+            for (auto& point : foil.volumen->punkte) point[2] += .25;
+            if (kennfeld) {
+                HydrodynamikKraftmodell polar;
+                polar.methode = "polare_2d";
+                polar.quelle = "Analytische konstante Testpolare";
+                polar.gueltigkeit = "Test";
+                polar.widerstandsanteile = {"gesamt"};
+                for (double alpha : {0., std::acos(-1.) / 2.})
+                    for (double reynolds : {1e5, 1e7})
+                        polar.kennfeld.push_back({alpha, reynolds, .4, .1,
+                            "geschaetzt", "Test", "Test", "hoch"});
+                foil.hydrodynamik_daten.emplace();
+                foil.hydrodynamik_daten->modelle.emplace("seitenkraft", polar);
+            }
+            for (const double lateral_speed : {0., .5}) {
+                Zustand state;
+                state.pose = Pose{{0., 0., -3.}, {0., 0., 0., 1.}};
+                state.geschwindigkeit_welt_m_s = {0., lateral_speed, 0.};
+                state.omega_modell_rad_s = {0., 0., 6.};
+                state = hydrodynamik_start(model, state, config());
+                const auto forces = kraefte(model, state.pose, nullptr, 1000.,
+                    9.81, {}, state.hydrodynamik.get(),
+                    state.geschwindigkeit_welt_m_s, state.omega_modell_rad_s);
+                const auto& contribution = hydrobeitrag(forces, "Schwert", "seitenkraft");
+                const auto& actual = contribution.lateraldruckpunkt_panelbilanz;
+
+                // Four lateral triangles, each area 1, projected area 1/2:
+                // x=+/-1/6, y=+/-0.01, z=0.25+/-1/3.
+                // At each x both faces have the same Fy; paired z offsets cancel.
+                // Relative chord speed magnitude is 6*0.01=0.06 and normal
+                // speed n=-(v_y+6*x). AR=2^2/2=2, cn=1.1+0.018*2.
+                // Estimated method is fully stalled (alpha>1.45 rad):
+                // Cl=cn*sin(alpha)*cos(alpha), Cd=.02+cn*sin(alpha)^2.
+                const auto panel_fy = [kennfeld](double n) {
+                    constexpr double chord = .06;
+                    constexpr double cn = 1.136;
+                    const double speed2 = chord * chord + n * n;
+                    const double speed = std::sqrt(speed2);
+                    if (kennfeld)
+                        return 250. * (.4 * speed2 * (n < 0. ? -1. : 1.)
+                            + .1 * speed * n);
+                    return 250. * n * (cn * chord +
+                        (.02 * speed2 + cn * n * n) / speed);
+                };
+                const double positive_x_fy = panel_fy(-lateral_speed - 1.);
+                const double negative_x_fy = panel_fy(-lateral_speed + 1.);
+                const double q = 2. * (positive_x_fy + negative_x_fy);
+                const double b = 2. * (std::abs(positive_x_fy) + std::abs(negative_x_fy));
+                const double x = (positive_x_fy - negative_x_fy) / 3.;
+                if (!actual.vorhanden || contribution.modell_methode !=
+                    (kennfeld ? "polare_2d" : "geschaetzte_endliche_streckungspolare"))
+                    throw std::runtime_error("Analytische Referenz verwendet falschen Seitenkraftpfad");
+                near(actual.querkraft_modell_n, q, 1e-8);
+                near(actual.panelbetragssumme_n, b, 1e-8);
+                near(actual.erstes_moment_x_nm, x, 1e-8);
+                near(actual.erstes_moment_z_nm, .25 * q, 1e-8);
+                near(contribution.vektor[1], q, 1e-8);
+                if (b <= std::abs(q) ||
+                    std::abs(x - q * contribution.punkt_m[0]) < 1.)
+                    throw std::runtime_error("Referenz unterscheidet Betragsschwerpunktfehler nicht");
+            }
+        }
+    }
 }
 
 void ruderseitenkraft_test()
@@ -287,8 +361,11 @@ void pruefen()
         foil_context.hydrodynamik.get(), crossflow.geschwindigkeit_welt_m_s);
     const auto& foil_lift = hydrobeitrag(foil_forces, "Schwert", "seitenkraft");
     if (foil_lift.zustand != Datenzustand::gueltig || foil_lift.vektor[1] >= 0. ||
+        !foil_lift.lateraldruckpunkt_panelbilanz.vorhanden ||
+        std::abs(foil_lift.lateraldruckpunkt_panelbilanz.querkraft_modell_n -
+            foil_lift.vektor[1]) > 1e-8 ||
         foil_lift.modell_status != "geschaetzt")
-        throw std::runtime_error("Schwert-Seitenkraft hemmt die Abdrift nicht oder ist nicht als Schaetzung markiert");
+        throw std::runtime_error("Schwert-Seitenkraft hemmt die Abdrift nicht, verliert Paneldaten oder ist nicht als Schaetzung markiert");
     auto bewegtes_foil = foil;
     bewegtes_foil.elemente.front().bewegung = Bewegungsdefinition{};
     bewegtes_foil.elemente.front().bewegung->art = Bewegungsart::drehen;
@@ -302,6 +379,16 @@ void pruefen()
     if (hydrobeitrag(ausgefahren, "Schwert", "seitenkraft").punkt_m ==
         hydrobeitrag(eingeklappt, "Schwert", "seitenkraft").punkt_m)
         throw std::runtime_error("Stellungsänderung hat die bewegte Hydrodynamikgeometrie nicht verändert");
+    if (!hydrobeitrag(ausgefahren, "Schwert", "seitenkraft").lateraldruckpunkt_panelbilanz.vorhanden ||
+        !hydrobeitrag(eingeklappt, "Schwert", "seitenkraft").lateraldruckpunkt_panelbilanz.vorhanden)
+        throw std::runtime_error("Bewegte Seitenkraft verliert die Panelbilanz");
+    const auto& extended_panels =
+        hydrobeitrag(ausgefahren, "Schwert", "seitenkraft").lateraldruckpunkt_panelbilanz;
+    const auto& retracted_panels =
+        hydrobeitrag(eingeklappt, "Schwert", "seitenkraft").lateraldruckpunkt_panelbilanz;
+    if (extended_panels.erstes_moment_x_nm == retracted_panels.erstes_moment_x_nm &&
+        extended_panels.erstes_moment_z_nm == retracted_panels.erstes_moment_z_nm)
+        throw std::runtime_error("Bewegte Seitenkraft aktualisiert ihre Panelmomente nicht");
 
     auto polar_foil = foil;
     HydrodynamikKraftmodell polar;
@@ -325,6 +412,9 @@ void pruefen()
     const auto& polar_force = hydrobeitrag(polar_forces, "Schwert", "seitenkraft");
     const auto& included_friction = hydrobeitrag(polar_forces, "Schwert", "reibung");
     if (polar_force.zustand != Datenzustand::gueltig ||
+        !polar_force.lateraldruckpunkt_panelbilanz.vorhanden ||
+        std::abs(polar_force.lateraldruckpunkt_panelbilanz.querkraft_modell_n -
+            polar_force.vektor[1]) > 1e-8 ||
         polar_force.modell_methode != "polare_2d" ||
         polar_force.modell_quelle != polar.quelle ||
         polar_force.modell_unsicherheit != "hoch" ||
@@ -437,7 +527,8 @@ void pruefen()
     if (!(moved.geschwindigkeit_welt_m_s[0] < start.geschwindigkeit_welt_m_s[0]) ||
         !(moved.pose.position_m()[0] > start.pose.position_m()[0]))
         throw std::runtime_error("Hydrodynamik wirkt nicht auf den Integrator");
-    const auto json = zustand_json(m, moved, "laufend");
+    const auto json = zustand_json(m, moved, "laufend", {}, nullptr, nullptr,
+        ErgebnisJsonFormat::Kompatibel);
     if (json.find("\"vertragsversion\":\"2\"") == std::string::npos ||
         json.find("\"quelle\":\"hydrodynamik\"") == std::string::npos ||
         json.find("\"hydrodynamik\":{\"rho_kg_m3\":1000") == std::string::npos ||
@@ -508,6 +599,11 @@ void referenzboot(const std::filesystem::path& path)
         !std::isfinite(friction.vektor[0]) || friction.vektor[0] >= 0.)
         throw std::runtime_error("Referenzmodell-Rumpfreibung ungueltig: " + model.id);
     if (model.id == "420") {
+        const auto& hull_pressure = hydrobeitrag(forces, hull->id, "druck");
+        if (!hull_pressure.lateraldruckpunkt_panelbilanz.vorhanden ||
+            std::abs(hull_pressure.lateraldruckpunkt_panelbilanz.querkraft_modell_n -
+                hull_pressure.vektor[1]) > 1e-8)
+            throw std::runtime_error("420er-Rumpfdruck verliert die echte Panelbilanz");
         const auto rudder_force = [&](double angle) {
             const auto pose_forces = kraefte(model, start.pose, nullptr, 1000., 9.81, {},
                 active.hydrodynamik.get(), start.geschwindigkeit_welt_m_s, {},
@@ -518,6 +614,8 @@ void referenzboot(const std::filesystem::path& path)
         const auto neutral_rudder = rudder_force(0.);
         const auto starboard_rudder = rudder_force(20.);
         if (!(port_rudder.vektor[1] < 0.) || !(starboard_rudder.vektor[1] > 0.) ||
+            !port_rudder.lateraldruckpunkt_panelbilanz.vorhanden ||
+            !starboard_rudder.lateraldruckpunkt_panelbilanz.vorhanden ||
             !(port_rudder.moment_s_nm[2] > 0.) || !(starboard_rudder.moment_s_nm[2] < 0.))
             throw std::runtime_error("420er-Ruder erzeugt bei Vorwaertsfahrt falsche Seitenkraft-/Giermomentvorzeichen");
         if (std::abs(neutral_rudder.vektor[1]) > 1e-8 ||
@@ -542,7 +640,7 @@ void referenzboot(const std::filesystem::path& path)
     }
 
     const auto nonce = std::chrono::steady_clock::now().time_since_epoch().count();
-    const auto output = std::filesystem::temp_directory_path() /
+    const auto output = std::filesystem::current_path() /
         ("segelphysik-hydrodynamik-" + model.id + "-" + std::to_string(nonce) + ".jsonl");
     if (std::filesystem::exists(output))
         throw std::runtime_error("Hydrodynamik-Testausgabe existiert bereits: " + output.u8string());
@@ -575,6 +673,7 @@ void referenzboot(const std::filesystem::path& path)
 int main(int argc, char** argv)
 {
     try {
+        analytische_seitenkraft_panelbilanz();
         pruefen();
         for (int i = 1; i < argc; ++i) referenzboot(std::filesystem::u8path(argv[i]));
         std::cout << "Hydrodynamiktests bestanden\n";

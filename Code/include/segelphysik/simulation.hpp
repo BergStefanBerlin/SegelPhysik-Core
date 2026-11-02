@@ -4,6 +4,8 @@
 #include <filesystem>
 
 namespace segelphysik {
+enum class ErgebnisJsonFormat { Kompatibel, V6 };
+
 struct Laufoptionen {
     bool dynamisch = false;
     Zustand start;
@@ -15,6 +17,8 @@ struct Laufoptionen {
     std::optional<TestantriebKonfiguration> testantrieb;
     bool testantrieb_aktiv = false;
     std::optional<HydrodynamikKonfiguration> hydrodynamik;
+    std::optional<StationaereGleichgewichtKonfiguration> stationaer;
+    ErgebnisJsonFormat ergebnis_json_format = ErgebnisJsonFormat::V6;
     // Scheduled events are applied before the indicated source step.
     std::vector<std::pair<std::size_t, TestantriebEreignis>> testantrieb_ereignisse;
     std::vector<std::pair<std::size_t, Bewegungsereignis>> bewegungsereignisse;
@@ -32,6 +36,8 @@ Laufbericht simulieren(const std::filesystem::path& modell,
 // contribution metadata, sums, balance status and (static only) equilibrium data.
 std::string zustand_json(const Modell& modell,const Zustand& zustand,
     const std::string& status, const std::string& diagnose = {},
-    const Gleichgewichtsangaben* gleichgewicht = nullptr);
+    const Gleichgewichtsangaben* gleichgewicht = nullptr,
+    const StationaeresGleichgewichtErgebnis* stationaer = nullptr,
+    ErgebnisJsonFormat format = ErgebnisJsonFormat::V6);
 std::string pruefung_json(const std::filesystem::path& modell, bool& gueltig);
 }

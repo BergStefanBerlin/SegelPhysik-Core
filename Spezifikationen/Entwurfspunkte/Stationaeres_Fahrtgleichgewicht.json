@@ -1,0 +1,18 @@
+{
+  "status": "finalisiert",
+  "stand": "2026-11-02",
+  "spezifikation": "../Spezifikation_Stationaeres_Fahrtgleichgewicht.md",
+  "zielversion": "C-0.8",
+  "hinweis": "Geradliniger Vertrag finalisiert und implementiert, Nachweise im bestehenden C-0.8-Plan. Abschnitt 7 wurde am 02.11.2026 finalisiert und fuer C-0.8 freigegeben; IDEE-C-00080..84 sind A-C-00118..122 zugeordnet. Bestehende Anforderungen und CPPI-Vertraege bleiben unveraendert.",
+  "punkte": [
+    {"id": "IDEE-C-00076", "status": "angenommen", "anforderungen": ["A-C-00114"], "thema": "Konstante Lasten und Elementstellungen", "abschnitt": "3"},
+    {"id": "IDEE-C-00077", "status": "angenommen", "anforderungen": ["A-C-00115"], "thema": "Vollstaendiges stationaeres Fahrtgleichgewicht", "abschnitt": "4"},
+    {"id": "IDEE-C-00078", "status": "angenommen", "anforderungen": ["A-C-00116"], "thema": "Eindeutigkeit und Nachweise", "abschnitt": "5"},
+    {"id": "IDEE-C-00079", "status": "angenommen", "anforderungen": ["A-C-00117"], "thema": "Finalisierungsentscheidungen und numerische Abnahme", "abschnitt": "6", "beschreibung": "Numerische Suchgrenzen, Solverstrategie und konkrete Interfaces werden vor Implementierung in U-C-000096 konkretisiert."},
+    {"id": "IDEE-C-00080", "status": "angenommen", "anforderungen": ["A-C-00118"], "thema": "Relatives Gleichgewicht mit konstanter Kursdrehrate", "abschnitt": "7.1", "beschreibung": "Bootsfeste wasserrelative Geschwindigkeit, Roll-/Stampflage und vertikale Kursdrehrate konstant; Geradeausfahrt als Sonderfall. Keine Stellungsoptimierung."},
+    {"id": "IDEE-C-00081", "status": "angenommen", "anforderungen": ["A-C-00119"], "thema": "Kinematik und vollstaendige Bewegungsbilanz", "abschnitt": "7.2", "beschreibung": "Zentripetalbeschleunigung, Kreiselterm, lokale Rotationsanstroemung und vorhandene Zusatztraegheit konsistent in allen sechs Residuen beruecksichtigen."},
+    {"id": "IDEE-C-00082", "status": "angenommen", "anforderungen": ["A-C-00120"], "thema": "Lastinvarianz, Referenzen und Kreisgrenzen", "abschnitt": "7.3", "beschreibung": "Weltfeste Last nicht ungeprueft als dauerhafte Kreisloesung zulassen; Null-Drehrate, reine Drehung und mitstroemenden Bahnrahmen explizit behandeln."},
+    {"id": "IDEE-C-00083", "status": "angenommen", "anforderungen": ["A-C-00121"], "thema": "Versionierter Ergebnisvertrag und Kursdrehrate", "abschnitt": "7.4", "beschreibung": "Signierte Kursdrehrate rad/s aus Core, getrennte aeussere Summen und Bewegungsresiduen; V5-Nullraten nicht umdeuten. V6-Kompatibilitaetsmodus und CPPI-0088..0100 vor Implementierung registriert."},
+    {"id": "IDEE-C-00084", "status": "angenommen", "anforderungen": ["A-C-00122"], "thema": "Abnahme und Finalisierungsentscheidungen", "abschnitt": "7.5", "beschreibung": "Referenzfahrtfehler <=0,1 m/s, Bewegungsresiduen <=0,1 N/Nm. Drehraten-/Kinematiktoleranzen und Suchgrenzen sind in Spezifikation und Plan final festgelegt; Teststatus wird ausschliesslich im Plan fortgeschrieben."}
+  ]
+}

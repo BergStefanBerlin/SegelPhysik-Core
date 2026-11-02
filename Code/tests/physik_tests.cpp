@@ -51,6 +51,37 @@ void flutungstest()
     r=gleichgewicht(flutmodell(9000.,500.),Zustand{});
     if(r.status!="unloesbar"||r.diagnose.find("geflutet: Rumpf")==std::string::npos)
         throw std::runtime_error("Geflutete Ueberlast ohne Diagnose: "+r.diagnose);
+    auto stationaeres_flutmodell=flutmodell(3000.,500.);
+    stationaeres_flutmodell.elemente.front().hydrodynamik_rolle=HydrodynamikRolle::rumpf;
+    for (auto& point : stationaeres_flutmodell.elemente.front().flutrand_m)
+        point[2] = -1.;
+    Zustand flut_start;
+    flut_start.pose=Pose{{0.,0.,.5625},{0.,0.,0.,1.}};
+    StationaereGleichgewichtKonfiguration flut_config;
+    const auto stationaere_flutung=stationaeres_gleichgewicht(
+        stationaeres_flutmodell,flut_start,flut_config,HydrodynamikKonfiguration{});
+    if(stationaere_flutung.status!="konvergiert" ||
+        stationaere_flutung.zustand.geflutet!=rumpf ||
+        stationaere_flutung.flutungswiederholungen!=1)
+        throw std::runtime_error("Stationaere Flutungswiederholung fehlt: "+
+            stationaere_flutung.status+" "+stationaere_flutung.diagnose+
+            " Wiederholungen="+std::to_string(stationaere_flutung.flutungswiederholungen)+
+            " posez="+std::to_string(stationaere_flutung.zustand.pose.position_m()[2])+
+            " Fz="+std::to_string(stationaere_flutung.residuum_kraft_welt_n[2])+
+            " Mx="+std::to_string(stationaere_flutung.residuum_moment_modell_nm[0])+
+            " My="+std::to_string(stationaere_flutung.residuum_moment_modell_nm[1])+
+            " Mz="+std::to_string(stationaere_flutung.residuum_moment_modell_nm[2]));
+    std::cout << "Stationaere Flutung: repeats="
+        << stationaere_flutung.flutungswiederholungen
+        << ", geflutet=" << stationaere_flutung.zustand.geflutet.front() << '\n';
+    StationaereGleichgewichtKonfiguration rang_config;
+    rang_config.aktiv=true;
+    rang_config.kraft_welt_n={10.,0.,0.};
+    const auto rang_result=stationaeres_gleichgewicht(flutmodell(3000.,500.),
+        Zustand{},rang_config,HydrodynamikKonfiguration{});
+    if(rang_result.status!="rangdefizit")
+        throw std::runtime_error("Stationaeres Rangdefizit nicht explizit: "+
+            rang_result.status+" "+rang_result.diagnose);
     const auto m=flutmodell(6000.,500.);
     Zustand z;z.pose=Pose{{0,0,5},{0,0,0,1}};
     z=dynamikschritt(m,z,.01);

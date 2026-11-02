@@ -1,5 +1,79 @@
 # Schnittstellenbeschreibung / Ergebnisvertrag Core → GUI
 
+## C-0.8: Modellinspektion – technisch in GUI integriert, Nutzerabnahme offen
+
+Der finale [Inspektionsvertrag, Abschnitt 3.7](../Spezifikationen/Spezifikation_Modellkatalog_Schnittstelle.md#37-normativer-daten--und-api-vertrag)
+definiert A-C-00098 bis A-C-00104 und CPPI-0032 bis CPPI-0059. Die am
+02.11.2026 finalisierte Erweiterung in
+[Abschnitt 4](../Spezifikationen/Spezifikation_Modellkatalog_Schnittstelle.md#4-c-08-erweiterung-objektzentrierte-gesamtinspektion)
+definiert A-C-00112/00113 und CPPI-0074 bis CPPI-0078.
+Er ist die maßgebliche Quelle für Aufrufe, Schema und Fehler; hier wird
+kein paralleler Vertrag geführt.
+
+`segelphysik/inspektion.hpp` stellt `readModelInspection` und die
+Baum-, Property-, Mesh- und JSON-Abfragen bereit. Der Snapshot ist
+unveränderlich; Detailabfragen lesen keine Dateien erneut und bleiben nach
+Dateiänderungen gültig. `CORE-INSP-0001` bis `CORE-INSP-0004` sind im
+Runtime-Fehlerkatalog dokumentiert. JSON-Antworten verwenden
+`inspektionsversion: "1"`; Katalog- und Simulationsergebnisversionen sind
+unverändert.
+
+Für den GUI-Ladeworker wird `readModelInspection` einmal aufgerufen.
+Darstellung und kompatible Altprojektionen kommen danach aus genau diesem
+Snapshot:
+
+```cpp
+const auto inspection = readModelInspection(catalogue, model_id, model_version);
+const auto structure = modellstruktur(*inspection);
+const auto display = darstellungsgeometrie(*inspection);
+```
+
+Diese Überladungen lesen keine Quelldateien. Gruppen stehen als
+`kind == "gruppe"` im Baum `modell`; ihre `element_ids` verweisen auf
+Elemente. Die Gesamtmasse ist die Property `@gesamtmasse_kg` (kg), die
+Darstellungshülle `@huellquader_m` (Objekt `min`/`max`, m), jeweils an der
+Wurzel `""`. Bewegungsdetails einschließlich abgeleitetem `@hubweg_m`
+stehen im Baum `bewegung` am Knoten
+`/gruppen/<RFC6901-Gruppe>/elemente/<RFC6901-Element>/Bewegung`.
+Katalog-/Versionsprüfung, Import, Meshleser und kompatible
+Katalog-/Struktur-/Geometrieeinstiege verwenden gemeinsame Core-Bausteine;
+die alten Signaturen, Antwortformen und Lebenszyklen bleiben erhalten.
+Die technische GUI-Integration verwendet diese Snapshotprojektionen im
+Ladeworker. Verifiziert wurden GUI-Release-Builds in
+`C:\spdeps\gui-workspace-tabs` und `C:\spdeps\guibuild\Release` sowie
+35/35 integrierte CTest-Fälle mit Ausschluss `^gui_graphics_render_`
+(19 Core- und 16 GUI-Tests), einschließlich Inspektions- und Workspace-
+DPI-Tests bei 100, 150 und 200 Prozent. Der ausgeschlossene,
+bekanntermaßen bereits zuvor fehlschlagende `gui_graphics_render_100`-
+Test meldet weiterhin, dass bei Modell 420 das Deaktivieren der Kurslinie
+das exakte Bild nicht wiederherstellt. Die persönliche fachliche
+Nutzerabnahme bleibt offen.
+
+## C-0.8-Erweiterung 02.11.2026: Objektbaum und Bewegungs-Vorschau
+
+Für die gemeinsame Objektansicht nutzt die GUI den kanonischen Baumtyp
+`objekte`. Er enthält nur Modell-, Baugruppen- und Elementknoten; Metadaten,
+`geometrie`-Quellen und Fachbereiche bleiben Eigenschaften, keine
+Pseudoknoten. Alle Properties kommen aus demselben Snapshot und besitzen
+das additive Feld `area` (`Model`, `Geometrie`, `Darstellung`, `Masse`,
+`Material`, `Hydrostatik`, `Hydrodynamik` oder `Bewegung`).
+
+```cpp
+const auto objectTree = getObjectTree(*inspection, "objekte");
+const auto properties = getObjectProperties(*inspection, "objekte", selectedIds, true);
+```
+
+`modellstruktur(*inspection).gruppen[].elemente[].bewegung` bleibt die
+kompatible typisierte Bewegungsdefinition. Für eine Vorschau ruft die GUI
+`getMovementPreview(*inspection, controllerElementId)` auf. Der Rückgabewert
+enthält modellfeste Achs-/Bezugswerte, Referenzstellung und die
+Core-transformierten Meshes der Normal- sowie verfügbaren Grenzstellungen.
+Werte in Prozent verwenden die bestehenden 0–100-Steuerwerte; eine
+Winkeldrehung mit `ruderwinkel` besitzt mangels Modellgrenzen keine
+erfundenen Minimum-/Maximum-Posen. Fehlende Vorschaugeometrie wird als
+Fehler gemeldet, nicht durch eine zweite GUI-Bewegungsimplementierung
+ersetzt.
+
 ## C-0.5: Temporärer Testantrieb, Ergebnisversion 3
 
 Technisch implementiert am 27.10.2026 nach ausdrücklichem Auftrag, keine
@@ -326,6 +400,60 @@ Die folgenden Felder beschreiben den implementierten Vertrag.
 | `elementvolumina` | Array mit Element-ID, `volumen_m3`, `geflutet` (bool, A-C-00047), `auftriebspunkt_modell_m` |
 | `moment_modell_nm` | Gesamtes Moment im Modellframe |
 | `moment_bezug_modell_m` | Gesamtschwerpunkt im Modellframe |
+
+### Ergebnisvertragsversion 5: stationäres Fahrtgleichgewicht
+
+Ein stationärer Lauf wird über `Laufoptionen::stationaer` aktiviert, also
+durch Belegung des optionalen Konfigurationsfelds. `aktiv` schaltet nur die
+konfigurierte Fremdkraft ein oder aus; `aktiv: false` ist ein gültiger
+stationärer Nullastfall. Die Konfiguration enthält `modellfest`,
+`kraft_welt_n` (Komponenten im gewählten Bezugsrahmen),
+`angriffspunkt_modell_m` und feste `stellungen` als
+`Bewegungsereignis`-Werte (`element_id`, `wert`). `modellfest: true`
+interpretiert den Kraftvektor im Modellrahmen; andernfalls im Weltrahmen.
+Der Angriffspunkt bleibt in beiden Fällen modellfest.
+Prozentstellungen sind auf 0–100 begrenzt. Für Ruderrichtungen enthält das
+Modell derzeit keine deklarierte physische Winkelgrenze; stationäre
+Konfigurationen akzeptieren daher endliche Werte bis zur technischen Grenze
+±1e6 Grad, ohne diese als physikalisch zulässigen Bereich auszugeben.
+
+Der übliche Zustandsdatensatz behält Pose, Geschwindigkeit, Beiträge,
+Summen und Modellfassung. Ergänzend enthält `stationaer`:
+
+| Feld | Bedeutung |
+|---|---|
+| `status`, `diagnose`, `konvergiert` | Expliziter Solverstatus; nur `konvergiert` besagt, dass alle sechs Residuen innerhalb der Toleranzen liegen |
+| `modellfest`, `kraft_n`, `kraft_bezugssystem`, `angriffspunkt_modell_m`, `stellungen` | Eingabesnapshot; ungültige nichtendliche Kraft-/Punktwerte werden als `null` ausgegeben |
+| `iterationen`, `flutungswiederholungen` | Solveriterationen und automatische Neuberechnungen nach neu erkannter Flutung |
+| `residuum_kraft_welt_n`, `residuum_moment_modell_nm` | Drei ungerundete Kraft- und Momentkomponenten |
+| `krafttoleranz_n`, `momenttoleranz_nm` | Angewandte Komponenten-Toleranzen, höchstens 0,1 N bzw. 0,1 Nm |
+| `referenzkurs_verwendet` | Wahr, wenn eine numerisch erkannte yaw-Invarianz den Startkurs als Referenz übernimmt |
+| `geschwindigkeit_relativ_wasser_m_s`, `geschwindigkeit_relativ_wasser_betrag_m_s`, `abdriftwinkel_rad` | Relativgeschwindigkeit und daraus berechnete Abdrift |
+| `nullen` | Explizit festgehaltene `vz_m_s: 0` und `omega_modell_rad_s: [0,0,0]` |
+
+Die Ergebnisvertragsversion ist `"5"` ausschließlich bei diesem Laufpfad;
+Versionen 1–4 und ihre Felder bleiben für bestehende Läufe unverändert.
+Das Feld `stationaer` bleibt auch bei Abbruch und Solverfehler vorhanden.
+Mögliche Solverstatus sind `konvergiert`, `nicht_konvergiert`,
+`rangdefizit`, `suchgrenze`, `abgebrochen` und `ungueltig`. Erkannte
+Flutungen werden in `geflutet` und `flutungswiederholungen` festgehalten;
+`flutung` ist kein Konvergenzstatus.
+Hydrostatik, stellungsabhängige Masse/Schwerpunkt/Benetzung und die
+vorhandenen stationär wirksamen Hydrodynamikbeiträge werden gemeinsam
+ausgewertet; es wird kein Zeitintegrator und kein Testantriebslimit benutzt.
+Eine erfolgreiche Lösung ist weder ein Stabilitäts- noch ein
+Eindeutigkeitsnachweis.
+
+Der gemeinsam wiederverwendbare analytische GUI-/Core-Testfall liegt unter
+`Code/tests/testdata/stationaere_referenz/modell.json` (Mesh `fin.obj` im
+selben Ordner). Mit 1500 N Weltkraft in +X am Modellpunkt `[0,0,-0.4]`,
+ruhigem Wasser mit `rho=1000 kg/m³`, `nu=1e-6 m²/s`, `cd=1`, `cl=0` und
+einer benetzten Seitenfläche von 2,4 m² gilt unabhängig
+`c=0,5*rho*cd*A=1200 N/(m/s)²` sowie
+`v=sqrt(F/c)=1,118033989 m/s`. Der Test erwartet höchstens 0,1 m/s
+Abweichung und prüft separat alle sechs Core-Residuen gegen 0,05 N/Nm.
+Erzeugung und Nachweis: `Code/tests/simulation_tests.cpp`, Test
+`simulation_gesamtlauf`.
 
 Alle Felder sind vorhanden. Ein nicht existierender Auftriebspunkt wird
 als JSON-`null` ausgegeben, nicht als scheinbar gültiger Ursprung.
@@ -694,3 +822,118 @@ Der Core-Test prüft die dynamische JSON-Ausgabe und die generische
 Beitragsform. GUI-Dateien wurden nicht geändert; die generische GUI-Integration
 ist damit vertragsseitig vorbereitet, aber nicht als GUI-Build oder
 End-to-End-Integration getestet.
+
+## Schema 2: ein OBJ, explizite Verwendungen und Quellherkunft (C-0.8)
+
+Maßgeblich sind A-C-00105 bis A-C-00109 in der vorhandenen
+`Spezifikation_Modellbeschreibung.md`; umgesetzt im bestehenden Plan
+`Umsetzungsplan_Modellinspektion.md`, U-C-000086 bis U-C-000089.
+Keine zweite Themenspezifikation, keine Schreib-/Editorfreigabe der GUI.
+
+Beispiel für das neue Importformat (Dichte und Farbe sind lediglich
+Beispielwerte, keine zusätzliche physikalische Modellfreigabe):
+
+```json
+{
+  "schema_version": "2",
+  "id": "boot",
+  "geometrie": {"datei": "boot.obj", "laengeneinheit": "m"},
+  "gruppen": {
+    "koerper": {
+      "elemente": [{
+        "id": "bauteil-17",
+        "Darstellung": {"mesh": "huelle-a", "farbe": "#aabbcc", "oberflaeche": "matt"},
+        "Hydrostatik": {
+          "masse": {"art": "schale", "dichte_kg_pro_m3": 600,
+                    "wanddicke_m": 0.01, "mesh": "schale-a"},
+          "volumen": {"mesh": "volumen-a"}
+        },
+        "Hydrodynamik": {"rolle": "rumpf"}
+      }]
+    }
+  }
+}
+```
+
+`boot.obj` enthält hier `o huelle-a`, `o schale-a` und `o volumen-a`.
+Die Identität ist jeweils der explizite `o`-Name, nicht der Elementname,
+die Rolle oder ein `g`-Name. Ein Quellnetz darf für mehrere Verwendungen
+referenziert werden. Bestehende unterschiedliche Schalen-/Volumennetze
+bleiben echte Varianten in einer einzigen Datei, damit Masse, Trägheit,
+Verdrängung und offene Flutränder exakt erhalten bleiben. Core schließt
+keine Schale automatisch und erfindet keine fehlenden Varianten.
+Im Schema 2 gibt es keine Rolle aus Namen; ohne `Hydrodynamik`-Block
+ist keine hydrodynamische Verwendung aktiviert. Ein vorhandener Block
+benötigt `rolle`: `rumpf`, `kiel` oder `ruder`.
+Das Altformat und seine historische Referenzkörperregel bleiben lesbar.
+
+### GUI-Abfrage ohne Schemaauswertung
+
+Die GUI fragt weiterhin ausschließlich den besitzenden, unveränderlichen
+`ModelInspection` ab. `getAvailableMeshTypes` kann zusätzlich `quelle`
+anbieten; `getMesh(snapshot, "quelle")` liefert jedes Quellnetz einmal,
+einschließlich nicht referenzierter Varianten. Bestehende Fachtypen
+`darstellung`, `hydrostatik_volumen`, `hydrodynamik`, `massen_mesh`,
+`massenpunkte`, `flutrand` bleiben bestehen.
+
+Zusätzliche Felder von `InspectionMesh` und den JSON-Projektionen:
+
+| Feld | Bedeutung |
+|---|---|
+| `source_id` | Schema 2: exakte stabile OBJ-`o`-ID; Altformat: Core-Quellkennung pro normalisierter Dateireferenz; leer bei expliziten JSON-Punktmassen |
+| `provenance` | `quelle` für unveränderte Quell-/Fachnetze; `abgeleitet` für Punktprojektionen oder berechnete offene Randknoten |
+| `derivation` | Lesbare, von Core gelieferte Unterscheidung zwischen Quellkopie, extrahierten Vertices, Punktmassenposition und berechnetem Schalenrand |
+| `element_ids` | Alle verwendenden Elemente; leer bei unbenutzter Quelle |
+| `element_id` | Kompatibel erste Verwendung oder leer; nicht die vollständige Beziehung |
+| `origin` | Bei Quellnetzen `OBJ.o:<ID>` (Schema 2) bzw. logische OBJ-Dateiherkunft im Altformat; keine absoluten Pfade |
+
+`InspectionNode.mesh_ids` verbindet vorhandene Elementknoten mit
+Mesh-Antworten. Die GUI kann daraus Quelle-/Berechnet-Unterknoten und
+überlagerbare, unabhängig anwählbare Geometrien aufbauen. Zur
+Deduplizierung unveränderter Varianten eignen sich `(Element-ID,
+source_id)`; die unterschiedlichen Topologien/Ableitungen nicht nur
+anhand der gemeinsamen Quell-ID zusammenwerfen. Massenpunkte sind
+extrahierte Vertices, keine neu integrierte Punktmassenverteilung.
+Flutrandpunkte sind tatsächlich über Kanteninzidenz berechnet.
+
+Schema 3 verschärft den Vertrag auf genau eine Quelle je geometrischem
+Element. Nach ausdrücklicher Nutzerfreigabe können `Darstellung`,
+`Hydrostatik.masse` und `Hydrostatik.volumen` eine `ableitung` angeben:
+`ohne_deckflaeche` selektiert die vorhandene Oberfläche ohne horizontale
+Deckfläche, `z_schnitt` verwendet den geschlossenen Quellteil unterhalb
+`z = z_m + steigung_x*x + steigung_y*y` einschließlich deklarierter
+Schnittfläche. Das ist eine explizite Teilgeometrie, kein weiterer
+editierbarer OBJ-Körper und keine implizite Reparatur.
+Diese Fachnetze haben `provenance = abgeleitet`, dieselbe `source_id`
+und die tatsächliche Definition in `derivation`. Flutrand/Massenvertices
+verweisen entsprechend auf die ausgewählte Massengeometrie. Die GUI
+ordnet sie unter dem Element den abgeleiteten Daten zu, ohne selbst
+eine Ableitung auszuwerten. Snapshot-, Bewegungs- und bisherige
+Simulationsendpunkte verwenden dieselbe Core-Geometrie.
+Konverter: `--schema3` bleibt strikt; `--schema3-ableitungen` erlaubt die
+geometrisch geprüften Ableitungen. Originale bleiben unverändert.
+
+Elementfilter von `getMesh` berücksichtigen alle `element_ids`.
+Alle Mesh-IDs und Quell-IDs sind relativ zum Modell/Snapshot; sie werden
+nicht über verschiedene Modelle hinweg als globale Identitäten behandelt.
+Die JSON-Hüllversion bleibt `"1"`: alle Ergänzungen sind additive
+Metadaten. Die Fassungskennung des neuen Dateiformats ändert sich
+erwartungsgemäß; sie hasht das gesamte einzelne OBJ und das JSON.
+
+### Explizite Migration und demonstrierbare Nutzung
+
+```powershell
+.\build\standard\Release\segelphysik_konvertieren.exe `
+  "..\Modelle\420\modell.json" ".\build\standard\mein-420-v2"
+```
+
+Alternativ CPPI-0065 `konvertiere_modell_v2(quelle, zielordner)`.
+Der Zielordner darf nicht existieren; sein Elternordner muss existieren.
+Originale werden nur gelesen, nie verändert. Ergebnis sind genau
+`modell.json` und `boot.obj`; der normale Katalog-/Inspektionsimport kann
+deren gemeinsamen Elternordner anschließend wie bei Altmodellen lesen.
+Schreibfehler melden gegebenenfalls einen unvollständigen neuen Ordner,
+der nicht stillschweigend entfernt wird.
+Der Regressionstest erzeugt zusätzliche demonstrierbare Referenzkopien
+unter `build\standard\v2-modelle-test`. Das sind Testprodukte, keine
+Änderungen an `..\Modelle` und keine automatische Migration beim Laden.

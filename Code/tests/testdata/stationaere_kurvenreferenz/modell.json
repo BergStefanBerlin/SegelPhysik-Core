@@ -1,0 +1,22 @@
+{
+  "schema_version": "0.1-entwurf",
+  "id": "stationaere_kurvenreferenz",
+  "name": "Analytische stationaere Kreisreferenz",
+  "Hydrodynamische_Traegheit": {
+    "zusatzmasse": {"a11":0,"a22":0,"a33":0,"a44":0,"a55":0,"a66":0},
+    "daempfung": {"zeta_rollen":0,"zeta_stampfen":0,"zeta_tauchen":0,"gieren_linear":0,"gieren_quadratisch":0}
+  },
+  "gruppen": {
+    "rumpf": {
+      "elemente": [
+        {"id":"hull","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":250,"position_m":[0,0,0]},"volumen":{"datei":"box.obj"}}},
+        {"id":"mass_x_plus","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":687.5,"position_m":[2,0,0]}}},
+        {"id":"mass_x_minus","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":687.5,"position_m":[-2,0,0]}}},
+        {"id":"mass_y_plus","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":437.5,"position_m":[0,2,0]}}},
+        {"id":"mass_y_minus","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":437.5,"position_m":[0,-2,0]}}},
+        {"id":"mass_z_plus","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":750,"position_m":[0,0,1]}}},
+        {"id":"mass_z_minus","Hydrostatik":{"masse":{"art":"punktmasse","masse_kg":750,"position_m":[0,0,-1]}}}
+      ]
+    }
+  }
+}

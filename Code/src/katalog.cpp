@@ -1,4 +1,7 @@
 #include "segelphysik/katalog.hpp"
+#include "segelphysik/inspektion.hpp"
+#include "katalog_intern.hpp"
+#include "modell_intern.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -97,62 +100,6 @@ std::ostringstream json_strom()
 void zahlen(std::ostream& out, const Vektor3& v)
 {
     out << '[' << v[0] << ',' << v[1] << ',' << v[2] << ']';
-}
-
-double obj_zahl(const std::string& token, const std::string& ort)
-{
-    double wert = 0.;
-    const char* start = token.data();
-    if (!token.empty() && token.front() == '+') ++start;
-    const auto ergebnis = std::from_chars(start, token.data() + token.size(), wert);
-    if (ergebnis.ec != std::errc{} || ergebnis.ptr != token.data() + token.size() || !std::isfinite(wert))
-        kat_fehler(5, "Ungueltige OBJ-Zahl in " + ort);
-    return wert;
-}
-
-// Display meshes are read leniently like the GUI did in G-0.1: polygons are
-// fan-triangulated, unsupported records are ignored.
-void obj_darstellung(const std::filesystem::path& datei, const std::string& ort, Darstellungsteil& teil)
-{
-    std::ifstream strom(datei, std::ios::binary);
-    if (!strom) kat_fehler(5, "Darstellungsnetz nicht lesbar: " + ort);
-    std::string zeile;
-    std::size_t nummer = 0;
-    while (std::getline(strom, zeile)) {
-        ++nummer;
-        const std::string stelle = ort + ":" + std::to_string(nummer);
-        std::istringstream tokens(zeile);
-        tokens.imbue(std::locale::classic());
-        std::string art, token;
-        if (!(tokens >> art)) continue;
-        if (art == "v") {
-            Vektor3 p{};
-            for (std::size_t i = 0; i < 3; ++i) {
-                if (!(tokens >> token)) kat_fehler(5, "OBJ-Punkt unvollstaendig in " + stelle);
-                p[i] = obj_zahl(token, stelle);
-            }
-            teil.punkte_m.push_back(p);
-        } else if (art == "f") {
-            std::vector<std::size_t> indizes;
-            while (tokens >> token) {
-                const auto feld = token.substr(0, token.find('/'));
-                long long index = 0;
-                const auto ergebnis = std::from_chars(feld.data(), feld.data() + feld.size(), index);
-                const auto anzahl = static_cast<long long>(teil.punkte_m.size());
-                if (ergebnis.ec != std::errc{} || ergebnis.ptr != feld.data() + feld.size() || index == 0)
-                    kat_fehler(5, "Ungueltiger OBJ-Index in " + stelle);
-                const long long null_basiert = index > 0 ? index - 1 : anzahl + index;
-                if (null_basiert < 0 || null_basiert >= anzahl)
-                    kat_fehler(5, "OBJ-Index ausserhalb des Netzes in " + stelle);
-                indizes.push_back(static_cast<std::size_t>(null_basiert));
-            }
-            if (indizes.size() < 3) kat_fehler(5, "Entartete OBJ-Flaeche in " + stelle);
-            for (std::size_t i = 1; i + 1 < indizes.size(); ++i)
-                teil.dreiecke.push_back({indizes[0], indizes[i], indizes[i + 1]});
-        }
-    }
-    if (teil.punkte_m.empty() || teil.dreiecke.empty())
-        kat_fehler(5, "Darstellungsnetz ohne Dreiecke: " + ort);
 }
 
 std::string relativer_name(const std::filesystem::path& datei, const std::filesystem::path& ordner)
@@ -278,21 +225,31 @@ Modell katalogmodell(const Modellkatalog& katalog, const std::string& modell_id,
     return lade_modell(katalog_datei(katalog, modell_id, erwartete_fassung));
 }
 
-Darstellungsgeometrie darstellungsgeometrie(const Modellkatalog& katalog,
+Darstellungsgeometrie darstellungsgeometrie_aus_dateien(const Modellkatalog& katalog,
     const std::string& modell_id, const std::string& erwartete_fassung,
     const std::optional<std::string>& element_id)
 {
     const auto& datei = katalog_datei(katalog, modell_id, erwartete_fassung);
-    const auto ordner = datei.parent_path();
-    Darstellungsgeometrie result{modell_id, erwartete_fassung, {}, {}};
     ModellBeschreibung beschreibung;
     try {
         beschreibung = lies_beschreibung(datei);
     } catch (const std::exception& e) {
         if (element_id) kat_fehler(6, "Unbekannte Element-ID: " + *element_id);
-        result.diagnosen.push_back(diagnose_aus(e.what(), ordner, "CORE-MOD-0005"));
+        Darstellungsgeometrie result{modell_id, erwartete_fassung, {}, {}};
+        result.diagnosen.push_back(diagnose_aus(e.what(), datei.parent_path(), "CORE-MOD-0005"));
         return result;
     }
+    return darstellungsgeometrie_aus_beschreibung(
+        modell_id, erwartete_fassung, datei, beschreibung, element_id);
+}
+
+Darstellungsgeometrie darstellungsgeometrie_aus_beschreibung(
+    const std::string& modell_id, const std::string& erwartete_fassung,
+    const std::filesystem::path& modelldatei, const ModellBeschreibung& beschreibung,
+    const std::optional<std::string>& element_id)
+{
+    const auto ordner = modelldatei.parent_path();
+    Darstellungsgeometrie result{modell_id, erwartete_fassung, {}, {}};
     bool gefunden = false;
     for (const auto& e : beschreibung.elemente) {
         if (element_id && e.id != *element_id) continue;
@@ -307,7 +264,29 @@ Darstellungsgeometrie darstellungsgeometrie(const Modellkatalog& katalog,
         teil.oberflaeche = e.oberflaeche;
         const auto name = relativer_name(*quelle, ordner);
         try {
-            obj_darstellung(*quelle, name, teil);
+            const auto& mesh_id = e.darstellung ? e.darstellung_mesh : e.volumen_mesh;
+            const auto mesh = std::find_if(beschreibung.quellmeshes.begin(), beschreibung.quellmeshes.end(),
+                [&](const QuellMesh& q) { return mesh_id && q.id == *mesh_id; });
+            if (mesh != beschreibung.quellmeshes.end()) {
+                teil.punkte_m = mesh->mesh.punkte;
+                teil.dreiecke = mesh->mesh.dreiecke;
+            } else {
+                const auto schema = beschreibung.dokument.value("schema_version", "");
+                const bool shared_geometry_schema = schema == "2" || schema == "3";
+                if (shared_geometry_schema && !mesh_id)
+                    throw std::runtime_error("CORE-MOD-0006: Mesh-ID fehlt");
+                const auto netz = lade_quellmesh(*quelle,
+                    shared_geometry_schema ? mesh_id : std::nullopt, !shared_geometry_schema);
+                teil.punkte_m = netz.punkte;
+                teil.dreiecke = netz.dreiecke;
+            }
+            if (const auto* definition = geometrieableitung(beschreibung, e.id,
+                    e.darstellung ? "Darstellung" : "volumen")) {
+                auto netz = abgeleitetes_mesh(
+                    Mesh{std::move(teil.punkte_m), std::move(teil.dreiecke)}, *definition);
+                teil.punkte_m = std::move(netz.punkte);
+                teil.dreiecke = std::move(netz.dreiecke);
+            }
             result.teile.push_back(std::move(teil));
         } catch (const std::exception& fehler) {
             result.diagnosen.push_back(diagnose_aus(fehler.what(), ordner, "CORE-KAT-0005"));
@@ -318,7 +297,7 @@ Darstellungsgeometrie darstellungsgeometrie(const Modellkatalog& katalog,
     return result;
 }
 
-Modellstruktur modellstruktur(const Modellkatalog& katalog, const std::string& modell_id,
+Modellstruktur modellstruktur_aus_dateien(const Modellkatalog& katalog, const std::string& modell_id,
                               const std::string& erwartete_fassung)
 {
     const auto& datei = katalog_datei(katalog, modell_id, erwartete_fassung);
@@ -343,7 +322,8 @@ Modellstruktur modellstruktur(const Modellkatalog& katalog, const std::string& m
         try { result.gesamtmasse_kg = lade_modell(datei).masse_kg; }
         catch (const std::exception&) {}
     }
-    const auto geometrie = darstellungsgeometrie(katalog, modell_id, erwartete_fassung);
+    const auto geometrie = darstellungsgeometrie_aus_dateien(
+        katalog, modell_id, erwartete_fassung, std::nullopt);
     for (const auto& teil : geometrie.teile)
         for (const auto& p : teil.punkte_m) {
             if (!result.huellquader_m) result.huellquader_m = std::array<Vektor3, 2>{p, p};
@@ -353,6 +333,31 @@ Modellstruktur modellstruktur(const Modellkatalog& katalog, const std::string& m
             }
         }
     return result;
+}
+
+Darstellungsgeometrie darstellungsgeometrie(const Modellkatalog& katalog,
+    const std::string& modell_id, const std::string& erwartete_fassung,
+    const std::optional<std::string>& element_id)
+{
+    try {
+        const auto inspection = readModelInspection(katalog, modell_id, erwartete_fassung);
+        return darstellungsgeometrie(*inspection, element_id);
+    } catch (const std::runtime_error& error) {
+        if (std::string(error.what()).rfind("CORE-INSP-0003", 0) != 0) throw;
+        return darstellungsgeometrie_aus_dateien(katalog, modell_id, erwartete_fassung, element_id);
+    }
+}
+
+Modellstruktur modellstruktur(const Modellkatalog& katalog, const std::string& modell_id,
+                              const std::string& erwartete_fassung)
+{
+    try {
+        const auto inspection = readModelInspection(katalog, modell_id, erwartete_fassung);
+        return modellstruktur(*inspection);
+    } catch (const std::runtime_error& error) {
+        if (std::string(error.what()).rfind("CORE-INSP-0003", 0) != 0) throw;
+        return modellstruktur_aus_dateien(katalog, modell_id, erwartete_fassung);
+    }
 }
 
 std::string katalog_json(const Modellkatalog& katalog)

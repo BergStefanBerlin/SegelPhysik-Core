@@ -135,17 +135,20 @@ int main(int argc,char* argv[]) {
             const auto untouched=testantrieb_start(m,fast,{0.,5.},true);
             check(untouched.geschwindigkeit_welt_m_s==fast.geschwindigkeit_welt_m_s,"Start wurde begrenzt");
         }
-        const auto history=zustand_json(m,off,"laufend");
+        const auto history=zustand_json(m,off,"laufend",{},nullptr,nullptr,
+            ErgebnisJsonFormat::Kompatibel);
         const auto live=dynamikschritt(m,off,.01,std::vector<TestantriebEreignis>{{1,true},{2,false},{3,true}});
         check(live.testantrieb->aktiv&&live.testantrieb->uebergang->ereignisse.size()==3,"Ereignisreihenfolge");
         check(live.testantrieb->uebergang->von_schritt==0&&live.testantrieb->uebergang->nach_schritt==1,"Grenzbestaetigung");
-        check(history==zustand_json(m,off,"laufend"),"Historie umgedeutet");
+        check(history==zustand_json(m,off,"laufend",{},nullptr,nullptr,
+            ErgebnisJsonFormat::Kompatibel),"Historie umgedeutet");
         check(history.find("\"vertragsversion\":\"3\"")!=std::string::npos,"Inaktive V3");
         check(history.find("\"uebergang\":null")!=std::string::npos,"Startnullabbildung");
-        check(zustand_json(m,start,"laufend").find("\"vertragsversion\":\"2\"")!=std::string::npos,"V2 geaendert");
+        check(zustand_json(m,start,"laufend",{},nullptr,nullptr,ErgebnisJsonFormat::Kompatibel).find("\"vertragsversion\":\"2\"")!=std::string::npos,"V2 geaendert");
         const auto disabled=dynamikschritt(m,live,.01,std::vector<TestantriebEreignis>{{4,false}});
         check(!disabled.testantrieb->aktiv,"Ausschalten");
-        const auto livejson=zustand_json(m,live,"laufend");
+        const auto livejson=zustand_json(m,live,"laufend",{},nullptr,nullptr,
+            ErgebnisJsonFormat::Kompatibel);
         check(livejson.find("\"kennung\":3")!=std::string::npos&&livejson.find("\"begrenzung\"")!=std::string::npos,"V3 Pflichtdaten");
         fehler([&]{dynamikschritt(m,live,.01,std::vector<TestantriebEreignis>{{3,false}});});
         fehler([&]{dynamikschritt(m,disabled,.01,std::vector<TestantriebEreignis>{{4,true}});});
@@ -168,6 +171,7 @@ int main(int argc,char* argv[]) {
         const auto imported=lade_modell(argv[1]);
         check(!imported.elemente.front().massenpunkte_m.empty(),"Import verwirft Massenpunkte");
         Laufoptionen o;o.dynamisch=true;o.dauer_s=.03;o.dt_s=.01;o.testantrieb=TestantriebKonfiguration{};
+        o.ergebnis_json_format=ErgebnisJsonFormat::Kompatibel;
         o.testantrieb_aktiv=true;o.testantrieb_ereignisse={{1,{1,false}},{2,{2,true}},{3,{3,false}}};
         check(!std::filesystem::exists(output),"Testausgabe existiert bereits");
         const auto report=simulieren(argv[1],output,o);
@@ -179,20 +183,23 @@ int main(int argc,char* argv[]) {
             }))
             direct=hydrodynamik_start(imported,direct,HydrodynamikKonfiguration{});
         std::ifstream in(output);std::string line;std::getline(in,line);
-        check(line==zustand_json(imported,direct,"laufend"),"Batch-Startparitaet");
+        check(line==zustand_json(imported,direct,"laufend",{},nullptr,nullptr,
+            ErgebnisJsonFormat::Kompatibel),"Batch-Startparitaet");
         for(std::size_t i=0;i<3;++i) {
             std::vector<TestantriebEreignis> events;
             for(const auto& e:o.testantrieb_ereignisse) if(e.first==i) events.push_back(e.second);
             const double ziel=static_cast<double>(i+1)*o.dt_s;
             direct=dynamikschritt(imported,direct,ziel-direct.zeit_s,events);
             std::getline(in,line);
-            check(line==zustand_json(imported,direct,i==2?"abgeschlossen":"laufend"),"Batch-Schrittparitaet");
+            check(line==zustand_json(imported,direct,i==2?"abgeschlossen":"laufend",
+                {},nullptr,nullptr,ErgebnisJsonFormat::Kompatibel),"Batch-Schrittparitaet");
         }
         check(line.find("\"kennung\":3")==std::string::npos,"Ereignis nach Laufende bestaetigt");
         in.close();std::filesystem::remove(output);
         Laufoptionen explicitoff;explicitoff.dynamisch=true;
         explicitoff.dauer_s=.02;explicitoff.dt_s=.01;
         explicitoff.testantrieb=TestantriebKonfiguration{};
+        explicitoff.ergebnis_json_format=ErgebnisJsonFormat::Kompatibel;
         check(!explicitoff.testantrieb_aktiv,"Defaultflag nicht inaktiv");
         check(simulieren(argv[1],output,explicitoff).status=="abgeschlossen","Explizit inaktiver Batch");
         std::ifstream inactivefile(output);

@@ -10,6 +10,8 @@
 
 namespace segelphysik {
 
+class ModelInspection;
+
 // Model catalogue interface (catalogue version 1). The GUI selects the folder
 // and holds the catalogue object; the core keeps no global state. Answers
 // address models by model ID and never contain file paths or internal
@@ -77,6 +79,7 @@ struct Modellstruktur {
 };
 Modellstruktur modellstruktur(const Modellkatalog& katalog, const std::string& modell_id,
                               const std::string& erwartete_fassung);
+Modellstruktur modellstruktur(const ModelInspection& inspection);
 
 struct Darstellungsteil {
     std::string element_id;
@@ -96,6 +99,8 @@ struct Darstellungsgeometrie {
 // Without element_id all elements; CORE-KAT-0006 for an unknown element.
 Darstellungsgeometrie darstellungsgeometrie(const Modellkatalog& katalog,
     const std::string& modell_id, const std::string& erwartete_fassung,
+    const std::optional<std::string>& element_id = std::nullopt);
+Darstellungsgeometrie darstellungsgeometrie(const ModelInspection& inspection,
     const std::optional<std::string>& element_id = std::nullopt);
 
 std::vector<KatalogDiagnose> modelldiagnose(const Modellkatalog& katalog,

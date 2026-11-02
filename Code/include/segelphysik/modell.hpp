@@ -2,6 +2,8 @@
 
 #include "segelphysik/pose.hpp"
 
+#include <nlohmann/json.hpp>
+
 #include <array>
 #include <cstddef>
 #include <filesystem>
@@ -70,6 +72,10 @@ struct Element {
     Vektor3 schwerpunkt_m{};
     std::array<double, 9> traegheit_kg_m2{};
     std::optional<Mesh> volumen;
+    std::optional<Mesh> massen_mesh;
+    std::string massenart;
+    std::optional<double> dichte_kg_pro_m3;
+    std::optional<double> wanddicke_m;
     std::optional<HydrodynamikRolle> hydrodynamik_rolle;
     std::optional<ElementHydrodynamikDaten> hydrodynamik_daten;
     std::optional<Bewegungsdefinition> bewegung;
@@ -100,7 +106,14 @@ struct Modell {
     std::optional<HydrodynamischeTraegheitModell> hydrodynamische_traegheit;
 };
 
-// JSON 0.1-entwurf: id, gruppen.{name}.elemente; elements contain id and
+// JSON "2"/"3": geometrie.{datei,laengeneinheit:"m"} selects one OBJ containing
+// uniquely named o objects. Darstellung, Hydrostatik.masse (except point
+// masses) and Hydrostatik.volumen reference these with mesh:"o-ID".
+// Schema 2 allows source variants per element; schema 3 requires one shared
+// source object per element. No auto repair.
+// Element ID, mesh ID and explicit Hydrodynamik.rolle are independent.
+// No role is inferred in versions 2 or 3. All source objects use triangle faces.
+// JSON 0.1-entwurf remains supported: id, gruppen.{name}.elemente; elements contain id and
 // Darstellung, Hydrostatik, and optionally Hydrodynamik and Bewegung. Hydrostatik requires
 // masse and optionally volumen. Hydrodynamik.rolle requires a physical volume
 // mesh and is one of rumpf, kiel or ruder; optional model data carries
@@ -110,7 +123,8 @@ struct Modell {
 // pyramide, quader, rolle, unregelmaessig) require exactly one physical
 // volume element and receive the rumpf role in the Core importer.
 // Paths are relative to the JSON file; Darstellung is never used for physics
-// (its file is not opened). Darstellung.farbe is an optional "#rrggbb" colour,
+// (legacy display-only files are not opened by lade_modell).
+// Darstellung.farbe is an optional "#rrggbb" colour,
 // Darstellung.oberflaeche an optional "matt", "glaenzend", "metall", "chrom", "lack", "glas",
 // "leuchtend", "schillernd", "facettiert", "drahtgitter", "perlmutt", "unsichtbar" (not drawn,
 // e.g. air bodies), "stoff", "holz" or "metall_gebuerstet". Surface names are
@@ -144,12 +158,14 @@ struct Modell {
 // Face-pair testing uses an AABB sweep, worst-case quadratic when boxes overlap.
 // Throws std::runtime_error with CORE-MOD-0001..0008 and file/element context.
 // fassung is a non-cryptographic FNV-1a fingerprint of JSON and the actually
-// imported physics OBJ contents, including boundaries; not of display files.
+// imported physics OBJ contents, including boundaries; not of legacy display
+// files. Versions 2 and 3 hash the entire consolidated OBJ.
 Modell lade_modell(const std::filesystem::path& datei);
 
 // Tolerant description reader for catalogue and display purposes. It does not
-// validate physics and throws (CORE-MOD-0001/0002/0005) only if the JSON
-// itself is unusable. Element order matches lade_modell (groups by name).
+// validate physics; unusable JSON is rejected. Readable source geometry is
+// retained in quellmeshes; absent/invalid sources remain display diagnostics.
+// Element order matches lade_modell (groups by name).
 struct ElementBeschreibung {
     std::string id;
     std::string gruppe;
@@ -158,6 +174,14 @@ struct ElementBeschreibung {
     std::optional<std::array<double, 3>> farbe_rgb;  // Darstellung.farbe "#rrggbb", 0..1
     std::optional<std::string> oberflaeche;          // Darstellung.oberflaeche, siehe oben
     std::optional<Bewegungsdefinition> bewegung;
+    std::optional<std::string> darstellung_mesh;
+    std::optional<std::string> volumen_mesh;
+    std::optional<std::string> masse_mesh;
+};
+struct QuellMesh {
+    std::string id;
+    std::string ursprung;
+    Mesh mesh;
 };
 struct ModellBeschreibung {
     std::string id;
@@ -165,11 +189,23 @@ struct ModellBeschreibung {
     std::optional<std::string> beschreibung;
     std::vector<std::string> gruppen;
     std::vector<ElementBeschreibung> elemente;
+    nlohmann::json dokument;
+    std::vector<QuellMesh> quellmeshes;
 };
 ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei);
 
 // Fingerprint over the JSON and all readable physics OBJ files in import
 // order. For an importable model it equals lade_modell(datei).fassung.
 std::string modell_fassung(const std::filesystem::path& datei);
+
+// Creates a new directory containing modell.json and boot.obj. Never overwrites
+// an existing destination; originals are read only. Uses the regular importer.
+void konvertiere_modell_v2(const std::filesystem::path& quelle,
+                          const std::filesystem::path& zielordner);
+// Explicit opt-in permits validated source-derived surface selections/plane
+// cuts. The default still rejects competing geometry without selecting it.
+void konvertiere_modell_v3(const std::filesystem::path& quelle,
+                          const std::filesystem::path& zielordner,
+                          bool ableitungen_zulassen = false);
 
 }

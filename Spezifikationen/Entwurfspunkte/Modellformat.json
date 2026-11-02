@@ -1,10 +1,41 @@
 {
-  "status": "entwurf",
+  "status": "finalisiert",
+  "stand": "2026-11-02",
   "thema": "Einheitliche Modellbeschreibung",
   "beispiele": "../Beispiele_Modellformat/README.md",
   "spezifikation": "../Spezifikation_Modellbeschreibung.md",
-  "hinweis": "Offene Diskussionspunkte sind keine freigegebenen Anforderungen und kein Umsetzungsauftrag. Bereits finalisierte Teilaspekte verweisen auf die maßgebliche Spezifikation; übrige Punkte bleiben offen.",
+  "hinweis": "IDEE-C-00072 und IDEE-C-00073 am 02.11.2026 finalisiert. Anschließend wählt der Nutzer ausdrücklich ausreichend genaue Erhaltung der bisherigen Physik über eine Quelle und reproduzierbare Teilgeometrien; Schnitt-/Flächenauswahl im bestehenden Vertrag präzisiert. Alle elf Modelle migriert und technisch geprüft; keine allgemeine Netzreparatur oder Änderung bestehender Rechenalgorithmen.",
+  "finalisierte_zuordnungen": [
+    {"idee": "IDEE-C-00072", "anforderung": "A-C-00110"},
+    {"idee": "IDEE-C-00073", "anforderung": "A-C-00111"}
+  ],
   "punkte": [
+    {
+      "id": "IDEE-C-00072",
+      "status": "angenommen",
+      "anforderungen": ["A-C-00110"],
+      "umsetzungsschritte": ["U-C-000090", "U-C-000091", "U-C-000095"],
+      "thema": "Genau ein maßgebliches Quellmesh je geometrischem Element",
+      "bezug": "../Spezifikation_Modellbeschreibung.md#c-08-erweiterung-eine-geometrische-quelle-je-element",
+      "beschreibung": "Ein OBJ mit benannten Elementnetzen; je Element genau eine bearbeitbare Quelle für alle Verwendungen. Keine Vereinfachung jetzt, vorhandene Schwerpunktberechnung und Stützstellensemantik unverändert. Geometriefreie Punktmassen ohne künstliches Mesh.",
+      "quelle": "Nutzerklärung vom 02.11.2026; auf ausdrücklichen Auftrag finalisiert."
+    },
+    {
+      "id": "IDEE-C-00073",
+      "status": "angenommen",
+      "anforderungen": ["A-C-00111"],
+      "umsetzungsschritte": ["U-C-000090", "U-C-000092", "U-C-000095"],
+      "thema": "Nachweisbare Ein-Quellmesh-Migration ohne stille Physikänderung",
+      "bezug": "../Spezifikation_Modellbeschreibung.md#a-c-00111-nachweisbare-migration-und-konfliktbehandlung",
+      "beschreibung": "Identische Geometrien zusammenführen; unterschiedliche Altgeometrien fachlich vergleichen und maßgebliche Quelle begründen. Versionierung vor Vertragsänderung festlegen. Elf Referenzmodelle und physikalische Ergebnisse vergleichen; Konflikte und Abweichungen nicht verschweigen.",
+      "historische_migrationskonflikte": [
+        "420: Rumpf Darstellung weicht von Masse/Volumen ab; Cockpit-Masseschale weicht von Darstellung/Volumen ab; Schwert-Volumen weicht von Darstellung/Masse ab.",
+        "folkeboot: Schwert- und Ruder-Volumennetze weichen jeweils von Darstellung/Masse ab.",
+        "optimist: Rumpf- und Schwert-Volumennetze weichen jeweils von Darstellung/Masse ab.",
+        "Der strikte Konverter verweigert diese Unterschiede weiterhin; Originale bleiben unverändert."
+      ],
+      "aufloesung": "Nutzer wählt Option 1: Physik ausreichend genau mit expliziten Ableitungen erhalten. --schema3-ableitungen verwendet geometrisch geprüfte Ebenenschnitte und vorhandene Oberflächen ohne Deckfläche. Physik-, Flutungs-, Stützstellen-, Dynamik- und GUI-Nachweise im maßgeblichen C-0.8-Plan; keine offene Modellentscheidung für die elf Referenzen."
+    },
     {
       "id": "IDEE-C-00001",
       "status": "teilweise_finalisiert",

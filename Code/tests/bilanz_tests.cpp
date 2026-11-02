@@ -135,8 +135,10 @@ void gleichgewichtsangaben(const Modell& m)
     pruefe(n.status != "konvergiert" && n.gleichgewicht &&
         (n.gleichgewicht->residuum_kraft_n > 1e-9 || n.gleichgewicht->residuum_moment_nm > 1e-9),
         "Nicht konvergierter Fall ohne Residuum ueber Toleranz");
-    const auto statisch = zustand_json(m, r.zustand, r.status, r.diagnose, &g);
-    const auto dynamisch = zustand_json(m, dynamikschritt(m, r.zustand, .01), "laufend");
+    const auto statisch = zustand_json(m, r.zustand, r.status, r.diagnose, &g, nullptr,
+        ErgebnisJsonFormat::Kompatibel);
+    const auto dynamisch = zustand_json(m, dynamikschritt(m, r.zustand, .01), "laufend",
+        {}, nullptr, nullptr, ErgebnisJsonFormat::Kompatibel);
     for (const auto* feld : {"\"vertragsversion\":\"2\"", "\"modell_id\"", "\"modell_fassung\"", "\"status\"",
             "\"diagnose\"", "\"zeit_s\"", "\"schritt\"", "\"position_m\"", "\"orientierung_xyzw\"",
             "\"geschwindigkeit_welt_m_s\"", "\"omega_modell_rad_s\"", "\"volumen_m3\"", "\"vektoren\"",

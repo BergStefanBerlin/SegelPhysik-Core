@@ -3,7 +3,39 @@
   "thema": "Lateraldruckpunkt",
   "spezifikation": "../Spezifikation_Lateraldruckpunkt.md",
   "hinweis": "Finalisiert am 28.10.2026 auf Nutzerauftrag. Zielversion: laufender Versionsschritt C-0.7. Segeldruckpunkt ist nicht Teil des Umfangs.",
+  "erweiterung_2026_11_02": {
+    "status": "finalisiert",
+    "hinweis": "Abschnitt 5 am 02.11.2026 auf ausdruecklichen Nutzerauftrag finalisiert und zur Implementierung freigegeben. Historische Anforderungen A-C-00093..00097 bleiben unveraendert.",
+    "zielversion": "C-0.8"
+  },
   "punkte": [
+    {
+      "id": "IDEE-C-00085",
+      "status": "angenommen",
+      "thema": "Panelgenaue Seitenkraftauswertung",
+      "bezug": "../Spezifikation_Lateraldruckpunkt.md#a-c-00123-panelgenaue-lateraldruckpunktauswertung",
+      "vorschlag": "Signierte erste Momente und Panelbetragssumme vor Bauteilaggregation erhalten; kein Begrenzen auf den Rumpf; geometrischen Ersatz strikt unterscheiden.",
+      "entscheidung": "Angenommen als panelgenaue Q/B/X/Z-Auswertung in Druck sowie beiden Seitenkraftmethoden vor Aggregation; Bestimmbarkeit anhand Panelbetragssumme.",
+      "anforderungen": ["A-C-00123"]
+    },
+    {
+      "id": "IDEE-C-00086",
+      "status": "angenommen",
+      "thema": "Ersatz-SDP aus eingefrorener Fremdkraft",
+      "bezug": "../Spezifikation_Lateraldruckpunkt.md#a-c-00124-ersatz-sdp-aus-der-fremdkraft",
+      "vorschlag": "Modellfester Ansatzpunkt der aktiven nichtverschwindenden Last; keine Segelphysik und keine neue Geradeausfahrtbedingung.",
+      "entscheidung": "Angenommen aus dem eingefrorenen stationaeren Ergebnis-Snapshot; inaktiv/null erhalten Status ohne Position, fehlender Kontext ohne Block.",
+      "anforderungen": ["A-C-00124"]
+    },
+    {
+      "id": "IDEE-C-00087",
+      "status": "angenommen",
+      "thema": "Additiver Druckpunktvertrag und Nachweise",
+      "bezug": "../Spezifikation_Lateraldruckpunkt.md#a-c-00125-additiver-ergebnisvertrag-und-legacyprojektion",
+      "vorschlag": "V6 mit expliziter lateraler Auswertungskennung 2 und getrenntem ersatz_segel-Block ergaenzen; Panelreferenzen, Schwellen, Frames, Paritaet und Physikinvarianz pruefen.",
+      "entscheidung": "Angenommen als additive Felder ohne Aenderung der Vertragsversion oder Altfelder; CPPI-0101..0104 registriert.",
+      "anforderungen": ["A-C-00125"]
+    },
     {
       "id": "IDEE-C-00060",
       "status": "angenommen",

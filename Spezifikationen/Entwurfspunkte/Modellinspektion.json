@@ -1,0 +1,54 @@
+{
+  "status": "finalisiert",
+  "thema": "Erweiterung der Modellkatalog-Schnittstelle um Objektinspektion",
+  "stand": "2026-11-02",
+  "ergaenzungsentwurf": "Abschnitt 4 enthält die am 02.11.2026 finalisierte objektzentrierte Erweiterung; bisherige Freigaben bleiben unverändert.",
+  "zielversion": "C-0.8",
+  "nachtraegliche_freigaben": [
+    {
+      "datum": "2026-11-01",
+      "quelle": "Nutzer fordert Wiederverwendung neuer Funktionen durch bisherige Funktionen ohne sichtbare Funktionsänderung.",
+      "anforderungen": ["A-C-00104"],
+      "umsetzungsschritte": ["U-C-000079", "U-C-000085", "U-C-000084"],
+      "status": "fachlich_festgelegt_umsetzung_offen"
+    }
+  ],
+  "fachliche_entscheidungen": {
+    "umfang": "Alle vorhandenen Objektbaumtypen und fachlichen Eigenschaften.",
+    "vertragserweiterung": "Nutzer bestätigt Physiknetze und bisher ausgeschlossene fachliche Eigenschaften als lesbare Inspektionsdaten für Bootsauswahl. Keine Rohpuffer oder Schreibzugriffe.",
+    "perspektive": "Spätere Reparaturen und Ummodellierungen vorbereiten, in diesem Umfang nicht implementieren.",
+    "konsistenz": "Bestätigt: einmal eingelesener Core-Inspektionsstand bleibt unverändert und gültig, unabhängig von späteren Dateiänderungen, bis ausdrücklich neues Einlesen angefordert wird. Details ausschließlich aus diesem Bestand. Mesh-Updates und Mesh-Modifikation später."
+  },
+  "spezifikation": "../Spezifikation_Modellkatalog_Schnittstelle.md#4-c-08-erweiterung-objektzentrierte-gesamtinspektion",
+  "finalisierte_zuordnungen": [
+    {"idee": "IDEE-C-00074", "anforderung": "A-C-00112"},
+    {"idee": "IDEE-C-00075", "anforderung": "A-C-00113"}
+  ],
+  "hinweis": "Die ursprünglichen Objektinspektionsanforderungen wurden am 01.11.2026 und die Erweiterung IDEE-C-00074/00075 am 02.11.2026 auf ausdrücklichen Nutzerauftrag finalisiert. Umsetzung, Core-Tests, GUI-Integration und persönliche Abnahme sind getrennte Status.",
+  "punkte": [
+    {
+      "id": "IDEE-C-00074",
+      "status": "angenommen",
+      "anforderungen": ["A-C-00112"],
+      "umsetzungsschritte": ["U-C-000093", "U-C-000095"],
+      "thema": "Objektzentrierte Hierarchie und bereichsübergreifende Eigenschaften",
+      "bezug": "../Spezifikation_Modellkatalog_Schnittstelle.md#a-c-00112-kanonischer-objektbaum-und-bereichszugeordnete-eigenschaften",
+      "beschreibung": "Einzige Hierarchie Modell/Baugruppe/Element, vollständige Snapshot-Eigenschaften mit stabilem area-Feld und unveränderte Fachabfragen; deduplizierte Auswahl samt Nachkommen."
+    },
+    {
+      "id": "IDEE-C-00075",
+      "status": "angenommen",
+      "anforderungen": ["A-C-00113"],
+      "umsetzungsschritte": ["U-C-000094", "U-C-000095"],
+      "thema": "Bestehende Bewegungsdaten für GUI-Vorschauen",
+      "bezug": "../Spezifikation_Modellkatalog_Schnittstelle.md#a-c-00113-typisierte-bewegungs-vorschau-aus-dem-snapshot",
+      "beschreibung": "Typisierte MovementPreview liefert Achsbezug, Referenzstellung und Transformationen über vorhandene Core-Semantik; vorhandene Grenzen werden verwendet, fehlende Grenzen bleiben ausdrücklich nicht vorhanden, keine neue Physik."
+    },
+    {"id": "IDEE-C-00066", "status": "angenommen", "anforderungen": ["A-C-00098"], "thema": "Verfügbare Baumsichten und Hierarchien", "bezug": "Spezifikation Abschnitt 3.7", "beschreibung": "Alle vorhandenen fachlichen Strukturen in fünf definierten Sichten; vollständiges Feldinventar."},
+    {"id": "IDEE-C-00067", "status": "angenommen", "anforderungen": ["A-C-00100"], "thema": "Eigenschaften einschließlich Unterobjekten", "bezug": "Spezifikation Abschnitt 3.7", "beschreibung": "Typisierte Werte, Einheiten/Status, stabile IDs und deduplizierte Nachkommenauswahl ohne Summierung."},
+    {"id": "IDEE-C-00068", "status": "angenommen", "anforderungen": ["A-C-00101"], "thema": "Verfügbare Mesh-Typen und Geometrieabruf", "bezug": "Spezifikation Abschnitt 3.7", "beschreibung": "Sechs bedingte Geometriearten einschließlich Physiknetzen als Inspektionsdaten; getAvailableMeshTypes/getMesh festgelegt."},
+    {"id": "IDEE-C-00069", "status": "angenommen", "anforderungen": ["A-C-00099"], "thema": "Fester eingelesener Inspektionsstand", "bezug": "Spezifikation Abschnitt 3.7", "beschreibung": "Einmaliger unveränderlicher Bestand ohne Dateizugriffe bei Detailabfragen; Dateiänderungen entwerten ihn nicht."},
+    {"id": "IDEE-C-00070", "status": "angenommen", "anforderungen": ["A-C-00102"], "thema": "Transportneutraler Vertrag und Diagnosen", "bezug": "Spezifikation Abschnitt 3.7", "beschreibung": "Konkrete APIs, C++-/JSON-Parität, versionierte Antworten, CORE-INSP-Diagnosen; Altaufrufe unverändert."},
+    {"id": "IDEE-C-00071", "status": "angenommen", "anforderungen": ["A-C-00103"], "thema": "Vertragstests und GUI-Übergabe", "bezug": "Spezifikation Abschnitt 3.7", "beschreibung": "Feldabdeckung, Vertrags-/Mutations-/Regressionstests; technische Lieferung getrennt von Sichtabnahme."}
+  ]
+}

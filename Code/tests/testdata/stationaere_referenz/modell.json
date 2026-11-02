@@ -1,0 +1,116 @@
+{
+  "schema_version": "0.1-entwurf",
+  "id": "stationaere_referenz",
+  "name": "Analytische stationaere Referenz",
+  "gruppen": {
+    "rumpf": {
+      "elemente": [
+        {
+          "id": "Fin",
+          "Hydrostatik": {
+            "masse": {
+              "art": "punktmasse",
+              "masse_kg": 1,
+              "position_m": [0, 0, -0.7]
+            },
+            "volumen": {"datei": "fin.obj"}
+          },
+          "Hydrodynamik": {
+            "rolle": "kiel",
+            "modelle": {
+              "seitenkraft": {
+                "methode": "polare_2d",
+                "quelle": "Analytische stationaere Referenz",
+                "gueltigkeit": "0 <= alpha <= pi/2, 0 <= Re <= 1e9",
+                "parameter": {},
+                "kennfeld": [
+                  {
+                    "anstellwinkel_rad": 0,
+                    "reynolds_zahl": 1,
+                    "cl": 0,
+                    "cd": 1,
+                    "status": "validiert",
+                    "quelle": "Analytische stationaere Referenz",
+                    "gueltigkeit": "0 <= alpha <= pi/2, 0 <= Re <= 1e9",
+                    "unsicherheit": "keine"
+                  },
+                  {
+                    "anstellwinkel_rad": 0,
+                    "reynolds_zahl": 1000000000,
+                    "cl": 0,
+                    "cd": 1,
+                    "status": "validiert",
+                    "quelle": "Analytische stationaere Referenz",
+                    "gueltigkeit": "0 <= alpha <= pi/2, 0 <= Re <= 1e9",
+                    "unsicherheit": "keine"
+                  },
+                  {
+                    "anstellwinkel_rad": 1.5707963267948966,
+                    "reynolds_zahl": 1,
+                    "cl": 0,
+                    "cd": 1,
+                    "status": "validiert",
+                    "quelle": "Analytische stationaere Referenz",
+                    "gueltigkeit": "0 <= alpha <= pi/2, 0 <= Re <= 1e9",
+                    "unsicherheit": "keine"
+                  },
+                  {
+                    "anstellwinkel_rad": 1.5707963267948966,
+                    "reynolds_zahl": 1000000000,
+                    "cl": 0,
+                    "cd": 1,
+                    "status": "validiert",
+                    "quelle": "Analytische stationaere Referenz",
+                    "gueltigkeit": "0 <= alpha <= pi/2, 0 <= Re <= 1e9",
+                    "unsicherheit": "keine"
+                  }
+                ],
+                "widerstandsanteile": ["profil"]
+              }
+            }
+          }
+        },
+        {
+          "id": "BallastXPlus",
+          "Hydrostatik": {
+            "masse": {
+              "art": "punktmasse",
+              "masse_kg": 11.75,
+              "position_m": [0.5, 0, -0.7]
+            }
+          }
+        },
+        {
+          "id": "BallastXMinus",
+          "Hydrostatik": {
+            "masse": {
+              "art": "punktmasse",
+              "masse_kg": 11.75,
+              "position_m": [-0.5, 0, -0.7]
+            }
+          }
+        },
+        {
+          "id": "BallastYPlus",
+          "Hydrostatik": {
+            "masse": {
+              "art": "punktmasse",
+              "masse_kg": 11.75,
+              "position_m": [0, 0.5, -0.7]
+            }
+          }
+        },
+        {
+          "id": "BallastYMinus",
+          "Hydrostatik": {
+            "masse": {
+              "art": "punktmasse",
+              "masse_kg": 11.75,
+              "position_m": [0, -0.5, -0.7]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -264,3 +264,355 @@ Die Umsetzung ist inzwischen über den
 beauftragt. Die Abnahmekriterien sind noch nicht als bestanden
 nachgewiesen. Rotationsdarstellung, Gelenke, lokale Elementbezüge,
 konkrete Ursprungswahl und weitere Modellthemen bleiben offen.
+
+## C-0.8-Erweiterung: konsolidierte Quellgeometrie (02.11.2026)
+
+Vom Nutzer zur Umsetzung freigegeben: Alternative 2 mit stabiler,
+rollenunabhängiger Identität. Dieser Abschnitt erweitert dieselbe
+maßgebliche Themenspezifikation; die bisherigen Anforderungen und das
+Altformat bleiben bestehen. Persönliche GUI-Abnahme bleibt separat offen.
+
+### A-C-00105: Ein OBJ mit expliziten Teilnetzen, Schema `"2"`
+
+Die JSON-Datei führt Gruppen, Elemente und ihre fachlichen Eigenschaften
+weiter. Genau ein oberster Geometrieverweis
+`"geometrie": {"datei": "boot.obj", "laengeneinheit": "m"}` benennt die
+gemeinsame OBJ-Datei. Der relative Dateiname ist frei wählbar, Endung `.obj`.
+`Darstellung`, `Hydrostatik.masse` (außer Punktmasse) und
+`Hydrostatik.volumen` verwenden jeweils `"mesh": "<o-ID>"` statt `datei`.
+Ein Teilnetz beginnt mit `o <stabile-ID>`. `g`, Material- oder Dateinamen
+sind keine Ersatzidentitäten. Mehrere fachliche Verwendungen dürfen
+dasselbe Teilnetz referenzieren. Auch unbenutzte Quellvarianten sind
+inspektierbar. Fehlende, leere oder doppelte `o`-IDs, Flächen ohne `o`,
+fehlende/ungültige Referenzen und andere Längeneinheiten werden abgelehnt.
+Globale Vertex-Indizes, negative Indizes und vorhandene `v/vt/vn`-Verweise
+bleiben korrekt; Teilnetze werden mit lokalen Indizes bereitgestellt.
+Vertices unter einem `o` sowie aus anderen Bereichen referenzierte
+Vertices gehören zum Teilnetz; die Reihenfolge ist die globale Quellreihenfolge.
+
+**Abnahme:** Import-/Negativtests, globale/negative Indizes und geteilte
+Referenzen in `modell_geometrie_v2`.
+
+### A-C-00106: Identität und hydrodynamische Verwendung getrennt
+
+Element-ID und Mesh-ID sind unabhängig voneinander und von Anzeigenamen.
+Nur ein expliziter Block `Hydrodynamik` aktiviert die hydrodynamische
+Verwendung; darin ist `rolle` verpflichtend und ausschließlich `rumpf`,
+`kiel` oder `ruder`. Die Rolle benötigt wie bisher ein physisches Volumen.
+Das Fehlen des gesamten Blocks bedeutet bewusst keine hydrodynamische
+Verwendung (z. B. Luftkörper); es ist keine Aufforderung zur Rolleninferenz.
+Namen wie `rumpf`, `quader` oder `ruder` lösen im Schema 2 keine Rolle aus.
+Mehrere Elemente dürfen dieselbe Rolle haben; Rollen sind keine IDs.
+Die historische Sonderregel der acht einfachen Körper bleibt ausschließlich
+im Altformat erhalten. Der Konverter materialisiert deren bisher implizite
+Rolle ausdrücklich im neuen JSON.
+
+**Abnahme:** Umbenannte Elemente/Modelle behalten explizite Rollen;
+fehlende/ungültige Rollen innerhalb eines Blocks werden abgelehnt; kein
+Block erzeugt keine Rolle, auch beim Modellnamen `quader`.
+
+### A-C-00107: Gemeinsamer Import ohne Änderung der Physik
+
+Altformat `0.1-entwurf` und Schema 2 verwenden dieselben Core-Bausteine
+für OBJ-Lesen, Geometrievalidierung, Massenintegration, Bewegung und
+Simulation. Für alte Darstellungsdateien bleibt der bisherige tolerante
+Modus einschließlich Fan-Triangulierung erhalten; Schema 2 fordert
+Dreiecke in allen Teilnetzen. Fachliche Rollen wählen vorhandene
+Quellgeometrie aus und reparieren, schließen oder erfinden keine Flächen.
+
+**Notwendige Präzisierung zu „ein Mesh pro Bauteil“:** Ein OBJ pro Modell
+ist verbindlich, aber ein physisches Element kann mehrere benannte
+Quellvarianten referenzieren. Die vorhandenen Referenzboote besitzen teils
+unterschiedliche Darstellungs-, offene Schalenmassen- und geschlossene
+Verdrängungsnetze. Deren Zusammenlegung würde Masse, Trägheit, Flutrand
+oder Verdrängung ändern. Deshalb bleiben die real vorhandenen Varianten
+als getrennte `o`-IDs in derselben Datei erhalten. Keine automatische
+Ableitung eines geschlossenen Volumens aus einer offenen Schale.
+
+**Abnahme:** Alle elf unveränderten Modelle werden über Alt-/Neuimport
+auf exakte Massen, Schwerpunkte, Trägheiten, Netze, Flutränder, Bewegungen,
+Darstellung, Struktur und Diagnose-IDs verglichen; dynamische
+Simulationszustände bleiben bis auf formatbedingt geänderte
+Modellfassungskennungen identisch.
+
+### A-C-00108: Quellregister und Herkunft im unveränderlichen Snapshot
+
+`getMesh(snapshot, "quelle")` liefert jedes Quellteilnetz genau einmal,
+auch ohne Verwendung. `source_id` ist im Schema 2 die stabile `o`-ID;
+im Altformat vergibt Core eine innerhalb der Beschreibung stabile
+Quellkennung pro normalisierter Dateireferenz. Dateipfade werden nicht
+als öffentliche Identität verwendet. `element_ids` enthält alle
+Verwendungen; `element_id` bleibt kompatibel die erste oder leer.
+Elementfilter berücksichtigen jede Verwendung.
+
+Alle Mesh-Antworten führen `provenance` (`quelle` oder `abgeleitet`),
+`source_id` (gegebenenfalls leer) und lesbare `derivation`.
+Fachnetze sind unveränderte Quellkopien. Massenpunkte sind eine
+abgeleitete Punktprojektion der Quellvertices, keine integrierten
+Punktmassen; bei Punktmassen stammen sie aus expliziten JSON-Positionen.
+Der Flutrand enthält tatsächlich durch Kanteninzidenz ermittelte offene
+Schalenrandknoten, keine erfundene geschlossene Begrenzung.
+`InspectionNode.mesh_ids` verbindet vorhandene Elementknoten mit den
+Mesh-Antworten; die GUI darf daraus Quelle-/Berechnet-Unterknoten bilden.
+Die bestehenden Fachtypen und JSON-Hüllen bleiben kompatibel, neue
+Metadaten sind additiv. Dateiänderungen nach Erstellung verändern den
+besitzenden Snapshot nicht und erzeugen keine späteren Dateizugriffe.
+Der Schema-2-Fassungsabdruck berücksichtigt das ganze einzelne OBJ
+einschließlich Darstellungs- und unbenutzter Varianten.
+
+**Abnahme:** Quellen-/Filter-/Verknüpfungsprüfungen, Variantenvollständigkeit,
+Snapshotabfragen nach Quelldateiänderung und Fassungsablehnung neuer
+Abfragen mit alter Katalogfassung.
+
+### A-C-00109: Explizite, geschützte Migration
+
+`konvertiere_modell_v2(quelle, zielordner)` sowie das Kommando
+`segelphysik_konvertieren <modell.json> <neuer Zielordner>` lesen über die
+gemeinsamen Importer und erzeugen ausschließlich einen neuen Zielordner
+mit `modell.json` und `boot.obj`. Ein existierender Zielordner wird
+abgelehnt, auch bei identischem Inhalt. Originaldateien bleiben
+unverändert. Der Konverter übernimmt vorhandene Geometrievarianten,
+Material-/Farbmetadaten, Bewegungen und explizite physikalische Daten.
+Punktmassen benötigen kein erfundenes Quellnetz. Nicht lesbare
+Darstellungsquellen werden nicht ersetzt, sondern verhindern die Migration.
+Schreib-/Speicherfehler werden gemeldet; ein dann gegebenenfalls bereits
+angelegter unvollständiger Zielordner wird nicht stillschweigend entfernt.
+
+**Abnahme:** Konvertierung aller elf Modelle, Schutz vorhandener Ziele
+und unveränderte Originaldateien.
+
+### Rückverfolgbarkeit der Erweiterung
+
+| Anforderung | Plan C-0.8 | Nachweis |
+|---|---|---|
+| A-C-00105 | U-C-000086, U-C-000089 | `modell_geometrie_v2`, Objekt-/Referenz-Negativfälle |
+| A-C-00106 | U-C-000086, U-C-000089 | explizite/fehlende Rolle, unabhängige IDs |
+| A-C-00107 | U-C-000086, U-C-000089 | elf Alt-/Neumodelle, dynamischer Simulationsvergleich |
+| A-C-00108 | U-C-000087, U-C-000089 | Quellregister, Herkunft, Filter, Snapshotpersistenz |
+| A-C-00109 | U-C-000088, U-C-000089 | Migration, Original-/Überschreibschutz |
+
+## C-0.8-Erweiterung: eine geometrische Quelle je Element
+
+**Status: fachlich finalisiert am 02.11.2026; Umsetzung gemäß dem
+maßgeblichen C-0.8-Plan beauftragt.** Die Herkunftszuordnung steht in
+[Modellformat.json](Entwurfspunkte/Modellformat.json).
+
+### A-C-00110: Ein-Quellmesh-Vertrag (Schema 3)
+
+Schema 3 führt den Vertrag „eine Quelle je geometrischem Element“ ausdrücklich
+ein. Modellordner und Schema 0.1 sowie Schema 2 bleiben lesbar und behalten
+ihre bisherige Semantik. Schema 3 nutzt ein gemeinsames OBJ mit benannten
+Elementnetzen; für jedes Element referenzieren Darstellung, Massenintegration,
+Hydrostatikvolumen und Hydrodynamik dieselbe Mesh-ID. Die Mesh-ID ist unabhängig
+von Element-ID, Anzeigename und expliziter physikalischer Rolle. Nicht
+geometrische Punktmassen bleiben ohne künstliches Mesh.
+
+Mehrere Verwendungen derselben Quelle sind zulässig; getrennte, konkurrierende
+Quellnetze für ein Element sind im Schema 3 unzulässig. Das gemeinsame Mesh
+muss für jede deklarierte Verwendung geeignet und gemäß den bereits geltenden
+Import-/Physikregeln valide sein. Unvereinbare offene Schalen und geschlossene
+Volumen werden nicht automatisch repariert, geschlossen oder ersetzt.
+
+**Präzisierung nach Nutzerfreigabe vom 02.11.2026:** Die bestehende Physik
+soll ausreichend genau, nicht bitgenau erhalten bleiben. Verwendungen dürfen
+deshalb explizite, reproduzierbare Teilgeometrien derselben Quelle bestimmen.
+Dies ist keine zweite editierbare Quelle und keine allgemeine Netzreparatur.
+Schema 3 erlaubt optional `ableitung` in `Darstellung`,
+`Hydrostatik.masse` und `Hydrostatik.volumen`:
+
+```json
+{
+  "mesh": "element_mesh_1",
+  "ableitung": {
+    "art": "z_schnitt",
+    "z_m": -0.47,
+    "steigung_x": 0.0,
+    "steigung_y": 0.0
+  }
+}
+```
+
+- `z_schnitt` verwendet den Quellteil unterhalb der modellfesten Ebene
+  `z = z_m + steigung_x*x + steigung_y*y`; Steigungen sind optional und
+  standardmäßig 0. Die deklarierte Schnittfläche wird reproduzierbar
+  trianguliert und geschlossen. Das Quellnetz muss bereits ein valider
+  geschlossener Körper sein. Das ist eine explizite Verwendung, kein
+  automatisches Schließen beschädigter Eingaben.
+- `ohne_deckflaeche` mit `z_m` entfernt ausschließlich die horizontalen,
+  in dieser Höhe liegenden Dreiecke aus der Quelle. Es ist eine
+  Oberflächenauswahl für Darstellung oder Schalenmasse, nicht für Volumen
+  oder Vollkörpermasse. Die offenen Kanten der ausgewählten Masseschale
+  liefern weiterhin über den bestehenden Algorithmus die Flutrandpunkte.
+- Ein Schnitt muss die Quelle tatsächlich teilen. Unbekannte Felder,
+  nicht endliche Werte, leere Auswahlen, ungültige Topologie sowie mehrere
+  Schnittringe oder Löcher werden ausdrücklich abgelehnt. Kein heuristisches
+  Füllen mehrerer Ringe. Geometrische Ebenentoleranz:
+  `1e-9 * max(1 m, Z-Ausdehnung der Quelle)`.
+- Ableitungen bleiben ausschließlich Core-Aufgabe. Die Inspektion zeigt
+  Quelle und verwendete Teilgeometrie getrennt mit `source_id`,
+  `provenance = abgeleitet` und tatsächlicher Ableitungsdefinition.
+  Massenstützstellen werden aus der ausgewählten Massengeometrie extrahiert;
+  kein neuer Schwerpunkt-, Trägheits-, Flutungs- oder Stützstellenalgorithmus.
+
+**Abnahme:** Schema-3-Validierung weist Mehrfachquellen pro Element ab und
+nimmt zulässige gemeinsame Referenzen an. Legacy- und Schema-2-Importe
+bleiben regressionsgeprüft; bestehende Massen-, Schwerpunkt-, Trägheits-,
+Volumen- und Stützstellenalgorithmen werden nicht geändert.
+
+### Zielvertrag und Abgrenzung zum bisherigen Schema 2
+
+Für jedes flächengeometrisch definierte Element existiert genau ein
+maßgebliches, bearbeitbares Quellmesh. Eine gemeinsame OBJ-Datei enthält
+die benannten Elementnetze; sie ist nicht ein einziges ungetrenntes Netz
+für das gesamte Modell. ID, Anzeigename und explizite physikalische Rolle
+bleiben voneinander unabhängig.
+
+Darstellung, Massenintegration, Hydrostatik und Hydrodynamik referenzieren
+dieselbe Quelle des Elements. Mehrere Verwendungen erzeugen weder weitere
+Quellidentitäten noch unabhängig gepflegte Geometriekopien. Die JSON
+enthält Identitäten, Eigenschaften, Verwendungen und gegebenenfalls
+ausdrückliche Ableitungsparameter, keine konkurrierenden Quellnetze für
+dieses Element. Rein geometriefreie Punktmassen bleiben ohne künstliches
+Mesh mit ihrer bestehenden Position und Massendefinition darstellbar.
+
+Das ist eine geplante Verschärfung gegenüber der in A-C-00107 dokumentierten
+Bestandskompatibilität mit mehreren Quellvarianten. Der historische
+Vertrag und seine Nachweise werden nicht rückwirkend umgedeutet:
+Das bisher implementierte Schema 2 erfüllt dieses neue Ziel noch nicht.
+Vor einer Dateivertragsänderung sind Versions-/Kompatibilitätsregeln
+festzulegen; kein stilles Neuinterpretieren vorhandener Dateien.
+
+### Bestehende Berechnungen und abgeleitete Daten
+
+In diesem Umfang keine Meshvereinfachung, keine neue Stützstellenerzeugung
+und keine Neufassung der Schwerpunkt-/Massen-/Trägheitsberechnung.
+Vorhandene Algorithmen und Semantik der Stützstellen bleiben unverändert.
+Insbesondere sind extrahierte Meshvertices keine neue diskretisierte
+Massenverteilung. Vorhandene Punkte, Flutränder und Berechnungsergebnisse
+bleiben nachvollziehbare Ableitungen oder explizite Parameter, keine
+zusätzlichen bearbeitbaren Meshquellen.
+
+Später mögliche Vereinfachungen sind reproduzierbare Ableitungen derselben
+Quelle, nicht Teil dieser Umstellung. Fehlende Flächen oder physikalische
+Information dürfen nicht durch automatische Schließung, Reparatur oder
+Raten ergänzt werden. Ist die gemeinsame Geometrie für eine Verwendung
+ungeeignet, wird die Unvereinbarkeit ausdrücklich diagnostiziert.
+
+### A-C-00111: Nachweisbare Migration und Konfliktbehandlung
+
+Ein ausdrücklicher Konverter darf alte Modellversionen nur in einen neuen,
+noch nicht vorhandenen Zielordner überführen. Er liest über den gemeinsamen
+Importer, verändert keine Originaldateien und gibt ein Schema-3-Modell nur
+aus, wenn sich alle Geometrieverwendungen eines Elements ohne fachliche
+Auswahl auf eine Quelle zurückführen lassen. Geometrievergleich erfolgt
+auf eingelesenen Koordinaten und Dreiecksbeziehungen, nicht anhand von
+Dateipfad- oder Textgleichheit. Bei nicht auflösbaren Abweichungen muss die
+Konvertierung mit Diagnose abbrechen; sie darf keinen als erfolgreich
+migriert aussehenden Ersatzstand oder automatische Ersatzgeometrie liefern.
+
+Die Inventur der elf Bestandsmodelle ergibt acht ohne Abweichung zwischen
+Darstellung, Masse und Volumen: `bleistift`, `kegel`, `kugel`, `platte`,
+`pyramide`, `quader`, `rolle`, `unregelmaessig`. Für diese ist die
+Ein-Quellmesh-Migration geometrisch eindeutig.
+
+Beim ursprünglichen strikten Migrationsversuch waren drei Modelle wegen
+konkreter Geometrie-/Topologieabweichungen gesperrt. Dieser Ausgangsbefund
+bleibt als Herkunftsnachweis erhalten; die nachfolgend ausdrücklich
+freigegebenen Ableitungen lösen diese Fälle. Originale werden nicht geändert:
+
+| Modell / Element | Identische Verwendungen | Abweichende Verwendung(en) | Befund |
+|---|---|---|---|
+| `420` / `Rumpf` | Masse = Volumen (34 530 Punkte, 69 056 Dreiecke) | Darstellung (36 168 Punkte, 72 332 Dreiecke) | unterschiedliche Geometrien |
+| `420` / `Cockpit` | Darstellung = Volumen (12 232 Punkte, 24 460 Dreiecke) | Masse (6 490 Punkte, 12 604 Dreiecke; 374 offene Kanten) | Schale gegenüber geschlossenem Volumen |
+| `420` / `Schwert` | Darstellung = Masse (14 Punkte, 24 Dreiecke) | Volumen (12 Punkte, 20 Dreiecke) | unterschiedliche Geometrien |
+| `folkeboot` / `Schwert` | Darstellung = Masse (12 Punkte, 20 Dreiecke) | Volumen (12 Punkte, 20 Dreiecke) | Koordinaten-/Dreiecksnetz verschieden |
+| `folkeboot` / `Ruder` | Darstellung = Masse (10 Punkte, 16 Dreiecke) | Volumen (10 Punkte, 16 Dreiecke) | Koordinaten-/Dreiecksnetz verschieden |
+| `optimist` / `Rumpf` | Darstellung = Masse (310 Punkte, 574 Dreiecke; 44 offene Kanten) | Volumen (311 Punkte, 618 Dreiecke) | offene Schale gegenüber geschlossenem Volumen |
+| `optimist` / `Schwert` | Darstellung = Masse (63 Punkte, 122 Dreiecke) | Volumen (49 Punkte, 94 Dreiecke) | unterschiedliche Geometrien |
+
+Die Zählungen stammen aus der geometrischen Normalisierung der eingelesenen
+OBJ-Koordinaten und Dreiecke; die identischen Netze wurden auch bei
+unterschiedlichen Quelldateipfaden als identisch erkannt. Die betroffenen
+Elemente erfordern eine fachliche Quellentscheidung, bevor ihre vollständige
+Migration freigegeben werden kann. Insbesondere werden die offenen
+Schalen von `420/Cockpit` und `optimist/Rumpf` nicht zur Volumengeometrie
+geschlossen.
+
+**Abnahme des strikten Aufrufs:** Die acht eindeutigen Modelle werden vollständig konvertiert und
+physikalisch regressionsgeprüft. `420`, `folkeboot` und `optimist` werden
+mit konkreter Konfliktdiagnose abgelehnt. Jede spätere Auflösung erfordert
+eine begründete Nutzerentscheidung und einen Vorher-/Nachhervergleich.
+
+**Auflösung nach der anschließenden Nutzerentscheidung:** Der Auftrag,
+die bisherige Physik über eine Quelle und explizite Ableitungen ausreichend
+genau zu erhalten, ersetzt die oben dokumentierte Entscheidungssperre.
+Der ursprüngliche strikte Aufruf `--schema3` lehnt abweichende Quellen
+weiterhin ab. Der bewusst gewählte Aufruf `--schema3-ableitungen`
+beziehungsweise `konvertiere_modell_v3(quelle, ziel, true)` darf:
+
+- das geschlossene Volumennetz als Quelle wählen und dessen vorhandene
+  Deckfläche für die alte offene Masseschale ausschließen
+  (420/Cockpit, Optimist/Rumpf; bei letzterem auch für die Darstellung);
+- vollständige Massennetze als Quelle nutzen und bisherige Auftriebsteile
+  durch aus den alten Schnittflächen bestimmte Ebenen ableiten
+  (420/Schwert, Folkeboot/Schwert und Ruder, Optimist/Schwert);
+- beim 420/Rumpf das vorhandene gemeinsame Massen-/Volumennetz als Quelle
+  nutzen. Die alte Darstellung ist geringfügig anders; es wird kein Netz
+  vereinfacht, sondern die physikalische Bestandsquelle übernommen.
+
+Der Konverter prüft die Ableitung vor Anlage des Zielordners und validiert
+das gesamte Zielmodell einschließlich Überschneidungen über denselben
+Importer. Er findet Quellen/Teilflächen geometrisch, nicht anhand von
+Bootsnamen. Nicht passende Fälle werden weiterhin mit CORE-MOD-0009
+abgelehnt. Insbesondere wäre der einfache horizontale Schnitt am 420-Schwert
+falsch: Der alte obere Abschluss ist geneigt, sonst entstünde eine
+Überschneidung mit dem Rumpf.
+
+Vorläufige, bewusst konservative Migrationsgrenzen:
+Hüllgrenzen je Koordinate 1 µm; geschlossene Ableitungen Volumen und zentrale
+Trägheitskomponenten höchstens 0,1 % (Tensor absolut relativ zum größten
+Bestandsbetrag), Schwerpunkt 0,1 mm. Für die reine Darstellungsübernahme:
+Oberfläche höchstens 0,1 %, Flächenschwerpunkt 1 mm, Flächenträgheit 1 %.
+Offene Masseschalen müssen weiterhin geometrisch übereinstimmen.
+
+Die Referenzabnahme ist strenger als diese Konvertergrenzen:
+Masse relativ `1e-9`, Massenschwerpunkt `1e-8 m`, Trägheit `1e-8`
+relativ mit Skalenuntergrenze 1; Flutrandkoordinaten als Menge exakt.
+Vier Wasserlagen einschließlich Krängung: verdrängtes Teilvolumen
+`1e-8 m³ + 1e-6 * Bestand`, Auftriebsschwerpunkt `1e-6 m`.
+Gesamtkräfte und Momente in zwei Lagen: `0,001 N` beziehungsweise
+`0,001 Nm`; gleiche Flutungsentscheidungen.
+Dynamischer Vergleich über 0,2 s mit 0,02-s-Schritten und nichttrivialer
+Anfangsgeschwindigkeit: Position, Quaternion, Geschwindigkeit und Drehrate
+je Komponente höchstens `1e-4` in ihrer Einheit. Diese kurzen Regressionen
+sind kein allgemeiner Langzeit-Stabilitätsnachweis.
+
+### Migration und prüfbare Abnahme
+
+- Bisherige Quellen je Element inventarisieren und geometrisch vergleichen;
+  Referenzgleichheit allein genügt nicht zur Erkennung gleicher Netze.
+- Identische Geometrie zusammenführen, physikalische Verwendungen erhalten.
+  Bei abweichenden Netzen eine begründete maßgebliche Quelle bestimmen;
+  höhere Dreieckszahl allein belegt keine fachliche Eignung.
+- Unterschiede zwischen offener Schale und geschlossenem Volumen nicht als
+  reine Deduplikation behandeln. Nicht verlustfrei auflösbare Fälle mit
+  Geometrie-/Ergebnisvergleich sichtbar zur fachlichen Entscheidung stellen.
+  Ohne Entscheidung kein als vollständig migriert ausgegebenes Ersatzmodell.
+- Originale und Altimport erhalten; Migration ausschließlich explizit in
+  neue Ziele. Kein Editor oder automatisches Speichern im GUI-Auftrag.
+- Für alle elf Referenzmodelle Zuordnung je Element sowie vor/nach
+  Geometrie, Masse, Schwerpunkt, Trägheit, Volumen, Stützstellen/Flutränder,
+  Bewegung und repräsentative Simulationszustände vergleichen.
+  Bei identischen Eingangsgeometrien bisherige Gleichheitsnachweise erhalten.
+  Bei geänderter Geometrie Abweichungen messen und fachlich freigeben;
+  keine erfundenen Toleranzen und keine Behauptung identischer Ergebnisse.
+
+**Abnahmeziel:** Jedes geometrische Element besitzt genau eine Quelle;
+alle Verwendungen und Ableitungen sind darauf zurückführbar. Verbleibende
+Migrationskonflikte außerhalb der ausdrücklich freigegebenen und geprüften
+Ableitungen verhindern die vollständige Abnahme.
+
+Die gemeinsame Objektinspektion und Bewegungsdaten sind im
+[Katalog-/Inspektionsvertrag](Spezifikation_Modellkatalog_Schnittstelle.md)
+spezifiziert. Rasterlinien und GUI-Layout sind ausschließlich Gegenstand
+der [GUI-Spezifikation](../../GUI/Spezifikationen/Spezifikation_GUI_Bootsauswahl.md).

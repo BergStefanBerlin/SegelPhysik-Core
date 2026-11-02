@@ -1,0 +1,35 @@
+{
+  "modell": "modell.json",
+  "beschreibung": "Exakte, bereits geloeste Kreisreferenz ohne Widerstand oder Zusatzmasse; u*r ist nicht eindeutig. Vollstaendigen Startzustand verwenden, kein Konvergenztest aus Ruhe.",
+  "start": {
+    "position_m": [0, 0, 0],
+    "orientierung_xyzw": [0.09983341664682815, 0, 0, 0.9950041652780258],
+    "geschwindigkeit_welt_m_s": [2, 0, 0],
+    "omega_modell_rad_s": [0, 0.0794677323180245, 0.39202663113649666]
+  },
+  "hydrodynamik": {
+    "rho_kg_m3": 1000,
+    "nu_m2_s": 0.000001,
+    "fluidgeschwindigkeit_welt_m_s": [0, 0, 0],
+    "zusatzmasse_daempfung": true
+  },
+  "stationaer": {
+    "aktiv": true,
+    "modellfest": true,
+    "kurvenfahrt": true,
+    "kraft_welt_n": [0, 3136.2130490919731, -635.74185854419579],
+    "angriffspunkt_modell_m": [0, 0.073482855507263231, 0.36250230691770285],
+    "stellungen": []
+  },
+  "erwartet": {
+    "status": "konvergiert",
+    "loesungstyp": "kurvenfahrt",
+    "u_modell_m_s": [2, 0, 0],
+    "kursdrehrate_rad_s": 0.4,
+    "rollen_rad": 0.2,
+    "stampfen_rad": 0,
+    "radius_m": 5,
+    "krafttoleranz_n": 0.05,
+    "momenttoleranz_nm": 0.05
+  }
+}

@@ -6,6 +6,7 @@
 #include <iterator>
 #include <limits>
 #include <locale>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 
@@ -70,6 +71,57 @@ Mesh bewegtes_mesh(const Mesh& mesh, const Element& eigentuemer, double wert)
 {
     Mesh result = mesh;
     for (auto& punkt : result.punkte) punkt = bewegungspunkt(punkt, eigentuemer, wert);
+    return result;
+}
+Vektor3 bewegungsvektor(const Vektor3& vektor, const Element& eigentuemer, double wert);
+Modell bewegtes_modell(const Modell& modell,
+    const std::vector<Bewegungsstellung>& stellungen)
+{
+    Modell result = modell;
+    for (auto& element : result.elemente) {
+        const auto* eigentuemer = bewegungseigentuemer(modell, element.id);
+        if (!eigentuemer) continue;
+        const double wert = bewegungswert(*eigentuemer, stellungen);
+        element.schwerpunkt_m = bewegungspunkt(element.schwerpunkt_m, *eigentuemer, wert);
+        if (element.volumen) element.volumen = bewegtes_mesh(*element.volumen, *eigentuemer, wert);
+        if (element.massen_mesh) element.massen_mesh = bewegtes_mesh(*element.massen_mesh, *eigentuemer, wert);
+        for (auto& point : element.massenpunkte_m)
+            point = bewegungspunkt(point, *eigentuemer, wert);
+        for (auto& point : element.flutrand_m)
+            point = bewegungspunkt(point, *eigentuemer, wert);
+
+        Vektor3 axes[3] = {
+            bewegungsvektor({1., 0., 0.}, *eigentuemer, wert),
+            bewegungsvektor({0., 1., 0.}, *eigentuemer, wert),
+            bewegungsvektor({0., 0., 1.}, *eigentuemer, wert)};
+        std::array<double, 9> rotated{};
+        for (std::size_t row = 0; row < 3; ++row)
+            for (std::size_t col = 0; col < 3; ++col)
+                for (std::size_t i = 0; i < 3; ++i)
+                    for (std::size_t j = 0; j < 3; ++j)
+                        rotated[3 * row + col] += axes[i][row] *
+                            element.traegheit_kg_m2[3 * i + j] * axes[j][col];
+        element.traegheit_kg_m2 = rotated;
+    }
+
+    double mass = 0.;
+    Vektor3 center{};
+    for (const auto& element : result.elemente) {
+        mass += element.masse_kg;
+        center = plus(center, mal(element.schwerpunkt_m, element.masse_kg));
+    }
+    if (mass > 0.) center = mal(center, 1. / mass);
+    result.masse_kg = mass;
+    result.schwerpunkt_m = center;
+    result.traegheit_kg_m2 = {};
+    for (const auto& element : result.elemente) {
+        const auto offset = plus(element.schwerpunkt_m, mal(center, -1.));
+        const double d2 = dot(offset, offset);
+        for (std::size_t row = 0; row < 3; ++row)
+            for (std::size_t col = 0; col < 3; ++col)
+                result.traegheit_kg_m2[3 * row + col] += element.traegheit_kg_m2[3 * row + col] +
+                    element.masse_kg * ((row == col ? d2 : 0.) - offset[row] * offset[col]);
+    }
     return result;
 }
 Vektor3 bewegungsvektor(const Vektor3& vektor, const Element& eigentuemer, double wert)
@@ -301,6 +353,18 @@ Beitrag basisbeitrag(const Element& element, const std::string& art)
     return result;
 }
 
+void addiere_ldp_panelbilanz(Beitrag& beitrag, const Vektor3& punkt_modell,
+    const Vektor3& kraft_modell)
+{
+    auto& bilanz = beitrag.lateraldruckpunkt_panelbilanz;
+    const double fy = kraft_modell[1];
+    bilanz.vorhanden = true;
+    bilanz.querkraft_modell_n += fy;
+    bilanz.panelbetragssumme_n += std::abs(fy);
+    bilanz.erstes_moment_x_nm += punkt_modell[0] * fy;
+    bilanz.erstes_moment_z_nm += punkt_modell[2] * fy;
+}
+
 Beitrag reibungsbeitrag(const Element& element, const Modell& modell, const Pose& pose,
     const HydrodynamikKonfiguration& config, const Vektor3& velocity,
     const Vektor3& omega, const std::vector<Nasspanel>& panels)
@@ -422,6 +486,7 @@ Beitrag druckbeitrag(const Element& element, const Modell& modell, const Pose& p
             .5 * config.rho_kg_m3 * cd * panel.flaeche_m2 * normal_speed * std::abs(normal_speed));
         const auto point_model = pose.weltpunkt_nach_modell(panel.punkt_welt);
         const auto force_model = pose.weltvektor_nach_modell(force_welt);
+        addiere_ldp_panelbilanz(result, point_model, force_model);
         const double magnitude = std::sqrt(dot(force_welt, force_welt));
         total_force = plus(total_force, force_welt);
         total_moment = plus(total_moment, moment_um(point_model, modell.schwerpunkt_m, force_model));
@@ -439,7 +504,8 @@ Beitrag druckbeitrag(const Element& element, const Modell& modell, const Pose& p
     return result;
 }
 
-Beitrag seitenkraftbeitrag(const Element& element, const Modell& modell, const Pose& pose,
+Beitrag seitenkraftbeitrag(const Element& element, const Modell& modell,
+    const Modell& geometrie, const Pose& pose,
     const HydrodynamikKonfiguration& config, const Vektor3& velocity,
     const Vektor3& omega, const std::vector<Nasspanel>& panels,
     const std::vector<Bewegungsstellung>& bewegungsstellungen)
@@ -467,7 +533,7 @@ Beitrag seitenkraftbeitrag(const Element& element, const Modell& modell, const P
     // Profilabmessungen stets am unverstellten Mesh bestimmen, sonst wird ein
     // gedrehtes Ruder als dicker Koerper und damit als Nicht-Tragflaeche eingestuft.
     const Mesh* reference_mesh = element.volumen ? &*element.volumen : nullptr;
-    for (const auto& candidate : modell.elemente)
+    for (const auto& candidate : geometrie.elemente)
         if (candidate.id == element.id && candidate.volumen) reference_mesh = &*candidate.volumen;
     if (!reference_mesh)
         throw std::invalid_argument("CORE-HYD-0001: Seitenkraft ohne physisches Volumenmesh: " + element.id);
@@ -480,7 +546,7 @@ Beitrag seitenkraftbeitrag(const Element& element, const Modell& modell, const P
     const double thickness_ratio = (high_y - low_y) / std::max(high_x - low_x, high_z - low_z);
     auto chord_axis = Vektor3{1., 0., 0.};
     auto span_axis = Vektor3{0., 0., 1.};
-    if (const auto* owner = bewegungseigentuemer(modell, element.id)) {
+    if (const auto* owner = bewegungseigentuemer(geometrie, element.id)) {
         const double setting = bewegungswert(*owner, bewegungsstellungen);
         chord_axis = einheitsvektor(bewegungsvektor(chord_axis, *owner, setting));
         span_axis = einheitsvektor(bewegungsvektor(span_axis, *owner, setting));
@@ -627,6 +693,7 @@ Beitrag seitenkraftbeitrag(const Element& element, const Modell& modell, const P
                 mal(relative, drag / speed));
             const auto point_model = pose.weltpunkt_nach_modell(panel.punkt_welt);
             const auto force_model = pose.weltvektor_nach_modell(force_welt);
+            addiere_ldp_panelbilanz(result, point_model, force_model);
             const double magnitude = std::sqrt(dot(force_welt, force_welt));
             total_force = plus(total_force, force_welt);
             total_moment = plus(total_moment, moment_um(point_model, modell.schwerpunkt_m, force_model));
@@ -656,6 +723,7 @@ Beitrag seitenkraftbeitrag(const Element& element, const Modell& modell, const P
         const auto force_welt = plus(mal(lift_axis_world, lift), mal(relative, drag / speed));
         const auto point_model = pose.weltpunkt_nach_modell(panel.punkt_welt);
         const auto force_model = pose.weltvektor_nach_modell(force_welt);
+        addiere_ldp_panelbilanz(result, point_model, force_model);
         const double magnitude = std::sqrt(dot(force_welt, force_welt));
         total_force = plus(total_force, force_welt);
         total_moment = plus(total_moment, moment_um(point_model, modell.schwerpunkt_m, force_model));
@@ -726,9 +794,14 @@ Vektor3 moment_um(const Vektor3& a,const Vektor3& p,const Vektor3& f,const Vekto
 }
 
 Kraefte hydrostatik(const Modell& modell,const Pose& pose,double rho,double g,
-    const std::vector<std::string>& geflutet)
+    const std::vector<std::string>& geflutet,
+    const std::vector<Bewegungsstellung>& bewegungsstellungen)
 {
     SEGEL_MESSUNG("hydrostatikauswertung");
+    if (!bewegungsstellungen.empty()) {
+        const auto bewegt = bewegtes_modell(modell, bewegungsstellungen);
+        return hydrostatik(bewegt, pose, rho, g, geflutet, {});
+    }
     positiv(rho);positiv(g);positiv(modell.masse_kg);
     Kraefte result;
     result.beitraege.reserve(2*modell.elemente.size()+1);
@@ -788,6 +861,7 @@ std::vector<std::string> flutung(const Modell& modell,const Pose& pose,std::vect
 const char* name(Quelle wert)
 {
     switch (wert) {
+    case Quelle::externe_kraft: return "externe_kraft";
     case Quelle::testantrieb: return "testantrieb";
     case Quelle::schwerkraft: return "schwerkraft";
     case Quelle::hydrostatik: return "hydrostatik";
@@ -826,6 +900,9 @@ Bilanz bilanz(const Modell& modell,std::vector<Beitrag>& beitraege,bool hydrodyn
     if(std::any_of(beitraege.begin(),beitraege.end(),
         [](const Beitrag& b){return b.quelle==Quelle::testantrieb;}))
         result.erwartete_beitraege.push_back("testantrieb.bug.kraft");
+    if(std::any_of(beitraege.begin(),beitraege.end(),
+        [](const Beitrag& b){return b.quelle==Quelle::externe_kraft;}))
+        result.erwartete_beitraege.push_back("stationaer.fremdkraft");
     for (const auto& e : modell.elemente) {
         result.erwartete_beitraege.push_back(e.id+":gewicht");
         if (e.volumen) result.erwartete_beitraege.push_back(e.id+":auftrieb");
@@ -991,6 +1068,869 @@ SolverErgebnis gleichgewicht(const Modell& modell,const Zustand& start,
 }
 
 namespace {
+QuaternionXyzw quaternion_rotation(const Vektor3& rotation)
+{
+    const double angle = std::sqrt(dot(rotation, rotation));
+    if (angle <= 1e-14) return {0., 0., 0., 1.};
+    const double scale = std::sin(angle / 2.) / angle;
+    return {rotation[0] * scale, rotation[1] * scale,
+        rotation[2] * scale, std::cos(angle / 2.)};
+}
+
+bool loesen_linear(std::array<double, 36> matrix, std::array<double, 6> rhs,
+    std::size_t n, std::array<double, 6>& solution)
+{
+    double scale = 0.;
+    for (std::size_t i = 0; i < n * n; ++i) scale = std::max(scale, std::abs(matrix[i]));
+    if (!std::isfinite(scale) || scale == 0.) return false;
+    for (std::size_t col = 0; col < n; ++col) {
+        std::size_t pivot = col;
+        for (std::size_t row = col + 1; row < n; ++row)
+            if (std::abs(matrix[row * n + col]) > std::abs(matrix[pivot * n + col])) pivot = row;
+        if (std::abs(matrix[pivot * n + col]) <= 1e-10 * scale) return false;
+        for (std::size_t j = 0; j < n; ++j)
+            std::swap(matrix[col * n + j], matrix[pivot * n + j]);
+        std::swap(rhs[col], rhs[pivot]);
+        for (std::size_t row = col + 1; row < n; ++row) {
+            const double factor = matrix[row * n + col] / matrix[col * n + col];
+            for (std::size_t j = col; j < n; ++j)
+                matrix[row * n + j] -= factor * matrix[col * n + j];
+            rhs[row] -= factor * rhs[col];
+        }
+    }
+    for (int row = static_cast<int>(n) - 1; row >= 0; --row) {
+        double value = rhs[static_cast<std::size_t>(row)];
+        for (std::size_t col = static_cast<std::size_t>(row) + 1; col < n; ++col)
+            value -= matrix[static_cast<std::size_t>(row) * n + col] * solution[col];
+        solution[static_cast<std::size_t>(row)] =
+            value / matrix[static_cast<std::size_t>(row) * n + static_cast<std::size_t>(row)];
+    }
+    return true;
+}
+
+void add_stationaere_kraft(Kraefte& forces, const Modell& model, const Pose& pose,
+    const StationaereGleichgewichtKonfiguration& config)
+{
+    const Vektor3 force_world = !config.aktiv ? Vektor3{} : config.modellfest
+        ? pose.modellvektor_nach_welt(config.kraft_welt_n) : config.kraft_welt_n;
+    const Vektor3 force_model = pose.weltvektor_nach_modell(force_world);
+    Beitrag contribution;
+    contribution.id = "stationaer.fremdkraft";
+    contribution.art = "kraft";
+    contribution.quelle = Quelle::externe_kraft;
+    contribution.gruppe = "stationaer";
+    contribution.punkt_m = config.angriffspunkt_modell_m;
+    contribution.vektor = force_model;
+    contribution.moment_s_nm = moment_um(config.angriffspunkt_modell_m,
+        model.schwerpunkt_m, force_model);
+    contribution.zustand = dot(force_world, force_world) == 0.
+        ? Datenzustand::null : Datenzustand::gueltig;
+    forces.kraft_welt_n = plus(forces.kraft_welt_n, force_world);
+    forces.moment_modell_nm = plus(forces.moment_modell_nm, contribution.moment_s_nm);
+    forces.beitraege.push_back(std::move(contribution));
+}
+}
+
+namespace {
+StationaeresGleichgewichtErgebnis stationaeres_kurvengleichgewicht(
+    const Modell& modell, const Zustand& start,
+    const StationaereGleichgewichtKonfiguration& konfiguration,
+    const HydrodynamikKonfiguration& hydro_config, double ftol, double mtol,
+    std::size_t budget, const std::atomic_bool* abbruch)
+{
+    StationaeresGleichgewichtErgebnis result;
+    result.zustand = start;
+    result.konfiguration = konfiguration;
+    result.kurvenfahrt = true;
+    result.krafttoleranz_n = ftol;
+    result.momenttoleranz_nm = mtol;
+    result.status = "ungueltig";
+    try {
+        positiv(ftol);
+        positiv(mtol);
+        if (ftol > .1 || mtol > .1)
+            throw std::invalid_argument("CORE-SIM-0001: Bewegungstoleranz darf 0,1 N bzw. Nm nicht ueberschreiten.");
+        if (budget == 0) throw std::invalid_argument("CORE-SIM-0001: Iterationsbudget muss positiv sein.");
+        if (!endlich(start.pose.position_m()) || !endlich(start.geschwindigkeit_welt_m_s) ||
+            !endlich(start.omega_modell_rad_s) || !std::isfinite(start.zeit_s))
+            throw std::invalid_argument("CORE-SIM-0001: Stationaerer Startzustand muss endlich sein.");
+        for (double value : start.pose.orientierung_xyzw())
+            if (!std::isfinite(value)) throw std::invalid_argument("CORE-SIM-0001: Startorientierung muss endlich sein.");
+        for (double value : konfiguration.kraft_welt_n)
+            if (!std::isfinite(value)) throw std::invalid_argument("CORE-SIM-0001: Fremdkraft muss endlich sein.");
+        for (double value : konfiguration.angriffspunkt_modell_m)
+            if (!std::isfinite(value)) throw std::invalid_argument("CORE-SIM-0001: Kraftangriffspunkt muss endlich sein.");
+        if (!std::isfinite(hydro_config.rho_kg_m3) || hydro_config.rho_kg_m3 <= 0. ||
+            !std::isfinite(hydro_config.nu_m2_s) || hydro_config.nu_m2_s <= 0. ||
+            !endlich(hydro_config.fluidgeschwindigkeit_welt_m_s))
+            throw std::invalid_argument("CORE-HYD-0001: Ungueltige stationaere Hydrodynamikkonfiguration.");
+        if (start.testantrieb_erforderlich && !start.testantrieb)
+            throw std::invalid_argument("CORE-SIM-0001: Erforderlicher Testkontext fehlt.");
+        if (start.testantrieb && start.testantrieb->aktiv)
+            throw std::invalid_argument("CORE-SIM-0001: Aktiver Testantrieb ist im stationaeren Solver nicht zulaessig.");
+        if (abbruch && abbruch->load()) {
+            result.status = "abgebrochen";
+            result.diagnose = "Abbruch angefordert";
+            return result;
+        }
+        if (konfiguration.aktiv && !konfiguration.modellfest &&
+            std::hypot(konfiguration.kraft_welt_n[0], konfiguration.kraft_welt_n[1]) > 1e-12) {
+            auto straight = konfiguration;
+            straight.kurvenfahrt = false;
+            auto fallback = stationaeres_gleichgewicht(modell, start, straight, hydro_config,
+                ftol, mtol, budget, abbruch);
+            if (fallback.status == "konvergiert") {
+                fallback.konfiguration = konfiguration;
+                fallback.kurvenfahrt = true;
+                fallback.loesungstyp = "geradeaus";
+                fallback.kursdrehrate_rad_s = 0.;
+                fallback.omega_modell_rad_s = {};
+                fallback.radius_m.reset();
+                fallback.residuum_bewegung_kraft_welt_n = fallback.residuum_kraft_welt_n;
+                fallback.residuum_bewegung_moment_modell_nm = fallback.residuum_moment_modell_nm;
+                fallback.aeussere_kraft_welt_n = fallback.residuum_kraft_welt_n;
+                fallback.aeusseres_moment_modell_nm = fallback.residuum_moment_modell_nm;
+                return fallback;
+            }
+            result.status = "last_invariant";
+            result.diagnose = "CORE-SIM-0004: Horizontale weltfeste Kraft ist bei einer stationaeren Drehung nicht kursinvariant; der Geradeaus-Sonderfall konvergierte nicht: " + fallback.diagnose;
+            result.iterationen = fallback.iterationen;
+            return result;
+        }
+
+        std::vector<Bewegungsstellung> settings = start.bewegungsstellungen;
+        std::set<std::string> seen;
+        for (const auto& setting : konfiguration.stellungen) {
+            const auto element = std::find_if(modell.elemente.begin(), modell.elemente.end(),
+                [&](const Element& candidate) { return candidate.id == setting.element_id; });
+            if (element == modell.elemente.end() || !element->bewegung ||
+                !seen.insert(setting.element_id).second)
+                throw std::invalid_argument("CORE-MOD-0002: Ungueltige oder doppelte stationaere Bewegungsstellung: " + setting.element_id);
+            const double minimum = element->bewegung->ruderwinkel ? -1e6 : 0.;
+            const double maximum = element->bewegung->ruderwinkel ? 1e6 : 100.;
+            if (!std::isfinite(setting.wert) || setting.wert < minimum || setting.wert > maximum)
+                throw std::invalid_argument("CORE-MOD-0002: Bewegungsstellung ausserhalb des Modellbereichs: " + setting.element_id);
+            const auto existing = std::find_if(settings.begin(), settings.end(),
+                [&](const Bewegungsstellung& value) { return value.element_id == setting.element_id; });
+            if (existing == settings.end()) settings.push_back({setting.element_id, setting.wert});
+            else existing->wert = setting.wert;
+        }
+        for (const auto& element : modell.elemente) {
+            if (!element.bewegung) continue;
+            const auto existing = std::find_if(settings.begin(), settings.end(),
+                [&](const Bewegungsstellung& value) { return value.element_id == element.id; });
+            if (existing == settings.end()) settings.push_back({element.id, element.bewegung->ruderwinkel ? 0. : 100.});
+        }
+        const auto physical_model = bewegtes_modell(modell, settings);
+        result.schwerpunkt_modell_m = physical_model.schwerpunkt_m;
+        auto flooded = start.geflutet;
+        std::sort(flooded.begin(), flooded.end());
+        flooded.erase(std::unique(flooded.begin(), flooded.end()), flooded.end());
+
+        Zustand initial = start;
+        if (dot(start.geschwindigkeit_welt_m_s, start.geschwindigkeit_welt_m_s) <= 1e-12 &&
+            dot(start.omega_modell_rad_s, start.omega_modell_rad_s) <= 1e-12) {
+            auto seed_config = konfiguration;
+            seed_config.kurvenfahrt = false;
+            auto seed = stationaeres_gleichgewicht(modell, start, seed_config, hydro_config,
+                ftol, mtol, std::min<std::size_t>(budget, 80), abbruch);
+            if (seed.status == "konvergiert") initial = seed.zustand;
+            else {
+                const auto hydrostatic = gleichgewicht(physical_model, start, ftol, mtol,
+                    std::min<std::size_t>(budget, 80), abbruch);
+                if (hydrostatic.status == "konvergiert") initial = hydrostatic.zustand;
+            }
+        }
+        initial.bewegungsstellungen = settings;
+        const auto& q = initial.pose.orientierung_xyzw();
+        const double roll0 = std::atan2(2. * (q[3]*q[0] + q[1]*q[2]),
+            1. - 2. * (q[0]*q[0] + q[1]*q[1]));
+        const double pitch0 = std::asin(std::clamp(2. * (q[3]*q[1] - q[2]*q[0]), -1., 1.));
+        const double yaw = std::atan2(2. * (q[3]*q[2] + q[0]*q[1]),
+            1. - 2. * (q[1]*q[1] + q[2]*q[2]));
+        std::array<double, 6> variables{initial.pose.position_m()[2], roll0, pitch0, 0., 0., 0.};
+        const auto relative_start = plus(initial.geschwindigkeit_welt_m_s,
+            mal(hydro_config.fluidgeschwindigkeit_welt_m_s, -1.));
+        const auto body_start = initial.pose.weltvektor_nach_modell(relative_start);
+        variables[3] = std::clamp(body_start[0], -50., 50.);
+        variables[4] = std::clamp(body_start[1], -50., 50.);
+        variables[5] = initial.pose.modellvektor_nach_welt(initial.omega_modell_rad_s)[2];
+        variables[5] = std::clamp(variables[5], -1., 1.);
+        result.status = "nicht_konvergiert";
+        result.diagnose = "CORE-SIM-0004: Iterationsbudget erschoepft.";
+
+        auto pose_for = [&](const std::array<double, 6>& x) {
+            return euler(x[0], x[1], x[2], yaw,
+                initial.pose.position_m()[0], initial.pose.position_m()[1]);
+        };
+        auto evaluate = [&](const std::array<double, 6>& x, Vektor3* outer_force,
+            Vektor3* outer_moment, Vektor3* motion_force, Vektor3* motion_moment,
+            Vektor3* omega_model, double* rate) {
+            const auto pose = pose_for(x);
+            const Vektor3 omega_world{0., 0., x[5]};
+            const Vektor3 omega_body = pose.weltvektor_nach_modell(omega_world);
+            const double r22 = pose.modellvektor_nach_welt({0., 0., 1.})[2];
+            if (std::abs(r22) < 1e-8) throw std::runtime_error("CORE-SIM-0004: Vertikale Schwerpunktkinematik ist singulaer.");
+            const double uz = -(hydro_config.fluidgeschwindigkeit_welt_m_s[2] +
+                pose.modellvektor_nach_welt({x[3], x[4], 0.})[2]) / r22;
+            const Vektor3 velocity_body{x[3], x[4], uz};
+            const auto velocity_relative_world = pose.modellvektor_nach_welt(velocity_body);
+            const auto velocity_world = plus(hydro_config.fluidgeschwindigkeit_welt_m_s,
+                velocity_relative_world);
+            const auto acceleration_world = cross(omega_world, velocity_relative_world);
+            HydrodynamikKontext context;
+            context.konfiguration = hydro_config;
+            context.modell_fassung = modell.fassung;
+            context.auswertung_schritt = initial.schritt;
+            context.auswertung_zeit_s = initial.zeit_s;
+            if (hydro_config.zusatzmasse_daempfung)
+                context.traegheit = std::make_shared<const HydrodynamischeTraegheit>(
+                    berechne_hydrodynamische_traegheit(physical_model, pose, hydro_config.rho_kg_m3, 9.81));
+            auto forces = kraefte(modell, pose, nullptr, hydro_config.rho_kg_m3, 9.81,
+                flooded, &context, velocity_world, omega_body, settings);
+            add_stationaere_kraft(forces, physical_model, pose, konfiguration);
+            const auto inertia = context.traegheit.get();
+            Vektor3 added_linear_momentum{};
+            std::array<double, 9> effective_inertia = physical_model.traegheit_kg_m2;
+            if (inertia) {
+                for (std::size_t axis = 0; axis < 3; ++axis) {
+                    added_linear_momentum[axis] = inertia->zusatzmasse[axis].wert * velocity_body[axis];
+                    effective_inertia[3*axis+axis] += inertia->zusatzmasse[3+axis].wert;
+                }
+            }
+            const auto added_linear_force_world = pose.modellvektor_nach_welt(cross(omega_body, added_linear_momentum));
+            const auto linear_inertia_world = plus(mal(acceleration_world, physical_model.masse_kg),
+                added_linear_force_world);
+            const auto angular_momentum = Vektor3{
+                effective_inertia[0]*omega_body[0] + effective_inertia[1]*omega_body[1] + effective_inertia[2]*omega_body[2],
+                effective_inertia[3]*omega_body[0] + effective_inertia[4]*omega_body[1] + effective_inertia[5]*omega_body[2],
+                effective_inertia[6]*omega_body[0] + effective_inertia[7]*omega_body[1] + effective_inertia[8]*omega_body[2]};
+            const auto angular_inertia = cross(omega_body, angular_momentum);
+            const auto rf = plus(forces.kraft_welt_n, mal(linear_inertia_world, -1.));
+            const auto rm = plus(forces.moment_modell_nm, mal(angular_inertia, -1.));
+            if (outer_force) *outer_force = forces.kraft_welt_n;
+            if (outer_moment) *outer_moment = forces.moment_modell_nm;
+            if (motion_force) *motion_force = rf;
+            if (motion_moment) *motion_moment = rm;
+            if (omega_model) *omega_model = omega_body;
+            if (rate) *rate = x[5];
+            std::array<double, 6> residual{};
+            for (std::size_t i = 0; i < 3; ++i) {
+                residual[i] = rf[i] / ftol;
+                residual[i+3] = rm[i] / mtol;
+            }
+            return residual;
+        };
+        const std::array<double, 6> lower{variables[0]-100., -1.483529864, -1.483529864, -50., -50., -1.};
+        const std::array<double, 6> upper{variables[0]+100., 1.483529864, 1.483529864, 50., 50., 1.};
+        auto within = [&](const std::array<double, 6>& x) {
+            for (std::size_t i=0;i<6;++i) if (x[i]<lower[i] || x[i]>upper[i]) return false;
+            return true;
+        };
+        double lambda = 1e-4;
+        std::size_t iterations = 0;
+        bool converged = false;
+        if (std::hypot(variables[3], variables[4]) <= 1e-10) {
+            Vektor3 initial_force{};
+            evaluate(variables, &initial_force, nullptr, nullptr, nullptr, nullptr, nullptr);
+            const auto body_force = pose_for(variables).weltvektor_nach_modell(initial_force);
+            if (std::hypot(body_force[0], body_force[1]) > ftol) {
+                variables[3] = body_force[0] < 0. ? -2. : 2.;
+                Vektor3 seeded_force{};
+                evaluate(variables, &seeded_force, nullptr, nullptr, nullptr, nullptr, nullptr);
+                const auto seeded_body_force = pose_for(variables).weltvektor_nach_modell(seeded_force);
+                double effective_mass_y = physical_model.masse_kg;
+                if (hydro_config.zusatzmasse_daempfung) {
+                    const auto inertia = berechne_hydrodynamische_traegheit(
+                        physical_model, pose_for(variables), hydro_config.rho_kg_m3, 9.81);
+                    effective_mass_y += inertia.zusatzmasse[1].wert;
+                }
+                variables[5] = std::clamp(seeded_body_force[1] /
+                    std::max(1e-9, effective_mass_y * std::abs(variables[3])), -.5, .5);
+                // Large rudder angles can give multiple yaw-balanced turning branches.
+                const auto seed_residual = [&](double rate, double* merit) {
+                    auto candidate = variables;
+                    candidate[5] = rate;
+                    Vektor3 moment{};
+                    const auto residual = evaluate(candidate, nullptr, nullptr, nullptr, &moment, nullptr, nullptr);
+                    if (merit) {
+                        *merit = 0.;
+                        for (double value : residual) *merit += value * value;
+                    }
+                    return pose_for(candidate).modellvektor_nach_welt(moment)[2];
+                };
+                double best_rate = variables[5];
+                double best_yaw = std::abs(seed_residual(best_rate, nullptr));
+                double best_balanced_merit = std::numeric_limits<double>::infinity();
+                double previous_rate = lower[5];
+                double previous_yaw = seed_residual(previous_rate, nullptr);
+                constexpr int seed_intervals = 40;
+                for (int index = 0; index <= seed_intervals; ++index) {
+                    if (abbruch && abbruch->load()) {
+                        result.status = "abgebrochen";
+                        result.diagnose = "Abbruch angefordert";
+                        return result;
+                    }
+                    const double rate = lower[5] + (upper[5] - lower[5]) * index / seed_intervals;
+                    const double yaw_moment = seed_residual(rate, nullptr);
+                    if (std::abs(yaw_moment) < best_yaw) {
+                        best_rate = rate;
+                        best_yaw = std::abs(yaw_moment);
+                    }
+                    if (yaw_moment == 0. || (index > 0 && previous_yaw * yaw_moment < 0.)) {
+                        double lo = previous_rate, hi = rate;
+                        double lo_yaw = previous_yaw;
+                        if (yaw_moment == 0.) lo = hi;
+                        for (int refinement = 0; refinement < 12 && lo != hi; ++refinement) {
+                            const double mid = .5 * (lo + hi);
+                            const double mid_yaw = seed_residual(mid, nullptr);
+                            if (mid_yaw == 0.) { lo = hi = mid; break; }
+                            if (lo_yaw * mid_yaw < 0.) hi = mid;
+                            else { lo = mid; lo_yaw = mid_yaw; }
+                        }
+                        double merit = 0.;
+                        const double balanced_rate = .5 * (lo + hi);
+                        seed_residual(balanced_rate, &merit);
+                        if (merit < best_balanced_merit) {
+                            variables[5] = balanced_rate;
+                            best_balanced_merit = merit;
+                        }
+                    }
+                    previous_rate = rate;
+                    previous_yaw = yaw_moment;
+                }
+                if (!std::isfinite(best_balanced_merit)) variables[5] = best_rate;
+            }
+        }
+        result.referenzkurs_verwendet = true;
+        for (; iterations < budget; ++iterations) {
+            if (abbruch && abbruch->load()) { result.status="abgebrochen"; result.diagnose="Abbruch angefordert"; break; }
+            Vektor3 of{}, om{}, mf{}, mm{}, omega{};
+            const auto residual = evaluate(variables, &of, &om, &mf, &mm, &omega, nullptr);
+            double norm=0., merit=0.;
+            for(double value:residual) { norm=std::max(norm,std::abs(value)); merit+=value*value; }
+            if (norm<=1.) { converged=true; result.status="konvergiert"; result.diagnose.clear(); break; }
+            std::array<double,36> jacobian{};
+            bool singular=false;
+            for(std::size_t col=0;col<6;++col) {
+                auto positive=variables, negative=variables;
+                const double h=col==0?1e-3:(col<=2?1e-5:(col<=4?1e-3:1e-5));
+                positive[col]+=h; negative[col]-=h;
+                try {
+                    const auto rp=evaluate(positive,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr);
+                    const auto rm=evaluate(negative,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr);
+                    for(std::size_t row=0;row<6;++row) jacobian[row*6+col]=(rp[row]-rm[row])/(2.*h);
+                } catch (...) { singular=true; break; }
+            }
+            if(singular) { result.status="rangdefizit"; result.diagnose="CORE-SIM-0004: Bewegungsabbildung ist singulaer."; break; }
+            std::array<double,6> column_norm{};
+            for(std::size_t col=0;col<6;++col)
+                for(std::size_t row=0;row<6;++row) column_norm[col]=std::hypot(column_norm[col],jacobian[row*6+col]);
+            if(std::any_of(column_norm.begin(),column_norm.end(),[](double value){return value<=1e-12;})) {
+                result.status="rangdefizit"; result.diagnose="CORE-SIM-0004: Bewegungsabbildung ist rangdefizient."; break;
+            }
+            std::array<double,36> rank_matrix{};
+            std::array<double,6> rank_rhs{};
+            for(std::size_t i=0;i<6;++i)
+                for(std::size_t j=0;j<6;++j)
+                    for(std::size_t row=0;row<6;++row)
+                        rank_matrix[i*6+j]+=(jacobian[row*6+i]/column_norm[i])*
+                            (jacobian[row*6+j]/column_norm[j]);
+            std::array<double,6> rank_solution{};
+            if(!loesen_linear(rank_matrix,rank_rhs,6,rank_solution)) {
+                result.status="rangdefizit";
+                result.diagnose="CORE-SIM-0004: Bewegungsabbildung ist rangdefizient.";
+                break;
+            }
+            bool improved=false;
+            for(int trial=0;trial<10 && !improved;++trial) {
+                std::array<double,36> normal{};
+                std::array<double,6> rhs{};
+                for(std::size_t i=0;i<6;++i) {
+                    for(std::size_t row=0;row<6;++row)
+                        rhs[i]-=jacobian[row*6+i]/column_norm[i]*residual[row];
+                    for(std::size_t j=0;j<6;++j) {
+                        for(std::size_t row=0;row<6;++row)
+                            normal[i*6+j]+=(jacobian[row*6+i]/column_norm[i])*(jacobian[row*6+j]/column_norm[j]);
+                    }
+                    normal[i*6+i]+=lambda;
+                }
+                std::array<double,6> scaled_delta{};
+                if(!loesen_linear(normal,rhs,6,scaled_delta)) { lambda*=10.; continue; }
+                std::array<double,6> delta{};
+                const std::array<double,6> max_step{.5,.1,.1,5.,5.,.05};
+                double scale=1.;
+                for(std::size_t i=0;i<6;++i) {
+                    delta[i]=scaled_delta[i]/column_norm[i];
+                    if(std::abs(delta[i])>max_step[i]) scale=std::min(scale,max_step[i]/std::abs(delta[i]));
+                }
+                for(int line=0;line<24;++line) {
+                    auto candidate=variables;
+                    for(std::size_t i=0;i<6;++i) candidate[i]+=scale*delta[i];
+                    if(within(candidate)) {
+                        try {
+                            const auto values=evaluate(candidate,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr);
+                            double candidate_merit=0.;
+                            for(double value:values) candidate_merit+=value*value;
+                            if(candidate_merit<merit) { variables=candidate; improved=true; lambda=std::max(1e-12,lambda*.3); break; }
+                        } catch (...) {}
+                    }
+                    scale*=.5;
+                }
+                if(!improved) lambda*=10.;
+            }
+            if(!improved) {
+                result.status="nicht_konvergiert";
+                result.diagnose="CORE-SIM-0004: Trust-Region-/Liniensuche stagniert.";
+                for(std::size_t i=0;i<6;++i)
+                    if(std::abs(variables[i]-lower[i])<1e-8 || std::abs(variables[i]-upper[i])<1e-8) {
+                        result.status="suchgrenze"; result.diagnose="CORE-SIM-0004: Endliche Suchgrenze verhindert weitere Residuenreduktion."; break;
+                    }
+                break;
+            }
+        }
+        result.iterationen=iterations;
+        if(iterations==budget && !converged) {
+            result.status="nicht_konvergiert";
+            result.diagnose="CORE-SIM-0004: Iterationsbudget erschoepft.";
+        }
+        if(converged) for(std::size_t i=0;i<6;++i)
+            if(std::abs(variables[i]-lower[i])<1e-8 || std::abs(variables[i]-upper[i])<1e-8) {
+                converged=false; result.status="suchgrenze"; result.diagnose="CORE-SIM-0004: Loesung liegt an einer endlichen Suchgrenze."; break;
+            }
+        result.zustand=initial;
+        result.zustand.pose=pose_for(variables);
+        const auto relative_body = Vektor3{variables[3],variables[4],
+            -(hydro_config.fluidgeschwindigkeit_welt_m_s[2] + result.zustand.pose.modellvektor_nach_welt({variables[3],variables[4],0.})[2]) /
+                result.zustand.pose.modellvektor_nach_welt({0.,0.,1.})[2]};
+        result.zustand.geschwindigkeit_welt_m_s=plus(hydro_config.fluidgeschwindigkeit_welt_m_s,
+            result.zustand.pose.modellvektor_nach_welt(relative_body));
+        result.zustand.omega_modell_rad_s=result.zustand.pose.weltvektor_nach_modell({0.,0.,variables[5]});
+        result.zustand.geflutet=flooded;
+        result.zustand.bewegungsstellungen=settings;
+        HydrodynamikKontext final_context;
+        final_context.konfiguration=hydro_config;
+        final_context.modell_fassung=modell.fassung;
+        final_context.auswertung_schritt=result.zustand.schritt;
+        final_context.auswertung_zeit_s=result.zustand.zeit_s;
+        if(hydro_config.zusatzmasse_daempfung)
+            final_context.traegheit=std::make_shared<const HydrodynamischeTraegheit>(
+                berechne_hydrodynamische_traegheit(physical_model,result.zustand.pose,hydro_config.rho_kg_m3,9.81));
+        result.zustand.hydrodynamik=std::make_shared<const HydrodynamikKontext>(final_context);
+        result.zustand.hydrodynamik_erforderlich=true;
+        evaluate(variables,&result.aeussere_kraft_welt_n,&result.aeusseres_moment_modell_nm,
+            &result.residuum_bewegung_kraft_welt_n,&result.residuum_bewegung_moment_modell_nm,
+            &result.omega_modell_rad_s,&result.kursdrehrate_rad_s);
+        result.residuum_kraft_welt_n=result.residuum_bewegung_kraft_welt_n;
+        result.residuum_moment_modell_nm=result.residuum_bewegung_moment_modell_nm;
+        const Vektor3 relative_world = result.zustand.pose.modellvektor_nach_welt(relative_body);
+        const double horizontal_speed=std::hypot(relative_world[0],relative_world[1]);
+        result.loesungstyp=std::abs(variables[5])<=1e-8?"geradeaus":
+            horizontal_speed<=1e-8?"reine_drehung":"kurvenfahrt";
+        result.radius_m=std::abs(variables[5])>1e-8 && horizontal_speed>1e-8
+            ? std::optional<double>(horizontal_speed/std::abs(variables[5])) : std::nullopt;
+        if(converged) {
+            const auto next_flooded=flutung(physical_model,result.zustand.pose,flooded);
+            if(next_flooded!=flooded) {
+                auto repeat_start=result.zustand;
+                repeat_start.geflutet=next_flooded;
+                auto repeated=stationaeres_gleichgewicht(modell,repeat_start,konfiguration,
+                    hydro_config,ftol,mtol,budget,abbruch);
+                repeated.iterationen+=result.iterationen;
+                repeated.flutungswiederholungen+=result.flutungswiederholungen+1;
+                return repeated;
+            }
+        }
+    } catch (const std::exception& error) {
+        result.status="ungueltig";
+        result.diagnose=error.what();
+    }
+    return result;
+}
+}
+
+StationaeresGleichgewichtErgebnis stationaeres_gleichgewicht(const Modell& modell,
+    const Zustand& start, const StationaereGleichgewichtKonfiguration& konfiguration,
+    const HydrodynamikKonfiguration& hydro_config, double ftol, double mtol,
+    std::size_t budget, const std::atomic_bool* abbruch)
+{
+    if (konfiguration.kurvenfahrt)
+        return stationaeres_kurvengleichgewicht(modell, start, konfiguration,
+            hydro_config, ftol, mtol, budget, abbruch);
+    StationaeresGleichgewichtErgebnis result;
+    result.zustand = start;
+    result.konfiguration = konfiguration;
+    result.krafttoleranz_n = ftol;
+    result.momenttoleranz_nm = mtol;
+    result.status = "ungueltig";
+    try {
+        positiv(ftol);
+        positiv(mtol);
+        if (ftol > .1 || mtol > .1)
+            throw std::invalid_argument("CORE-SIM-0001: Stationaere Toleranz darf 0,1 N bzw. Nm nicht ueberschreiten.");
+        if (budget == 0)
+            throw std::invalid_argument("CORE-SIM-0001: Iterationsbudget muss positiv sein.");
+        for (double value : konfiguration.kraft_welt_n)
+            if (!std::isfinite(value))
+                throw std::invalid_argument("CORE-SIM-0001: Fremdkraft muss endlich sein.");
+        for (double value : konfiguration.angriffspunkt_modell_m)
+            if (!std::isfinite(value))
+                throw std::invalid_argument("CORE-SIM-0001: Kraftangriffspunkt muss endlich sein.");
+        if (!endlich(start.pose.position_m()) ||
+            !endlich(start.geschwindigkeit_welt_m_s) ||
+            !std::isfinite(start.zeit_s))
+            throw std::invalid_argument("CORE-SIM-0001: Stationaerer Startzustand muss endlich sein.");
+        for (double value : start.pose.orientierung_xyzw())
+            if (!std::isfinite(value))
+                throw std::invalid_argument("CORE-SIM-0001: Startorientierung muss endlich sein.");
+        if (!std::isfinite(hydro_config.rho_kg_m3) || hydro_config.rho_kg_m3 <= 0. ||
+            !std::isfinite(hydro_config.nu_m2_s) || hydro_config.nu_m2_s <= 0. ||
+            !endlich(hydro_config.fluidgeschwindigkeit_welt_m_s))
+            throw std::invalid_argument("CORE-HYD-0001: Ungueltige stationaere Hydrodynamikkonfiguration.");
+        HydrodynamikKontext initial_hydro_context;
+        initial_hydro_context.konfiguration = hydro_config;
+        initial_hydro_context.modell_fassung = modell.fassung;
+        initial_hydro_context.auswertung_schritt = start.schritt;
+        initial_hydro_context.auswertung_zeit_s = start.zeit_s;
+        result.zustand.hydrodynamik =
+            std::make_shared<const HydrodynamikKontext>(initial_hydro_context);
+        result.zustand.hydrodynamik_erforderlich = true;
+        if (start.testantrieb_erforderlich && !start.testantrieb)
+            throw std::invalid_argument("CORE-SIM-0001: Erforderlicher Testkontext fehlt.");
+        if (start.testantrieb && start.testantrieb->aktiv)
+            throw std::invalid_argument("CORE-SIM-0001: Aktiver Testantrieb ist im stationaeren Solver nicht zulaessig.");
+        if (abbruch && abbruch->load()) {
+            result.status = "abgebrochen";
+            result.diagnose = "Abbruch angefordert";
+            return result;
+        }
+
+        auto settings = start.bewegungsstellungen;
+        std::set<std::string> seen;
+        for (const auto& setting : konfiguration.stellungen) {
+            const auto element = std::find_if(modell.elemente.begin(), modell.elemente.end(),
+                [&](const Element& candidate) { return candidate.id == setting.element_id; });
+            if (element == modell.elemente.end() || !element->bewegung ||
+                !seen.insert(setting.element_id).second)
+                throw std::invalid_argument("CORE-MOD-0002: Ungueltige oder doppelte stationaere Bewegungsstellung: " +
+                    setting.element_id);
+            // Rudder definitions have no physical angle limits in model
+            // metadata; retain only a technical finite input bound.
+            const double minimum = element->bewegung->ruderwinkel ? -1e6 : 0.;
+            const double maximum = element->bewegung->ruderwinkel ? 1e6 : 100.;
+            if (!std::isfinite(setting.wert) || setting.wert < minimum || setting.wert > maximum)
+                throw std::invalid_argument("CORE-MOD-0002: Bewegungsstellung ausserhalb des Modellbereichs: " +
+                    setting.element_id);
+            const auto existing = std::find_if(settings.begin(), settings.end(),
+                [&](const Bewegungsstellung& value) { return value.element_id == setting.element_id; });
+            if (existing == settings.end()) settings.push_back({setting.element_id, setting.wert});
+            else existing->wert = setting.wert;
+        }
+        for (const auto& element : modell.elemente) {
+            if (!element.bewegung) continue;
+            const auto existing = std::find_if(settings.begin(), settings.end(),
+                [&](const Bewegungsstellung& value) { return value.element_id == element.id; });
+            if (existing == settings.end())
+                settings.push_back({element.id, element.bewegung->ruderwinkel ? 0. : 100.});
+        }
+        result.status = "nicht_konvergiert";
+        result.diagnose = "CORE-SIM-0004: Iterationsbudget erschoepft.";
+        const auto physisches_modell = bewegtes_modell(modell, settings);
+        result.schwerpunkt_modell_m = physisches_modell.schwerpunkt_m;
+        std::vector<std::string> flooded = start.geflutet;
+        std::sort(flooded.begin(), flooded.end());
+        flooded.erase(std::unique(flooded.begin(), flooded.end()), flooded.end());
+
+        Zustand initial = start;
+        initial.bewegungsstellungen = settings;
+        initial.omega_modell_rad_s = {};
+        initial.geschwindigkeit_welt_m_s[2] = 0.;
+        initial.hydrodynamik.reset();
+        initial.hydrodynamik_erforderlich = false;
+        auto static_seed = gleichgewicht(physisches_modell, initial, .05, .05,
+            std::min<std::size_t>(budget, 200), abbruch);
+        if (static_seed.status == "konvergiert") initial = static_seed.zustand;
+        initial.bewegungsstellungen = settings;
+        initial.geflutet = flooded;
+
+        HydrodynamikKontext hydro_context;
+        hydro_context.konfiguration = hydro_config;
+        hydro_context.modell_fassung = modell.fassung;
+        hydro_context.auswertung_schritt = initial.schritt;
+        hydro_context.auswertung_zeit_s = initial.zeit_s;
+        const auto& q0 = initial.pose.orientierung_xyzw();
+        std::array<double, 6> variables{
+            initial.pose.position_m()[2], 0., 0., 0.,
+            initial.geschwindigkeit_welt_m_s[0], initial.geschwindigkeit_welt_m_s[1]};
+        variables[4] = std::clamp(variables[4], -50., 50.);
+        variables[5] = std::clamp(variables[5], -50., 50.);
+        auto pose_for = [&](const std::array<double, 6>& u) {
+            const Vektor3 rotation{.1 * u[1], .1 * u[2], .1 * u[3]};
+            return Pose{{initial.pose.position_m()[0], initial.pose.position_m()[1], u[0]},
+                produkt(quaternion_rotation(rotation), q0)};
+        };
+        auto speed_for = [&](const std::array<double, 6>& u) {
+            return Vektor3{u[4], u[5], 0.};
+        };
+        auto evaluated = [&](const std::array<double, 6>& u, Vektor3* force_residual,
+            Vektor3* moment_residual) {
+            const auto pose = pose_for(u);
+            const auto velocity = speed_for(u);
+            auto forces = kraefte(modell, pose, nullptr, hydro_config.rho_kg_m3, 9.81,
+                flooded, &hydro_context, velocity, {}, settings);
+            add_stationaere_kraft(forces, physisches_modell, pose, konfiguration);
+            if (force_residual) *force_residual = forces.kraft_welt_n;
+            if (moment_residual) *moment_residual = forces.moment_modell_nm;
+            std::array<double, 6> residual{};
+            for (std::size_t i = 0; i < 3; ++i) {
+                residual[i] = forces.kraft_welt_n[i] / ftol;
+                residual[i + 3] = forces.moment_modell_nm[i] / mtol;
+            }
+            return residual;
+        };
+
+        bool converged = false;
+        evaluated(variables, &result.residuum_kraft_welt_n,
+            &result.residuum_moment_modell_nm);
+        const bool already_balanced = std::all_of(result.residuum_kraft_welt_n.begin(),
+            result.residuum_kraft_welt_n.end(),
+            [&](double value) { return std::abs(value) <= ftol; }) &&
+            std::all_of(result.residuum_moment_modell_nm.begin(),
+                result.residuum_moment_modell_nm.end(),
+                [&](double value) { return std::abs(value) <= mtol; });
+        if (already_balanced) {
+            auto positive_yaw = variables, negative_yaw = variables;
+            positive_yaw[3] += 1e-4;
+            negative_yaw[3] -= 1e-4;
+            const auto rp = evaluated(positive_yaw, nullptr, nullptr);
+            const auto rm = evaluated(negative_yaw, nullptr, nullptr);
+            double yaw_sensitivity = 0.;
+            for (std::size_t row = 0; row < 6; ++row)
+                yaw_sensitivity = std::max(yaw_sensitivity,
+                    std::abs(rp[row] - rm[row]) / 2e-4);
+            result.referenzkurs_verwendet = yaw_sensitivity <= 1e-7;
+            converged = true;
+            result.status = "konvergiert";
+            result.diagnose.clear();
+        }
+
+        // A drag-only model has zero numerical slope at zero speed. Use the
+        // residual direction to seed a finite trial speed before Newton steps.
+        try {
+            Vektor3 seed_force{}, seed_moment{};
+            evaluated(variables, &seed_force, &seed_moment);
+            const double horizontal = std::hypot(seed_force[0], seed_force[1]);
+            if (horizontal > ftol) {
+                const double speed = std::min(20., std::sqrt(horizontal));
+                variables[4] += speed * seed_force[0] / horizontal;
+                variables[5] += speed * seed_force[1] / horizontal;
+            } else if (std::hypot(hydro_config.fluidgeschwindigkeit_welt_m_s[0],
+                hydro_config.fluidgeschwindigkeit_welt_m_s[1]) > 0.) {
+                variables[4] = hydro_config.fluidgeschwindigkeit_welt_m_s[0];
+                variables[5] = hydro_config.fluidgeschwindigkeit_welt_m_s[1];
+            }
+        } catch (...) {
+        }
+
+        const std::array<double, 6> lower{-100., -31.41592653589793,
+            -31.41592653589793, -31.41592653589793, -50., -50.};
+        const std::array<double, 6> upper{100., 31.41592653589793,
+            31.41592653589793, 31.41592653589793, 50., 50.};
+        std::size_t total_iterations = 0;
+        // A model-fixed load does not define an absolute heading: rotating
+        // heading and water-relative velocity together leaves the balance unchanged.
+        const bool heading_reference = !konfiguration.aktiv || konfiguration.modellfest;
+        bool yaw_fixed = heading_reference;
+        if (heading_reference) result.referenzkurs_verwendet = true;
+        for (std::size_t iteration = 0; !converged && iteration < budget; ++iteration) {
+            if (abbruch && abbruch->load()) {
+                result.status = "abgebrochen";
+                result.diagnose = "Abbruch angefordert";
+                break;
+            }
+            ++total_iterations;
+            auto residual = evaluated(variables, &result.residuum_kraft_welt_n,
+                &result.residuum_moment_modell_nm);
+            double norm = 0.;
+            double merit = 0.;
+            for (double value : residual) {
+                norm = std::max(norm, std::abs(value));
+                merit += value * value;
+            }
+            if (norm <= 1.) {
+                converged = true;
+                result.status = "konvergiert";
+                result.diagnose.clear();
+                break;
+            }
+
+            std::array<double, 36> jacobian{};
+            for (std::size_t col = 0; col < 6; ++col) {
+                if (heading_reference && col == 3) continue;
+                auto positive = variables;
+                auto negative = variables;
+                const double h = col == 4 || col == 5 ? .01 : 1e-4;
+                positive[col] += h;
+                negative[col] -= h;
+                const auto rp = evaluated(positive, nullptr, nullptr);
+                const auto rm = evaluated(negative, nullptr, nullptr);
+                for (std::size_t row = 0; row < 6; ++row)
+                    jacobian[row * 6 + col] = (rp[row] - rm[row]) / (2. * h);
+            }
+            std::array<double, 6> delta{};
+            std::array<double, 6> negative_residual{};
+            for (std::size_t i = 0; i < 6; ++i) negative_residual[i] = -residual[i];
+            if (!loesen_linear(jacobian, negative_residual, 6, delta)) {
+                double max_column = 0., yaw_column = 0.;
+                for (std::size_t col = 0; col < 6; ++col) {
+                    double column = 0.;
+                    for (std::size_t row = 0; row < 6; ++row)
+                        column = std::hypot(column, jacobian[row * 6 + col]);
+                    if (col == 3) yaw_column = column;
+                    else max_column = std::max(max_column, column);
+                }
+                if (heading_reference || (yaw_column <= std::max(1e-9, max_column * 1e-7) &&
+                    std::abs(residual[5]) <= 1.)) {
+                    std::array<double, 36> normal{};
+                    std::array<double, 6> rhs{};
+                    const std::array<std::size_t, 5> active{0, 1, 2, 4, 5};
+                    std::array<double, 5> column_scale{};
+                    for (std::size_t i = 0; i < 5; ++i) {
+                        for (std::size_t row = 0; row < 6; ++row)
+                            column_scale[i] = std::hypot(column_scale[i],
+                                jacobian[row * 6 + active[i]]);
+                        if (column_scale[i] <= 1e-14) break;
+                    }
+                    for (std::size_t i = 0; i < 5; ++i) {
+                        if (column_scale[i] <= 1e-14) continue;
+                        for (std::size_t row = 0; row < 6; ++row)
+                            rhs[i] -= jacobian[row * 6 + active[i]] /
+                                column_scale[i] * residual[row];
+                        for (std::size_t j = 0; j < 5; ++j) {
+                            if (column_scale[j] <= 1e-14) continue;
+                            for (std::size_t row = 0; row < 6; ++row)
+                                normal[i * 5 + j] += jacobian[row * 6 + active[i]] /
+                                    column_scale[i] * jacobian[row * 6 + active[j]] /
+                                    column_scale[j];
+                        }
+                    }
+                    std::array<double, 6> reduced{};
+                    if (!loesen_linear(normal, rhs, 5, reduced)) {
+                        result.status = "rangdefizit";
+                        result.diagnose = "CORE-SIM-0004: Stationaere Kraft-/Momentenabbildung ist rangdefizient.";
+                        break;
+                    }
+                    delta = {};
+                    for (std::size_t i = 0; i < 5; ++i)
+                        delta[active[i]] = reduced[i] / column_scale[i];
+                    yaw_fixed = true;
+                    result.referenzkurs_verwendet = true;
+                } else {
+                    result.status = "rangdefizit";
+                    result.diagnose = "CORE-SIM-0004: Stationaere Kraft-/Momentenabbildung ist rangdefizient.";
+                    break;
+                }
+            }
+
+            const std::array<double, 6> maximum_step{.5, 2., 2., 2., 5., 5.};
+            double scale = 1.;
+            for (std::size_t i = 0; i < 6; ++i)
+                if (delta[i] != 0.) scale = std::min(scale, maximum_step[i] / std::abs(delta[i]));
+            bool improved = false;
+            bool boundary_limited = false;
+            for (int line = 0; line < 24; ++line) {
+                auto candidate = variables;
+                for (std::size_t i = 0; i < 6; ++i)
+                    candidate[i] += scale * delta[i];
+                if (yaw_fixed) candidate[3] = 0.;
+                bool within = true;
+                for (std::size_t i = 0; i < 6; ++i)
+                    within = within && candidate[i] >= lower[i] && candidate[i] <= upper[i];
+                boundary_limited = boundary_limited || !within;
+                if (within) {
+                    const auto trial = evaluated(candidate, nullptr, nullptr);
+                    double trial_merit = 0.;
+                    for (double value : trial) trial_merit += value * value;
+                    if (trial_merit < merit) {
+                        variables = candidate;
+                        improved = true;
+                        break;
+                    }
+                }
+                scale *= .5;
+            }
+            if (!improved) {
+                result.status = boundary_limited ? "suchgrenze" : "nicht_konvergiert";
+                result.diagnose = boundary_limited
+                    ? "CORE-SIM-0004: Endliche Suchgrenze verhindert weitere Residuenreduktion."
+                    : "CORE-SIM-0004: Liniensuche stagniert.";
+                break;
+            }
+        }
+        result.iterationen = total_iterations;
+        if (converged) {
+            for (std::size_t i = 0; i < variables.size(); ++i)
+                if (std::abs(variables[i] - lower[i]) < 1e-8 ||
+                    std::abs(variables[i] - upper[i]) < 1e-8) {
+                    converged = false;
+                    result.status = "suchgrenze";
+                    result.diagnose = "CORE-SIM-0004: Loesung liegt an einer endlichen Suchgrenze.";
+                    break;
+                }
+        }
+        result.zustand = start;
+        result.zustand.pose = pose_for(variables);
+        result.zustand.geschwindigkeit_welt_m_s = speed_for(variables);
+        result.zustand.omega_modell_rad_s = {};
+        result.zustand.geflutet = flooded;
+        result.zustand.bewegungsstellungen = settings;
+        auto final_context = hydro_context;
+        final_context.auswertung_schritt = result.zustand.schritt;
+        final_context.auswertung_zeit_s = result.zustand.zeit_s;
+        result.zustand.hydrodynamik =
+            std::make_shared<const HydrodynamikKontext>(final_context);
+        result.zustand.hydrodynamik_erforderlich = true;
+        auto final_forces = kraefte(modell, result.zustand.pose, nullptr,
+            hydro_config.rho_kg_m3, 9.81, flooded, &hydro_context,
+            result.zustand.geschwindigkeit_welt_m_s, {}, settings);
+        add_stationaere_kraft(final_forces, physisches_modell,
+            result.zustand.pose, konfiguration);
+        result.residuum_kraft_welt_n = final_forces.kraft_welt_n;
+        result.residuum_moment_modell_nm = final_forces.moment_modell_nm;
+        result.aeussere_kraft_welt_n = final_forces.kraft_welt_n;
+        result.aeusseres_moment_modell_nm = final_forces.moment_modell_nm;
+        result.residuum_bewegung_kraft_welt_n = final_forces.kraft_welt_n;
+        result.residuum_bewegung_moment_modell_nm = final_forces.moment_modell_nm;
+        result.omega_modell_rad_s = {};
+        result.kursdrehrate_rad_s = 0.;
+        result.loesungstyp = "geradeaus";
+        result.kurvenfahrt = false;
+        result.radius_m.reset();
+        if (converged) {
+            const auto next_flooded = flutung(physisches_modell, result.zustand.pose, flooded);
+            if (next_flooded != flooded) {
+                auto repeat_start = result.zustand;
+                repeat_start.geflutet = next_flooded;
+                auto repeated = stationaeres_gleichgewicht(modell, repeat_start,
+                    konfiguration, hydro_config, ftol, mtol, budget, abbruch);
+                repeated.iterationen += result.iterationen;
+                repeated.flutungswiederholungen +=
+                    result.flutungswiederholungen + 1;
+                return repeated;
+            }
+        }
+        if (result.status == "nicht_konvergiert" &&
+            result.diagnose == "CORE-SIM-0004: Iterationsbudget erschoepft")
+            result.diagnose = "CORE-SIM-0004: Iterationsbudget erschoepft.";
+        if (result.status.empty()) result.status = "nicht_konvergiert";
+    } catch (const std::exception& error) {
+        result.status = "ungueltig";
+        result.diagnose = error.what();
+    }
+    return result;
+}
+
+namespace {
 void testparameter(const TestantriebKonfiguration& c)
 {
     if(!std::isfinite(c.kraft_n)||c.kraft_n<0.||c.kraft_n>100000.||
@@ -1096,7 +2036,8 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
     const HydrodynamikKontext* hydro,const Vektor3& geschwindigkeit,
     const Vektor3& omega,const std::vector<Bewegungsstellung>& bewegungsstellungen)
 {
-    auto k=hydrostatik(m,p,rho,g,geflutet);
+    const auto physisches_modell = bewegtes_modell(m, bewegungsstellungen);
+    auto k=hydrostatik(physisches_modell,p,rho,g,geflutet);
     if(c) {
         testparameter(c->konfiguration);
         if(c->modell_fassung!=m.fassung)
@@ -1145,11 +2086,13 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
                 }
                 k.beitraege.push_back(std::move(b));
             };
-            add(reibungsbeitrag(hydrodynamik_element,m,p,hydro->konfiguration,geschwindigkeit,omega,panels));
+            add(reibungsbeitrag(hydrodynamik_element,physisches_modell,p,
+                hydro->konfiguration,geschwindigkeit,omega,panels));
             if(*e.hydrodynamik_rolle==HydrodynamikRolle::rumpf)
-                add(druckbeitrag(hydrodynamik_element,m,p,hydro->konfiguration,geschwindigkeit,omega,panels));
+                add(druckbeitrag(hydrodynamik_element,physisches_modell,p,
+                    hydro->konfiguration,geschwindigkeit,omega,panels));
             else
-                add(seitenkraftbeitrag(hydrodynamik_element,m,p,hydro->konfiguration,
+                add(seitenkraftbeitrag(hydrodynamik_element,physisches_modell,m,p,hydro->konfiguration,
                     geschwindigkeit,omega,panels,bewegungsstellungen));
         }
         if(const auto* ht=hydro->traegheit.get()) {
@@ -1199,6 +2142,15 @@ Lateraldruckpunkt lateraldruckpunkt(const Modell& m,const Pose& p,const Kraefte&
         if(b.quelle!=Quelle::hydrodynamik||b.zustand!=Datenzustand::gueltig||b.art!="kraft"||!b.punkt_bekannt)
             continue;
         if(!endet_mit(b.id,":hydrodynamik:druck")&&!endet_mit(b.id,":hydrodynamik:seitenkraft")) continue;
+        const auto& panels = b.lateraldruckpunkt_panelbilanz;
+        if (panels.vorhanden) {
+            fy += panels.querkraft_modell_n;
+            fy_betrag += panels.panelbetragssumme_n;
+            fy_x += panels.erstes_moment_x_nm;
+            fy_z += panels.erstes_moment_z_nm;
+            if (panels.querkraft_modell_n != 0.) quellen.push_back(b.id);
+            continue;
+        }
         const double f=b.vektor[1];
         if(!std::isfinite(f)||f==0.) continue;
         fy+=f;fy_betrag+=std::abs(f);fy_x+=f*b.punkt_m[0];fy_z+=f*b.punkt_m[2];

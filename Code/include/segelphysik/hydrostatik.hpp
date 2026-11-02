@@ -16,7 +16,7 @@ struct VolumenWerte {
 
 // Contract version 2 metadata is stored as enums to keep the per-evaluation
 // cost of the solver hot path unchanged; names appear only when serialised.
-enum class Quelle { schwerkraft, hydrostatik, hydrodynamik, summe, nicht_zugeordnet, testantrieb };
+enum class Quelle { schwerkraft, hydrostatik, hydrodynamik, summe, nicht_zugeordnet, testantrieb, externe_kraft };
 enum class Rolle { einzelbeitrag, gruppensumme, gesamtsumme };
 enum class Punktart { angriffspunkt, bezugspunkt };
 enum class Datenzustand { gueltig, null, deaktiviert, nicht_berechnet, ungueltig };
@@ -25,6 +25,14 @@ const char* name(Quelle wert);
 const char* name(Rolle wert);
 const char* name(Punktart wert);
 const char* name(Datenzustand wert);
+
+struct LateraldruckpunktPanelbilanz {
+    bool vorhanden{};
+    double querkraft_modell_n{};
+    double panelbetragssumme_n{};
+    double erstes_moment_x_nm{};
+    double erstes_moment_z_nm{};
+};
 
 struct Beitrag {
     std::string id;
@@ -47,6 +55,7 @@ struct Beitrag {
     std::vector<std::string> modell_widerstandsanteile;
     Vektor3 moment_s_nm{};  // moment about the current total centre of mass S
     bool punkt_bekannt = true;
+    LateraldruckpunktPanelbilanz lateraldruckpunkt_panelbilanz;
 };
 
 struct Kraefte {
@@ -56,6 +65,7 @@ struct Kraefte {
     std::vector<Beitrag> beitraege;
     std::vector<std::pair<std::string, VolumenWerte>> elementvolumina;
 };
+struct Bewegungsstellung;
 
 struct HydrodynamikKonfiguration {
     double rho_kg_m3 = 1000.;
@@ -114,7 +124,8 @@ Vektor3 moment_um(const Vektor3& angriffspunkt, const Vektor3& bezugspunkt,
 // zero buoyancy (A-C-00047). All other elements are unaffected.
 Kraefte hydrostatik(const Modell& modell, const Pose& pose,
                    double rho = 1000., double g = 9.81,
-                   const std::vector<std::string>& geflutet = {});
+                   const std::vector<std::string>& geflutet = {},
+                   const std::vector<Bewegungsstellung>& bewegungsstellungen = {});
 // Returns bisher plus every floodable element with a rim point below the
 // water plane (world z < 0) in this pose. Sorted, without duplicates;
 // flooding is permanent and never removed.
@@ -264,6 +275,46 @@ Bilanz bilanz(const Modell& modell, std::vector<Beitrag>& beitraege,
 SolverErgebnis gleichgewicht(const Modell& modell, const Zustand& start,
     double krafttoleranz_n = .001, double momenttoleranz_nm = .001,
     std::size_t budget = 200, const std::atomic_bool* abbruch = nullptr);
+
+struct StationaereGleichgewichtKonfiguration {
+    bool aktiv = false;
+    bool modellfest = true;
+    Vektor3 kraft_welt_n{};
+    Vektor3 angriffspunkt_modell_m{};
+    std::vector<Bewegungsereignis> stellungen;
+    bool kurvenfahrt = false;
+};
+
+struct StationaeresGleichgewichtErgebnis {
+    Zustand zustand;
+    StationaereGleichgewichtKonfiguration konfiguration;
+    Vektor3 schwerpunkt_modell_m{};
+    std::string status;
+    std::string diagnose;
+    std::size_t iterationen{};
+    Vektor3 residuum_kraft_welt_n{};
+    Vektor3 residuum_moment_modell_nm{};
+    double krafttoleranz_n{};
+    double momenttoleranz_nm{};
+    bool referenzkurs_verwendet{};
+    std::size_t flutungswiederholungen{};
+    bool kurvenfahrt{};
+    std::string loesungstyp = "geradeaus";
+    double kursdrehrate_rad_s{};
+    Vektor3 omega_modell_rad_s{};
+    Vektor3 aeussere_kraft_welt_n{};
+    Vektor3 aeusseres_moment_modell_nm{};
+    Vektor3 residuum_bewegung_kraft_welt_n{};
+    Vektor3 residuum_bewegung_moment_modell_nm{};
+    std::optional<double> radius_m;
+};
+
+StationaeresGleichgewichtErgebnis stationaeres_gleichgewicht(
+    const Modell& modell, const Zustand& start,
+    const StationaereGleichgewichtKonfiguration& konfiguration,
+    const HydrodynamikKonfiguration& hydrodynamik,
+    double krafttoleranz_n = .05, double momenttoleranz_nm = .05,
+    std::size_t budget = 100, const std::atomic_bool* abbruch = nullptr);
 // Updates the flooding state from the start and end pose of the step.
 Zustand dynamikschritt(const Modell& modell, const Zustand& zustand,
     double dt_s, double rho = 1000., double g = 9.81);

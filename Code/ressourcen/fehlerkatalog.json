@@ -155,6 +155,14 @@
       "pruefstatus": "implementiert"
     },
     {
+      "id": "CORE-MOD-0009",
+      "kurztext": "Schema-3-Quellmesh je Element nicht eindeutig.",
+      "pass_kriterium": "Alle Geometrieverwendungen eines Elements verweisen auf seine einzige Quellmesh-ID; jedes Quellmesh gehoert genau einem Element.",
+      "fail_kriterium": "Geometrieverwendungen verwenden unterschiedliche Mesh-IDs, ein Quellmesh wird mehreren Elementen zugeordnet oder das OBJ enthaelt unbenutzte Netze.",
+      "handlungsanweisung": "Geometrien fachlich vergleichen und eine gemeinsame Quelle entscheiden; keine automatische Quellenwahl, Schliessung oder Ersatzgeometrie voraussetzen.",
+      "pruefstatus": "implementiert"
+    },
+    {
       "id": "CORE-BIL-0001",
       "kurztext": "Kraft- oder Momentenbeitrag nicht endlich.",
       "pass_kriterium": "Vektor, Punkt und Moment jedes Beitrags sind endlich.",
@@ -208,6 +216,38 @@
       "pass_kriterium": "Die angefragte Element-ID ist im Modell enthalten.",
       "fail_kriterium": "Das Modell enthaelt kein Element mit dieser ID.",
       "handlungsanweisung": "Element-IDs aus modellstruktur verwenden.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-INSP-0001",
+      "kurztext": "Unbekannter oder nicht verfuegbarer Inspektionstyp.",
+      "pass_kriterium": "Der angefragte Baum- oder Mesh-Typ ist im Snapshot als verfuegbar gelistet.",
+      "fail_kriterium": "Der angefragte Typ ist unbekannt oder fuer diesen Snapshot nicht verfuegbar.",
+      "handlungsanweisung": "Verfuegbare Typen aus demselben Snapshot abrufen.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-INSP-0002",
+      "kurztext": "Unbekannte Knoten- oder Element-ID.",
+      "pass_kriterium": "Alle angefragten IDs gehoeren zum angegebenen Snapshot und Baum.",
+      "fail_kriterium": "Mindestens eine ID ist im betreffenden Snapshot bzw. Baum unbekannt.",
+      "handlungsanweisung": "IDs aus dem Objektbaum desselben Snapshots verwenden.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-INSP-0003",
+      "kurztext": "Inspektionsbestand waehrend des Einlesens nicht konsistent.",
+      "pass_kriterium": "Modellstruktur und alle benoetigten Quelldaten bleiben waehrend der Aufnahme unveraendert und lesbar.",
+      "fail_kriterium": "Gesamtstruktur ist unlesbar oder Quelldaten aendern sich waehrend der Snapshotaufnahme.",
+      "handlungsanweisung": "Quelldaten stabilisieren und ein neues Einlesen ausdruecklich anfordern.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-INSP-0004",
+      "kurztext": "Inspektionsdaten teilweise nicht aufbereitbar.",
+      "pass_kriterium": "Alle aufbereiteten Eigenschaften und Geometrien entsprechen dem Snapshot und tragen ihren dokumentierten Status.",
+      "fail_kriterium": "Eine lesbare Teilansicht enthaelt eine fehlgeschlagene oder ungueltige Wert-/Geometrieaufbereitung.",
+      "handlungsanweisung": "Diagnose und Status beachten; teilweise aufbereitete Daten nicht als gueltige Physik behandeln.",
       "pruefstatus": "implementiert"
     }
   ]
