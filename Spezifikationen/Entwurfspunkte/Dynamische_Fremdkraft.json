@@ -44,10 +44,12 @@
       "id": "IDEE-C-00092",
       "status": "blockiert_nicht_finalisiert",
       "abschnitt": "6",
-      "text": "Vollstaendige Statik-zu-Dynamik-Matrix und Zeitintegrationskonvergenz nachweisen, keine stationaeren Suchheuristiken kopieren. Erst nach Mindestintegration und gemeinsamem Funktionsgate historische Core-Staende bis etwa 27.10.2026 bei vergleichbarem Physikumfang messen und Ursachen anhand dynamischer Codepfade belegen.",
+      "analyse_status": "ursachenanalyse_freigegeben_2026-11-03_19:23",
+      "text": "Vollstaendige Statik-zu-Dynamik-Matrix und Zeitintegrationskonvergenz nachweisen, keine stationaeren Suchheuristiken kopieren. Priorisierte Ursachenanalyse des Laufzeitverlaufs C-0.7 bis C-0.9 ist ab 03.11.2026 19:23 Uhr freigegeben und einschliesslich Core-Messungen nach Abschluss der GUI-Messungen und ausdruecklicher Freigabe des Messfensters abgeschlossen; Evidenz im C-0.9-Umsetzungsplan Abschnitt 4.3.",
       "offen": [
         "Vollstaendige fachliche Matrix und zusaetzliche Integrations-/Konvergenznachweise sind nicht freigegeben.",
-        "Historischer Performancevergleich und weitergehende Optimierungen sind bis persoenlicher GUI-Pruefung und erneutem ausdruecklichen Nutzer-Go blockiert."
+        "Ursachenanalyse und Core-Messungen sind im C-0.9-Umsetzungsplan Abschnitt 4.3 dokumentiert; die GUI-Messungen stehen im G-0.10-Plan Abschnitte 13.7-13.8. Keine Produktionscode-Aenderung oder Optimierung ohne separaten Auftrag.",
+        "Der IDEE-Punkt bleibt nicht finalisiert; die Analyse schliesst keine physikalischen Nachweise oder Nutzerabnahmen."
       ]
     }
   ]

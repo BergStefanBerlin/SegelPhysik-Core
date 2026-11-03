@@ -1,8 +1,11 @@
 # Spezifikation Core: Allgemeine Fremdkraft im dynamischen Lauf
 
 **Status:** Teilfinalisiert fuer den Core-Mindestvertrag in Abschnitt 8.
-Weitergehende Matrix, GUI-Abnahme und Performancevergleich sind nicht
-freigegeben.
+Priorisierte Ursachenanalyse und Messlaeufe sind nach Abschluss der
+GUI-Messungen und ausdruecklicher Freigabe des Core-Messfensters am
+03.11.2026 abgeschlossen; Ergebnisse siehe C-0.9-Umsetzungsplan,
+Abschnitt 4.3. Weitergehende Matrix, GUI-Abnahme und Implementierung von
+Optimierungen bleiben offen.
 **Stand:** 03.11.2026, Mindestumfang ausdruecklich beauftragt ab 18:43 Uhr.
 **Arbeitszielversion:** C-0.9; keine Tag- oder Release-Freigabe.
 
@@ -18,8 +21,9 @@ werden weder umbenannt noch als Ersatz fuer diesen Vertrag verwendet.
 
 Die Abschnitte 1 bis 7 halten Bestand, Quellen und spaetere Pruefideen fest.
 Verbindlich und zur Umsetzung freigegeben ist ausschliesslich der in
-Abschnitt 8 abgegrenzte Core-Mindestvertrag. Der Performancevergleich bleibt
-bis zur persoenlichen GUI-Pruefung und erneutem ausdruecklichem Go gesperrt.
+Abschnitt 8 abgegrenzte Core-Mindestvertrag. Ursachenanalyse und
+Core-Messlaeufe sind nach Abschnitt 9 abgeschlossen und im C-0.9-Plan
+nachgewiesen. Optimierungen bleiben ohne separaten Auftrag gesperrt.
 
 ## 1. Ziel und gepruefter Bestand
 
@@ -141,8 +145,8 @@ mit Fremdkraft berechnet ausgeben.
 
 ### 6.1 Nicht freigegebener Entwurf einer weitergehenden Matrix
 
-Nachpruefung auf Nutzerauftrag vom 03.11.2026, 18:28 Uhr, vor der
-Performanceuntersuchung. Vollstaendig meint die fachlichen
+Nachpruefung auf Nutzerauftrag vom 03.11.2026, 18:28 Uhr, vor den
+Performance-Messlaeufen. Vollstaendig meint die fachlichen
 Physik-/Datenvertraege, nicht die Uebernahme eines stationaeren Solvers
 als dynamischen Integrator. Die folgende Matrix ist eine
 spaetere Pruefidee und kein freigegebener Umsetzungsschritt. Die
@@ -213,8 +217,12 @@ noch zu bestaetigender Vorschlag. Keine Release-Aktion beauftragt.
 Nutzerauftrag vom 03.11.2026, 18:37 Uhr, danach konkretisierter
 Planauftrag: zuerst GUI und minimale korrekte Core-Anpassungen fuer
 den neuen Rechenfall, dann gemeinsame Tests und historischer
-Performancevergleich. Dieser Auftrag startet keine vorgezogene
-Codeoptimierung und hebt offene fachliche Entscheidungen nicht auf.
+Performancevergleich. Das Go vom 03.11.2026, 19:23 Uhr hob den Stopp fuer
+die Ursachenanalyse auf; nach Abschluss der GUI-Messungen wurde das
+Core-Messfenster ausdruecklich freigegeben. Der Vergleich ist in
+Abschnitt 4.3 des C-0.9-Umsetzungsplans dokumentiert.
+Dieser Auftrag startet keine vorgezogene Codeoptimierung und hebt offene
+fachliche Entscheidungen nicht auf.
 
 Die aktuelle Dynamik gegen kompatible aeltere Staende bis etwa
 27.10.2026 vergleichen. Gleiche Modellgeometrie, Anfangszustaende,
@@ -283,5 +291,50 @@ wiederverwendet; kein neuer Integrator und keine Stellungsoptimierung.
 
 Weitere Entwurfspunkte und geplante Matrixfaelle sind nicht Teil dieser
 Freigabe. Die GUI-Integration und gemeinsame GUI-Pruefung bleiben offen.
-Historischer Performancevergleich sowie weitergehende Optimierungen sind
-bis zur persoenlichen GUI-Pruefung und erneutem ausdruecklichem Go blockiert.
+Die priorisierte Ursachenanalyse der historischen Laufzeit ist seit
+03.11.2026, 19:23 Uhr ausdruecklich freigegeben; Core-Messungen wurden
+nach Abschluss der GUI-Messungen und ausdruecklicher Freigabe des
+Messfensters durchgefuehrt. Analyse und Messungen duerfen offene
+Physiknachweise weder schliessen noch als Abnahme ausweisen.
+Implementierung, Produktionscode-Aenderungen und Optimierungen bleiben
+bis zu einem separaten ausdruecklichen Auftrag blockiert.
+
+## 9. Analysefreigabe (03.11.2026, 19:23 Uhr)
+
+Freigegeben ist ausschliesslich die Ursachenanalyse des Laufzeitverlaufs
+von `C-0.7` (`ebca994770b216a749e18917d2ae387de1612dff`) ueber `C-0.8`
+(`d6d57c7dc5084dc3599f7208b3c63c35446b3345`) bis `C-0.9`
+(`3fa197135a0858ee525d3e4bc8273242e0ee97c2`): Quellpfad-Inventar,
+Modell-/Element-/Meshkomplexitaet, getrennte statische und dynamische
+Aufrufpfade, JSON-/Inspektionsaufwand sowie qualitative, physikalisch
+bewertete Ursachenhypothesen. Keine Code- oder Modelldaten-Aenderung,
+kein Zurueckportieren von Physik und kein Performance-Fix ist damit
+autorisiert.
+
+Die Core-Messungen mit identischen 420er- und Folkeboot-Eingaben,
+`dt = 0,01 s`, festem Simulationshorizont und ungebremstem Lauf erfolgten
+nach dem GUI-Messfenster. Je Build: gleicher Release-Compiler und
+gleiche Einstellungen, ein Warmlauf und fuenf Messlaeufe; Median und
+Spannweite sind berichtet. Start/Laden, reine Integrationsschritte,
+Einzelzustand-JSON und CLI-Gesamtausgabe sind getrennt ausgewiesen.
+Die erneute GUI-Messung mit Scratch-Harness (Matrix `gui-perf-final3`)
+enthaelt 1 Warmup + 5 x 6 Snapshots, alle fuenf einfachen Flags ein/aus,
+Single/Four/Hidden und beide Workspace-Pfade. Sie ist kein Core-
+Laufzeitnachweis; ihre Ergebnisse stehen im G-0.10-Plan, Abschnitte
+13.7-13.8. Die Core-Messungen stehen separat im C-0.9-Plan, Abschnitt
+4.3; sie wurden nach GUI-Abschluss und ausdruecklicher Slot-Freigabe
+seriell durchgefuehrt.
+Historische Modelldaten wurden nicht veraendert. Das aktuelle Schema 3
+ist fuer C-0.7 nicht ladbar; ein getrennt ausgewiesener Dreiversionslauf
+mit archivierten `0.1-entwurf`-Eingaben ist im C-0.9-Plan dokumentiert.
+
+Der Vergleich prueft gemeinsame Physikpfade, behauptet aber keine
+vollstaendige Statik-Dynamik-Paritaet. Hydrostatik, reale Geometrie,
+Masse/Schwerpunkt und passende Kraftbeitraege sind relevante
+Gemeinsamkeiten. Zeitintegration, zeitabhaengige Pose und Geschwindigkeit,
+hydrodynamische Daempfung/Zusatzmasse, mehrere Kraftauswertungen je Schritt
+sowie Ausgabe pro Zeitschritt sind legitime dynamische Mehrarbeit.
+Statische Gleichgewichts-/Kurvenfahrtsuche ist dagegen ein separater
+iterativer Solver und kein dynamischer Zeitschritt. Die offenen
+Rotations-, Bewegungs-, Flutungs-, Frame- und Integrationskonvergenz-
+Nachweise aus Abschnitt 6 bleiben unveraendert offen.

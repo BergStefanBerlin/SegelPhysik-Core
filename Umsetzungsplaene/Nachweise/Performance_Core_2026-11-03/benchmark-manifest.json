@@ -1,0 +1,110 @@
+{
+  "measured_at": "2026-11-03T19:40+01:00 onward; raw files retain write timestamps",
+  "machine": {
+    "cpu": "AMD Ryzen 5 8600G w/ Radeon 760M Graphics",
+    "cores": 6,
+    "logical_processors": 12,
+    "os": "Windows 10.0.26300"
+  },
+  "build": {
+    "configuration": "Release",
+    "generator": "Visual Studio 17 2022, x64",
+    "compiler": "MSVC 19.44.35229",
+    "visual_studio_msbuild": "17.14.60",
+    "windows_sdk": "10.0.26100.0",
+    "test_instrumentation": false,
+    "serial_measurement_runs": true
+  },
+  "sources": {
+    "C-0.7": "ebca994770b216a749e18917d2ae387de1612dff",
+    "C-0.8": "d6d57c7dc5084dc3599f7208b3c63c35446b3345",
+    "C-0.9": "3fa197135a0858ee525d3e4bc8273242e0ee97c2"
+  },
+  "input_models": {
+    "legacy420": {
+      "path": "C:\\_DATEN\\Code\\Python\\Organisierter Code\\Segelphysik\\Modelle alt\\420\\modell.json",
+      "sha256": "fa9539de98d10305777ebeff05b1f2e8f60b95ecc6fdf0a4e1263dec29d1024e",
+      "bytes": 5503
+    },
+    "legacyFolkeboot": {
+      "path": "C:\\_DATEN\\Code\\Python\\Organisierter Code\\Segelphysik\\Modelle alt\\folkeboot\\modell.json",
+      "sha256": "0043f85987ddc0af19fb3484d02df6a614f9ad28fdb6e647cc163fccf134045c",
+      "bytes": 4672
+    },
+    "schema3_420": {
+      "path": "C:\\_DATEN\\Code\\Python\\Organisierter Code\\Segelphysik\\Modelle\\420\\modell.json",
+      "sha256": "90383a6bc04305453598bcfa5207ec63cb35dd838e137849056044d01717914a",
+      "bytes": 5679
+    },
+    "schema3_Folkeboot": {
+      "path": "C:\\_DATEN\\Code\\Python\\Organisierter Code\\Segelphysik\\Modelle\\folkeboot\\modell.json",
+      "sha256": "0a6314b9ab321796db5e393fdcc29bec0082dd269b86f4f932d12734cec16c2d",
+      "bytes": 4933
+    }
+  },
+  "design": {
+    "warmup_runs": 1,
+    "measured_runs": 5,
+    "duration_s": 0.5,
+    "dt_s": 0.01,
+    "steps": 50,
+    "cli_output_interval": 1,
+    "cli_output_states": 51,
+    "timing_statistics": "median and min-max range",
+    "api_cases": [
+      "free",
+      "testantrieb default 200 N",
+      "hydrodynamik default",
+      "hydrodynamik plus testantrieb"
+    ],
+    "C-0.9_only_case": "active 10 N modellfeste force applied at model CG; no hydro context; force context setup excluded from timed loop",
+    "schema3_C-0.7": "rejected with unknown field geometrie; no timing reported",
+    "legacy_model_limit": "0.1-entwurf models are draft and simulationsfreigabe=false; technical comparability only"
+  },
+  "evidence_files": {
+    "api_step_raw": {
+      "path": "api-legacy-step-raw.jsonl",
+      "sha256": "bcb044cc8eda36bc33fe5430056f58cad16c0757173d2183ded2da30fc4af7eb"
+    },
+    "api_step_normalized": {
+      "path": "api-legacy-step-normalized.jsonl",
+      "sha256": "abc7ac3bcdd5a22751970281012c8abd1bda00b0afc9d195f7b7a6fe4ea4c0af"
+    },
+    "api_schema3_step_raw": {
+      "path": "api-step-raw.jsonl",
+      "sha256": "375015ec00c9372fa9058c7c8690fa8de0969020af591b540f687b29d8e4c500"
+    },
+    "api_schema3_step_normalized": {
+      "path": "api-step-normalized.jsonl",
+      "sha256": "da5d73fdfde69492b9544353c756dcea8bee053ddc0c86421b4f1367017a655d"
+    },
+    "api_setup_raw": {
+      "path": "api-setup-raw.jsonl",
+      "sha256": "69eff3a34bee496c1971815ba28852c0ccade338db4b5288ef0c3766df8085d7"
+    },
+    "api_setup_normalized": {
+      "path": "api-setup-normalized.jsonl",
+      "sha256": "f0269af0dbda512e8545aea4d0466c1be019a8a43481027ca2bd5f1c8e745248"
+    },
+    "cli_schema3_raw": {
+      "path": "cli-end-to-end-raw.jsonl",
+      "sha256": "f6498a1e22de06fdcdf15de58d1e0b154b3ab064cb7ce01891b7643eb8ed9805"
+    },
+    "cli_legacy_raw": {
+      "path": "cli-legacy-end-to-end-raw.jsonl",
+      "sha256": "94962e92bb748ec886fabe2fd68d6d21fc7d44ef851ee76742e124107db5f055"
+    },
+    "legacy_model_inventory": {
+      "path": "legacy-model-inventory.json",
+      "sha256": "01d90821000b4f17182e4d01431aa818989d423405e496c00d79e768d39454bf"
+    },
+    "derived_summary": {
+      "path": "derived-summary.json",
+      "sha256": "cdb57f7f8acadca213f5e7b38705edfa459528e37d710899f57874abd684a7d1"
+    },
+    "build_info": {
+      "path": "build-metadata.txt",
+      "sha256": "381b7169ba765b8b874f7e5845c6a8c8ad87501d1297c83ad21f761897db016e"
+    }
+  }
+}

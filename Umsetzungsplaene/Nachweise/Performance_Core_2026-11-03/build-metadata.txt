@@ -1,0 +1,12 @@
+﻿c07_BUILDINFO SegelPhysik-Core
+c07_BUILDINFO Entwicklungsstand: Hydrostatikkern; fachliche Gesamtabnahme offen
+c07_BUILDINFO Testinstrumentierung vorbereitet: nein
+c07_BUILDINFO Gesamtlaufzeit immer aktiv; Detailmessungen nur im expliziten Testmodus.
+c08_BUILDINFO SegelPhysik-Core
+c08_BUILDINFO Entwicklungsstand: Hydrostatikkern; fachliche Gesamtabnahme offen
+c08_BUILDINFO Testinstrumentierung vorbereitet: nein
+c08_BUILDINFO Gesamtlaufzeit immer aktiv; Detailmessungen nur im expliziten Testmodus.
+c09_BUILDINFO SegelPhysik-Core
+c09_BUILDINFO Entwicklungsstand: Hydrostatikkern; fachliche Gesamtabnahme offen
+c09_BUILDINFO Testinstrumentierung vorbereitet: nein
+c09_BUILDINFO Gesamtlaufzeit immer aktiv; Detailmessungen nur im expliziten Testmodus.

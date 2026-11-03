@@ -1,0 +1,758 @@
+{
+  "api_step": [
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c07",
+      "scenario": "drive",
+      "n": 5,
+      "median": 132.4739,
+      "min": 130.6758,
+      "max": 133.1289
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c07",
+      "scenario": "free",
+      "n": 5,
+      "median": 87.548,
+      "min": 86.938,
+      "max": 87.8727
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c07",
+      "scenario": "hydro",
+      "n": 5,
+      "median": 946.2298,
+      "min": 934.0571,
+      "max": 961.5239
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c07",
+      "scenario": "hydro_drive",
+      "n": 5,
+      "median": 995.4563,
+      "min": 987.1067,
+      "max": 999.256
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c08",
+      "scenario": "drive",
+      "n": 5,
+      "median": 222.223,
+      "min": 216.7325,
+      "max": 279.7201
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c08",
+      "scenario": "free",
+      "n": 5,
+      "median": 168.2422,
+      "min": 147.7479,
+      "max": 189.6733
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c08",
+      "scenario": "hydro",
+      "n": 5,
+      "median": 1145.0006,
+      "min": 1094.0321,
+      "max": 1210.1602
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c08",
+      "scenario": "hydro_drive",
+      "n": 5,
+      "median": 1182.1124,
+      "min": 1159.7194,
+      "max": 1248.7101
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c09",
+      "scenario": "drive",
+      "n": 5,
+      "median": 271.9107,
+      "min": 262.1006,
+      "max": 342.6999
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c09",
+      "scenario": "foreign",
+      "n": 5,
+      "median": 190.2025,
+      "min": 180.7465,
+      "max": 242.4489
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c09",
+      "scenario": "free",
+      "n": 5,
+      "median": 221.3856,
+      "min": 173.9217,
+      "max": 247.9892
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c09",
+      "scenario": "hydro",
+      "n": 5,
+      "median": 1181.4899,
+      "min": 1174.7075,
+      "max": 1223.6409
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c09",
+      "scenario": "hydro_drive",
+      "n": 5,
+      "median": 1525.2219,
+      "min": 1509.6978,
+      "max": 1598.0618
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c07",
+      "scenario": "drive",
+      "n": 5,
+      "median": 1.2788,
+      "min": 1.2749,
+      "max": 1.3005
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c07",
+      "scenario": "free",
+      "n": 5,
+      "median": 0.845,
+      "min": 0.8396,
+      "max": 0.8466
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c07",
+      "scenario": "hydro",
+      "n": 5,
+      "median": 15.5673,
+      "min": 14.5557,
+      "max": 15.6792
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c07",
+      "scenario": "hydro_drive",
+      "n": 5,
+      "median": 16.0212,
+      "min": 15.1372,
+      "max": 16.8798
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c08",
+      "scenario": "drive",
+      "n": 5,
+      "median": 2.8754,
+      "min": 2.1453,
+      "max": 3.5264
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c08",
+      "scenario": "free",
+      "n": 5,
+      "median": 2.7438,
+      "min": 1.9074,
+      "max": 2.8858
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c08",
+      "scenario": "hydro",
+      "n": 5,
+      "median": 15.4366,
+      "min": 14.5277,
+      "max": 18.438
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c08",
+      "scenario": "hydro_drive",
+      "n": 5,
+      "median": 14.929,
+      "min": 14.6867,
+      "max": 19.399
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c09",
+      "scenario": "drive",
+      "n": 5,
+      "median": 3.3977,
+      "min": 2.0051,
+      "max": 4.0554
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c09",
+      "scenario": "foreign",
+      "n": 5,
+      "median": 2.3143,
+      "min": 1.6624,
+      "max": 2.9773
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c09",
+      "scenario": "free",
+      "n": 5,
+      "median": 2.651,
+      "min": 1.7416,
+      "max": 3.1751
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c09",
+      "scenario": "hydro",
+      "n": 5,
+      "median": 15.0161,
+      "min": 14.7,
+      "max": 19.432
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c09",
+      "scenario": "hydro_drive",
+      "n": 5,
+      "median": 20.1619,
+      "min": 19.6651,
+      "max": 24.8083
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c08",
+      "scenario": "drive",
+      "n": 5,
+      "median": 236.3881,
+      "min": 224.7862,
+      "max": 290.487
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c08",
+      "scenario": "free",
+      "n": 5,
+      "median": 179.6366,
+      "min": 142.4512,
+      "max": 197.6009
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c08",
+      "scenario": "hydro",
+      "n": 5,
+      "median": 1113.4835,
+      "min": 1104.0711,
+      "max": 1162.9605
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c08",
+      "scenario": "hydro_drive",
+      "n": 5,
+      "median": 1221.1585,
+      "min": 1175.368,
+      "max": 1294.2644
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c09",
+      "scenario": "drive",
+      "n": 5,
+      "median": 258.5152,
+      "min": 247.4266,
+      "max": 340.7808
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c09",
+      "scenario": "foreign",
+      "n": 5,
+      "median": 253.0055,
+      "min": 226.6464,
+      "max": 261.7417
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c09",
+      "scenario": "free",
+      "n": 5,
+      "median": 239.3835,
+      "min": 188.3188,
+      "max": 246.5772
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c09",
+      "scenario": "hydro",
+      "n": 5,
+      "median": 1142.2943,
+      "min": 1135.0555,
+      "max": 1224.2381
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c09",
+      "scenario": "hydro_drive",
+      "n": 5,
+      "median": 1553.5263,
+      "min": 1521.9463,
+      "max": 1676.2274
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c08",
+      "scenario": "drive",
+      "n": 5,
+      "median": 3.1056,
+      "min": 2.54,
+      "max": 3.9605
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c08",
+      "scenario": "free",
+      "n": 5,
+      "median": 2.5527,
+      "min": 2.3257,
+      "max": 3.1527
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c08",
+      "scenario": "hydro",
+      "n": 5,
+      "median": 17.3689,
+      "min": 16.8755,
+      "max": 19.8589
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c08",
+      "scenario": "hydro_drive",
+      "n": 5,
+      "median": 17.917,
+      "min": 16.8421,
+      "max": 21.146
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c09",
+      "scenario": "drive",
+      "n": 5,
+      "median": 4.5295,
+      "min": 2.2123,
+      "max": 4.8049
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c09",
+      "scenario": "foreign",
+      "n": 5,
+      "median": 3.432,
+      "min": 1.8613,
+      "max": 4.3083
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c09",
+      "scenario": "free",
+      "n": 5,
+      "median": 2.3609,
+      "min": 1.4924,
+      "max": 2.5633
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c09",
+      "scenario": "hydro",
+      "n": 5,
+      "median": 17.7675,
+      "min": 16.2658,
+      "max": 22.292
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c09",
+      "scenario": "hydro_drive",
+      "n": 5,
+      "median": 23.1367,
+      "min": 22.051,
+      "max": 30.568
+    }
+  ],
+  "api_setup": [
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c07",
+      "mode": "json",
+      "n": 5,
+      "median": 5.9733,
+      "min": 5.9492,
+      "max": 6.0441
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c07",
+      "mode": "load",
+      "n": 5,
+      "median": 1153.2645,
+      "min": 1134.5434,
+      "max": 1249.6581
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c08",
+      "mode": "json",
+      "n": 5,
+      "median": 7.1129,
+      "min": 7.0176,
+      "max": 7.4819
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c08",
+      "mode": "load",
+      "n": 5,
+      "median": 1155.8918,
+      "min": 1096.5643,
+      "max": 1216.6005
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c09",
+      "mode": "json",
+      "n": 5,
+      "median": 6.9269,
+      "min": 6.8531,
+      "max": 7.0937
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c09",
+      "mode": "load",
+      "n": 5,
+      "median": 1145.0815,
+      "min": 1103.0328,
+      "max": 1309.8819
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c07",
+      "mode": "json",
+      "n": 5,
+      "median": 0.3456,
+      "min": 0.3258,
+      "max": 0.4408
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c07",
+      "mode": "load",
+      "n": 5,
+      "median": 5.5216,
+      "min": 5.4642,
+      "max": 5.6341
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c08",
+      "mode": "json",
+      "n": 5,
+      "median": 0.3335,
+      "min": 0.3282,
+      "max": 0.3499
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c08",
+      "mode": "load",
+      "n": 5,
+      "median": 5.5531,
+      "min": 5.5156,
+      "max": 5.5819
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c09",
+      "mode": "json",
+      "n": 5,
+      "median": 0.3523,
+      "min": 0.3466,
+      "max": 0.4059
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c09",
+      "mode": "load",
+      "n": 5,
+      "median": 5.7367,
+      "min": 5.5517,
+      "max": 5.9008
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c08",
+      "mode": "json",
+      "n": 5,
+      "median": 7.011,
+      "min": 6.9537,
+      "max": 7.134
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c08",
+      "mode": "load",
+      "n": 5,
+      "median": 1089.5134,
+      "min": 1045.8785,
+      "max": 1315.5634
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c09",
+      "mode": "json",
+      "n": 5,
+      "median": 7.0775,
+      "min": 7.0284,
+      "max": 7.1567
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c09",
+      "mode": "load",
+      "n": 5,
+      "median": 1160.1864,
+      "min": 1054.863,
+      "max": 1291.3526
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c08",
+      "mode": "json",
+      "n": 5,
+      "median": 0.3335,
+      "min": 0.3273,
+      "max": 0.3397
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c08",
+      "mode": "load",
+      "n": 5,
+      "median": 5.2324,
+      "min": 5.1404,
+      "max": 5.2874
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c09",
+      "mode": "json",
+      "n": 5,
+      "median": 0.3721,
+      "min": 0.3659,
+      "max": 0.3839
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c09",
+      "mode": "load",
+      "n": 5,
+      "median": 5.1694,
+      "min": 5.1358,
+      "max": 5.2427
+    }
+  ],
+  "cli_end_to_end": [
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c07",
+      "n": 5,
+      "median_s": 2.5315847,
+      "min_s": 2.5102118,
+      "max_s": 2.552652,
+      "median_output_bytes": 1512830,
+      "states": 51
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c08",
+      "n": 5,
+      "median_s": 3.0401877,
+      "min_s": 2.959447,
+      "max_s": 3.393491,
+      "median_output_bytes": 1515654,
+      "states": 51
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "420",
+      "version": "c09",
+      "n": 5,
+      "median_s": 3.0047367,
+      "min_s": 2.9823557,
+      "max_s": 3.1480827,
+      "median_output_bytes": 1515915,
+      "states": 51
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c07",
+      "n": 5,
+      "median_s": 0.06404,
+      "min_s": 0.0630238,
+      "max_s": 0.0704226,
+      "median_output_bytes": 1386966,
+      "states": 51
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c08",
+      "n": 5,
+      "median_s": 0.0750646,
+      "min_s": 0.070658,
+      "max_s": 0.0876856,
+      "median_output_bytes": 1390310,
+      "states": 51
+    },
+    {
+      "model_data": "legacy-0.1",
+      "model": "folkeboot",
+      "version": "c09",
+      "n": 5,
+      "median_s": 0.0783687,
+      "min_s": 0.0776854,
+      "max_s": 0.0802321,
+      "median_output_bytes": 1390455,
+      "states": 51
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c08",
+      "n": 5,
+      "median_s": 2.9295556,
+      "min_s": 2.9140322,
+      "max_s": 2.9526067,
+      "median_output_bytes": 1516113,
+      "states": 51
+    },
+    {
+      "model_data": "schema3",
+      "model": "420",
+      "version": "c09",
+      "n": 5,
+      "median_s": 2.9396174,
+      "min_s": 2.9272381,
+      "max_s": 2.9415268,
+      "median_output_bytes": 1516349,
+      "states": 51
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c08",
+      "n": 5,
+      "median_s": 0.0709646,
+      "min_s": 0.0682081,
+      "max_s": 0.0716825,
+      "median_output_bytes": 1392188,
+      "states": 51
+    },
+    {
+      "model_data": "schema3",
+      "model": "folkeboot",
+      "version": "c09",
+      "n": 5,
+      "median_s": 0.0729766,
+      "min_s": 0.0711674,
+      "max_s": 0.0749393,
+      "median_output_bytes": 1392187,
+      "states": 51
+    }
+  ]
+}

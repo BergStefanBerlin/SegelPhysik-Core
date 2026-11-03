@@ -1,0 +1,282 @@
+[
+  {
+    "model": "420",
+    "schema": "0.1-entwurf",
+    "status": "entwurf",
+    "simulationsfreigabe": false,
+    "groups": 4,
+    "elements": 11,
+    "model_bytes": 5503,
+    "model_sha256": "fa9539de98d10305777ebeff05b1f2e8f60b95ecc6fdf0a4e1263dec29d1024e",
+    "referenced_unique_obj_count": 19,
+    "meshes": [
+      {
+        "path": "meshes\\gui\\fock.obj",
+        "bytes": 152,
+        "vertices": 3,
+        "triangles": 1,
+        "sha256": "66c520442faa746fca0b931a30b47af4f11406904282d036cef7ce09b05eb3af"
+      },
+      {
+        "path": "meshes\\gui\\grossbaum.obj",
+        "bytes": 2555,
+        "vertices": 50,
+        "triangles": 96,
+        "sha256": "d62f5909d6124f4ab1a3e307b1e3deeb6fbfb4119208ce93a8323d3648d38716"
+      },
+      {
+        "path": "meshes\\gui\\grosssegel.obj",
+        "bytes": 779,
+        "vertices": 19,
+        "triangles": 17,
+        "sha256": "60a67e2e88ca9e8f14e9b3086ee6df11670bd36cdadfc093e7a387d17a5dee1c"
+      },
+      {
+        "path": "meshes\\gui\\mast.obj",
+        "bytes": 7774,
+        "vertices": 146,
+        "triangles": 288,
+        "sha256": "138595e2c2448b421fb99d933afbafc2690184935bc47b41f603d40c19294bfc"
+      },
+      {
+        "path": "meshes\\gui\\ruder.obj",
+        "bytes": 530,
+        "vertices": 10,
+        "triangles": 16,
+        "sha256": "a1682a32831fbc7aff550a49be6f9b4a77afeb5e8b96e3b0251a75d90eb5f871"
+      },
+      {
+        "path": "meshes\\gui\\ruderstock.obj",
+        "bytes": 1330,
+        "vertices": 26,
+        "triangles": 46,
+        "sha256": "5f31e7235d27249d216b7d26b5fcd6b41235bbf42d7d26be864f2bddb26de1f4"
+      },
+      {
+        "path": "meshes\\gui\\rumpf.obj",
+        "bytes": 2457360,
+        "vertices": 36168,
+        "triangles": 72332,
+        "sha256": "001765f2e6a4bcbf87fc48dae6631e6a84e3faee204928b242a4bb82c7141797"
+      },
+      {
+        "path": "meshes\\gui\\schwert.obj",
+        "bytes": 703,
+        "vertices": 14,
+        "triangles": 24,
+        "sha256": "664b8cd5c0f44a93a70249a202684cd31a91b113201993577ecaecdc326f5ddc"
+      },
+      {
+        "path": "meshes\\gui\\vorstag.obj",
+        "bytes": 3491,
+        "vertices": 71,
+        "triangles": 125,
+        "sha256": "5fc837408df9094c3f87a5f94a62774fb2b91e6a23994cbb3c9d8afea4ac4091"
+      },
+      {
+        "path": "meshes\\hydrostatik\\cockpit.obj",
+        "bytes": 792920,
+        "vertices": 12232,
+        "triangles": 24460,
+        "sha256": "aec036e884aa5461aeff096f30b8a9669af8f06879f67c3e2af213c95d12abaf"
+      },
+      {
+        "path": "meshes\\hydrostatik\\ruder.obj",
+        "bytes": 530,
+        "vertices": 10,
+        "triangles": 16,
+        "sha256": "a1682a32831fbc7aff550a49be6f9b4a77afeb5e8b96e3b0251a75d90eb5f871"
+      },
+      {
+        "path": "meshes\\hydrostatik\\rumpf.obj",
+        "bytes": 2343802,
+        "vertices": 34530,
+        "triangles": 69056,
+        "sha256": "bcb71c4860125f24f5bf4979b3b13100068b8586f2e4ec556d0016f9cbcdf62e"
+      },
+      {
+        "path": "meshes\\hydrostatik\\schwert.obj",
+        "bytes": 631,
+        "vertices": 12,
+        "triangles": 20,
+        "sha256": "72586df72fb4cd47c195d37d468a21b926400549feb155885cc30b18e08a9e7e"
+      },
+      {
+        "path": "meshes\\masse\\cockpit.obj",
+        "bytes": 404549,
+        "vertices": 6490,
+        "triangles": 12604,
+        "sha256": "25cad77c8f4c86db17c7d964df4b360f5a7effe060fb9a85049f32976b2d5ff0"
+      },
+      {
+        "path": "meshes\\masse\\grossbaum.obj",
+        "bytes": 2555,
+        "vertices": 50,
+        "triangles": 96,
+        "sha256": "d62f5909d6124f4ab1a3e307b1e3deeb6fbfb4119208ce93a8323d3648d38716"
+      },
+      {
+        "path": "meshes\\masse\\mast.obj",
+        "bytes": 7774,
+        "vertices": 146,
+        "triangles": 288,
+        "sha256": "138595e2c2448b421fb99d933afbafc2690184935bc47b41f603d40c19294bfc"
+      },
+      {
+        "path": "meshes\\masse\\ruder.obj",
+        "bytes": 530,
+        "vertices": 10,
+        "triangles": 16,
+        "sha256": "a1682a32831fbc7aff550a49be6f9b4a77afeb5e8b96e3b0251a75d90eb5f871"
+      },
+      {
+        "path": "meshes\\masse\\rumpf.obj",
+        "bytes": 2343802,
+        "vertices": 34530,
+        "triangles": 69056,
+        "sha256": "bcb71c4860125f24f5bf4979b3b13100068b8586f2e4ec556d0016f9cbcdf62e"
+      },
+      {
+        "path": "meshes\\masse\\schwert.obj",
+        "bytes": 703,
+        "vertices": 14,
+        "triangles": 24,
+        "sha256": "664b8cd5c0f44a93a70249a202684cd31a91b113201993577ecaecdc326f5ddc"
+      }
+    ],
+    "missing_obj": []
+  },
+  {
+    "model": "folkeboot",
+    "schema": "0.1-entwurf",
+    "status": "entwurf",
+    "simulationsfreigabe": false,
+    "groups": 4,
+    "elements": 8,
+    "model_bytes": 4672,
+    "model_sha256": "0043f85987ddc0af19fb3484d02df6a614f9ad28fdb6e647cc163fccf134045c",
+    "referenced_unique_obj_count": 17,
+    "meshes": [
+      {
+        "path": "meshes\\gui\\fock.obj",
+        "bytes": 475,
+        "vertices": 6,
+        "triangles": 8,
+        "sha256": "2fd01c44d99f1dd38ba95b3c4ed8bd8e6cc551bcb994c576344032b88825b287"
+      },
+      {
+        "path": "meshes\\gui\\grossbaum.obj",
+        "bytes": 569,
+        "vertices": 8,
+        "triangles": 12,
+        "sha256": "815e162a0a7f45332f0235129079a86c2cf9ae4fd93bb9716f666dcbe903f972"
+      },
+      {
+        "path": "meshes\\gui\\grosssegel.obj",
+        "bytes": 501,
+        "vertices": 8,
+        "triangles": 12,
+        "sha256": "6ef7c6ea4c89c03dc045c9f34daddb1d80e95fccc357a4d8961d62ab8186e4ed"
+      },
+      {
+        "path": "meshes\\gui\\kiel.obj",
+        "bytes": 856,
+        "vertices": 12,
+        "triangles": 20,
+        "sha256": "cb014a877628529aaa5287b016c811b99c17421e165035bc06244875e7eb6ffc"
+      },
+      {
+        "path": "meshes\\gui\\mast.obj",
+        "bytes": 1604,
+        "vertices": 24,
+        "triangles": 44,
+        "sha256": "0fe5590c89da00850ac90ad7fa63078788599c8af592a64d6fcebb858142fa7e"
+      },
+      {
+        "path": "meshes\\gui\\ruder.obj",
+        "bytes": 733,
+        "vertices": 10,
+        "triangles": 16,
+        "sha256": "0d185745c9d13dc75d48383d1f11d17ccf1fe3c3ebf174e0c495cee42f03c8aa"
+      },
+      {
+        "path": "meshes\\gui\\rumpf.obj",
+        "bytes": 12806,
+        "vertices": 189,
+        "triangles": 374,
+        "sha256": "4d5c838ba73b86941d5f6069322004653dc9d6f3c383b7d510c2a8510fbce1df"
+      },
+      {
+        "path": "meshes\\hydrostatik\\kiel.obj",
+        "bytes": 937,
+        "vertices": 12,
+        "triangles": 20,
+        "sha256": "e94a2ed26aa584188b46fb3ad2b7ec07d7244114f4a2893e2de8a876cd01c94f"
+      },
+      {
+        "path": "meshes\\hydrostatik\\ruder.obj",
+        "bytes": 814,
+        "vertices": 10,
+        "triangles": 16,
+        "sha256": "5879ac5ad83f3f8c31ea01c66d7cba7fce8e86786069f705cde35f07c312ab46"
+      },
+      {
+        "path": "meshes\\hydrostatik\\rumpf.obj",
+        "bytes": 12806,
+        "vertices": 189,
+        "triangles": 374,
+        "sha256": "4d5c838ba73b86941d5f6069322004653dc9d6f3c383b7d510c2a8510fbce1df"
+      },
+      {
+        "path": "meshes\\masse\\fock.obj",
+        "bytes": 475,
+        "vertices": 6,
+        "triangles": 8,
+        "sha256": "2fd01c44d99f1dd38ba95b3c4ed8bd8e6cc551bcb994c576344032b88825b287"
+      },
+      {
+        "path": "meshes\\masse\\grossbaum.obj",
+        "bytes": 569,
+        "vertices": 8,
+        "triangles": 12,
+        "sha256": "815e162a0a7f45332f0235129079a86c2cf9ae4fd93bb9716f666dcbe903f972"
+      },
+      {
+        "path": "meshes\\masse\\grosssegel.obj",
+        "bytes": 501,
+        "vertices": 8,
+        "triangles": 12,
+        "sha256": "6ef7c6ea4c89c03dc045c9f34daddb1d80e95fccc357a4d8961d62ab8186e4ed"
+      },
+      {
+        "path": "meshes\\masse\\kiel.obj",
+        "bytes": 856,
+        "vertices": 12,
+        "triangles": 20,
+        "sha256": "cb014a877628529aaa5287b016c811b99c17421e165035bc06244875e7eb6ffc"
+      },
+      {
+        "path": "meshes\\masse\\mast.obj",
+        "bytes": 1604,
+        "vertices": 24,
+        "triangles": 44,
+        "sha256": "0fe5590c89da00850ac90ad7fa63078788599c8af592a64d6fcebb858142fa7e"
+      },
+      {
+        "path": "meshes\\masse\\ruder.obj",
+        "bytes": 733,
+        "vertices": 10,
+        "triangles": 16,
+        "sha256": "0d185745c9d13dc75d48383d1f11d17ccf1fe3c3ebf174e0c495cee42f03c8aa"
+      },
+      {
+        "path": "meshes\\masse\\rumpf.obj",
+        "bytes": 12806,
+        "vertices": 189,
+        "triangles": 374,
+        "sha256": "4d5c838ba73b86941d5f6069322004653dc9d6f3c383b7d510c2a8510fbce1df"
+      }
+    ],
+    "missing_obj": []
+  }
+]
