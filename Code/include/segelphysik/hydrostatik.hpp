@@ -64,6 +64,7 @@ struct Kraefte {
     double volumen_m3{};
     std::vector<Beitrag> beitraege;
     std::vector<std::pair<std::string, VolumenWerte>> elementvolumina;
+    Vektor3 schwerpunkt_modell_m{};
 };
 struct Bewegungsstellung;
 
@@ -183,6 +184,18 @@ struct TestantriebKontext {
     double auswertung_zeit_s{};
 };
 
+struct DynamischeFremdkraftKonfiguration {
+    bool aktiv{};
+    Vektor3 kraft_modellfest_n{};
+    Vektor3 angriffspunkt_modell_m{};
+};
+struct DynamischeFremdkraftKontext {
+    DynamischeFremdkraftKonfiguration konfiguration;
+    std::string modell_fassung;
+    std::size_t auswertung_schritt{};
+    double auswertung_zeit_s{};
+};
+
 struct Zustand {
     Pose pose{{}, {0., 0., 0., 1.}};
     Vektor3 geschwindigkeit_welt_m_s{};
@@ -197,6 +210,8 @@ struct Zustand {
     std::vector<Bewegungsstellung> bewegungsstellungen;
     std::size_t letzte_bewegungsereigniskennung{};
     std::optional<BewegungsUebergang> bewegungsuebergang;
+    std::shared_ptr<const DynamischeFremdkraftKontext> dynamische_fremdkraft;
+    bool dynamische_fremdkraft_erforderlich = false;
 };
 
 // Returned states own an immutable historical context; no global live flag.
@@ -204,13 +219,16 @@ Zustand testantrieb_start(const Modell&, const Zustand&,
     const TestantriebKonfiguration&, bool aktiv);
 Zustand hydrodynamik_start(const Modell&, const Zustand&,
     const HydrodynamikKonfiguration&);
+Zustand dynamische_fremdkraft_start(const Modell&, const Zustand&,
+    const DynamischeFremdkraftKonfiguration&);
 Kraefte kraefte(const Modell&, const Pose&, const TestantriebKontext*,
     double rho = 1000., double g = 9.81,
     const std::vector<std::string>& geflutet = {},
     const HydrodynamikKontext* hydrodynamik = nullptr,
     const Vektor3& geschwindigkeit_welt_m_s = {},
     const Vektor3& omega_modell_rad_s = {},
-    const std::vector<Bewegungsstellung>& bewegungsstellungen = {});
+    const std::vector<Bewegungsstellung>& bewegungsstellungen = {},
+    const DynamischeFremdkraftKontext* dynamische_fremdkraft = nullptr);
 std::array<double, 16> bewegungstransformation(const Modell&, const std::string& element_id,
     const std::vector<Bewegungsstellung>& bewegungsstellungen = {});
 

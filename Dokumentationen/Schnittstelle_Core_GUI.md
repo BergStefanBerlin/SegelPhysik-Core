@@ -937,3 +937,61 @@ der nicht stillschweigend entfernt wird.
 Der Regressionstest erzeugt zusätzliche demonstrierbare Referenzkopien
 unter `build\standard\v2-modelle-test`. Das sind Testprodukte, keine
 Änderungen an `..\Modelle` und keine automatische Migration beim Laden.
+
+## C-0.9: Dynamische modellfeste Fremdkraft – Core-Mindestvertrag
+
+Maßgeblich sind [A-C-00126 bis A-C-00128](../Spezifikationen/Spezifikation_Dynamische_Fremdkraft.md)
+und [CPPI-0105 bis CPPI-0112](Schnittstellenregister_Core.md). Dieser
+Abschnitt dokumentiert nur die Core-Schnittstelle; GUI-Kamera,
+Bedienungs- und Nutzerabnahme bleiben im GUI-Vertrag.
+
+Für Batch-Aufrufe kann `Laufoptionen::dynamische_fremdkraft` mit
+`DynamischeFremdkraftKonfiguration` gesetzt werden. Der direkte Livepfad
+ruft nach Vorbereitung der festen `Zustand::bewegungsstellungen`
+`dynamische_fremdkraft_start(modell, zustand, konfiguration)` auf. Der
+zurückgegebene Zustand hält einen unveränderlichen
+`DynamischeFremdkraftKontext`; `dynamikschritt` übernimmt diesen Kontext
+ohne zusätzliche Kraftargumente. Die Konfiguration enthält `aktiv`,
+`kraft_modellfest_n` und `angriffspunkt_modell_m`. Die Core-Schnittstelle
+hat keinen Frame-Schalter: beide Eingaben sind immer modellfest. Die GUI
+muss jede feste Elementstellung vor der Startfunktion in
+`Zustand::bewegungsstellungen` setzen. Batch nutzt dieselbe Liste in
+`Laufoptionen::start.bewegungsstellungen`. Gleichzeitige aktive Kontexte
+von `dynamische_fremdkraft` und dem alten Testantrieb liefern
+`CORE-SIM-0001`.
+
+Ein Zustand mit Fremdkraftkontext verwendet Ergebnisvertrag `"7"`.
+Er enthält den Konfigurationssnapshot:
+
+```json
+{
+  "dynamische_fremdkraft": {
+    "aktiv": true,
+    "modellfest": true,
+    "kraft_modellfest_n": [10, 0, 0],
+    "angriffspunkt_modell_m": [0, 1, 0],
+    "modell_fassung": "...",
+    "auswertung_schritt": 0,
+    "auswertung_zeit_s": 0
+  }
+}
+```
+
+Der zugehörige Einzelbeitrag erscheint genau einmal in `vektoren` mit
+`id: "dynamisch.fremdkraft"`, `quelle: "externe_kraft"`,
+`gruppe: "dynamische_fremdkraft"`, `frame: "modell"`,
+`punkt_m`, `vektor` und `moment_s_nm`. Sein `zustand` ist `gueltig`,
+`null` (aktiv mit Nullkraft) oder `deaktiviert`; fehlender Kontext erzeugt
+keinen Beitrag und behält den bisherigen Ergebnisvertrag. Summen werden
+aus Einzelbeiträgen abgeleitet und enthalten die Fremdkraft nicht doppelt.
+Der Fremdkraftmomentbezug ist der physische Gesamtschwerpunkt derselben
+Elementstellungen; dieser Schwerpunkt steht in
+`moment_bezug_modell_m`. Die Kraft wirkt in den Kraftauswertungen des
+Integrators, nicht nur in dieser Projektion.
+
+U-C-000112 bis U-C-000114 und technische Core-Tests sind abgeschlossen.
+Der GUI-Adapter muss Vertragsversion 7 akzeptieren und `externe_kraft`
+als Quelle der dynamischen Fremdkraft darstellen. GUI-Integration,
+persönliche Prüfung sowie Performancevergleich sind getrennte,
+noch nicht abgeschlossene Gates; der Performancevergleich ist bis zu
+erneuter ausdrücklicher Nutzerfreigabe blockiert.

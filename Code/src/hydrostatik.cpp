@@ -124,6 +124,45 @@ Modell bewegtes_modell(const Modell& modell,
     }
     return result;
 }
+Modell physisches_modell_fuer(const Modell& modell,
+    const std::vector<Bewegungsstellung>& stellungen)
+{
+    if(std::none_of(modell.elemente.begin(),modell.elemente.end(),
+        [](const Element& element) { return element.bewegung.has_value(); }))
+        return modell;
+    auto result=bewegtes_modell(modell,stellungen);
+    auto positiv_definit=[](const std::array<double,9>& inertia) {
+        return inertia[0]>0. && inertia[0]*inertia[4]-inertia[1]*inertia[3]>0. &&
+            inertia[0]*(inertia[4]*inertia[8]-inertia[5]*inertia[7])-
+                inertia[1]*(inertia[3]*inertia[8]-inertia[5]*inertia[6])+
+                inertia[2]*(inertia[3]*inertia[7]-inertia[4]*inertia[6])>0.;
+    };
+    // Hand-built/legacy models may only provide aggregate inertia; retain it
+    // while applying the changed parallel-axis contribution of moved masses.
+    if(!positiv_definit(result.traegheit_kg_m2) &&
+        positiv_definit(modell.traegheit_kg_m2)) {
+        std::array<double,9> alte_parallel{},neue_parallel{};
+        for(std::size_t e=0;e<modell.elemente.size();++e) {
+            const auto& original=modell.elemente[e];
+            const auto& bewegt=result.elemente[e];
+            const auto old_offset=plus(original.schwerpunkt_m,mal(modell.schwerpunkt_m,-1.));
+            const auto new_offset=plus(bewegt.schwerpunkt_m,mal(result.schwerpunkt_m,-1.));
+            const double old_radius2=dot(old_offset,old_offset);
+            const double new_radius2=dot(new_offset,new_offset);
+            for(std::size_t row=0;row<3;++row)
+                for(std::size_t col=0;col<3;++col) {
+                    alte_parallel[3*row+col]+=original.masse_kg*
+                        ((row==col?old_radius2:0.)-old_offset[row]*old_offset[col]);
+                    neue_parallel[3*row+col]+=bewegt.masse_kg*
+                        ((row==col?new_radius2:0.)-new_offset[row]*new_offset[col]);
+                }
+        }
+        result.traegheit_kg_m2=modell.traegheit_kg_m2;
+        for(std::size_t i=0;i<result.traegheit_kg_m2.size();++i)
+            result.traegheit_kg_m2[i]+=neue_parallel[i]-alte_parallel[i];
+    }
+    return result;
+}
 Vektor3 bewegungsvektor(const Vektor3& vektor, const Element& eigentuemer, double wert)
 {
     return plus(bewegungspunkt(vektor, eigentuemer, wert),
@@ -799,11 +838,12 @@ Kraefte hydrostatik(const Modell& modell,const Pose& pose,double rho,double g,
 {
     SEGEL_MESSUNG("hydrostatikauswertung");
     if (!bewegungsstellungen.empty()) {
-        const auto bewegt = bewegtes_modell(modell, bewegungsstellungen);
+        const auto bewegt = physisches_modell_fuer(modell, bewegungsstellungen);
         return hydrostatik(bewegt, pose, rho, g, geflutet, {});
     }
     positiv(rho);positiv(g);positiv(modell.masse_kg);
     Kraefte result;
+    result.schwerpunkt_modell_m=modell.schwerpunkt_m;
     result.beitraege.reserve(2*modell.elemente.size()+1);
     const auto gewicht_richtung=pose.weltvektor_nach_modell({0.,0.,-g});
     for (const auto& e : modell.elemente) {
@@ -1985,6 +2025,16 @@ void kontextpruefung(const Modell& m,const Zustand& s)
         s.hydrodynamik->auswertung_schritt!=s.schritt ||
         s.hydrodynamik->auswertung_zeit_s!=s.zeit_s))
         throw std::invalid_argument("CORE-HYD-0001: Hydrodynamikkontext passt nicht zum Zustand oder Modell.");
+    if(s.dynamische_fremdkraft_erforderlich&&!s.dynamische_fremdkraft)
+        throw std::invalid_argument("CORE-SIM-0001: Erforderlicher Fremdkraftkontext fehlt.");
+    if(s.dynamische_fremdkraft &&
+        (s.dynamische_fremdkraft->modell_fassung!=m.fassung ||
+         s.dynamische_fremdkraft->auswertung_schritt!=s.schritt ||
+         s.dynamische_fremdkraft->auswertung_zeit_s!=s.zeit_s))
+        throw std::invalid_argument("CORE-SIM-0001: Fremdkraftkontext passt nicht zum Zustand oder Modell.");
+    if(s.dynamische_fremdkraft && s.dynamische_fremdkraft->konfiguration.aktiv &&
+        s.testantrieb && s.testantrieb->aktiv)
+        throw std::invalid_argument("CORE-SIM-0001: Fremdkraft und Testantrieb duerfen nicht gleichzeitig aktiv sein.");
 }
 }
 
@@ -2020,24 +2070,78 @@ Zustand hydrodynamik_start(const Modell& m,const Zustand& s,
     context->modell_fassung=m.fassung;
     context->auswertung_schritt=s.schritt;
     context->auswertung_zeit_s=s.zeit_s;
+    const auto physisches_modell=physisches_modell_fuer(m,s.bewegungsstellungen);
     if(config.zusatzmasse_daempfung)
         context->traegheit=std::make_shared<const HydrodynamischeTraegheit>(
-            berechne_hydrodynamische_traegheit(m,s.pose,config.rho_kg_m3,9.81));
+            berechne_hydrodynamische_traegheit(physisches_modell,s.pose,config.rho_kg_m3,9.81));
     kraefte(m,s.pose,s.testantrieb.get(),1000.,9.81,s.geflutet,context.get(),
-        s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s);
+        s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s,s.bewegungsstellungen,
+        s.dynamische_fremdkraft.get());
     auto result=s;
     result.hydrodynamik=context;
     result.hydrodynamik_erforderlich=true;
     return result;
 }
 
+Zustand dynamische_fremdkraft_start(const Modell& m,const Zustand& s,
+    const DynamischeFremdkraftKonfiguration& config)
+{
+    kontextpruefung(m,s);
+    if(s.dynamische_fremdkraft || s.dynamische_fremdkraft_erforderlich ||
+        !std::isfinite(s.zeit_s))
+        throw std::invalid_argument("CORE-SIM-0001: Fremdkraftstart benoetigt einen gueltigen Zustand ohne Fremdkraftkontext.");
+    if(!endlich(config.kraft_modellfest_n) || !endlich(config.angriffspunkt_modell_m))
+        throw std::invalid_argument("CORE-SIM-0001: Fremdkraft und Ansatzpunkt muessen endlich sein.");
+    if(config.aktiv && s.testantrieb && s.testantrieb->aktiv)
+        throw std::invalid_argument("CORE-SIM-0001: Fremdkraft und Testantrieb duerfen nicht gleichzeitig aktiv sein.");
+
+    auto result=s;
+    for(const auto& element:m.elemente) {
+        if(!element.bewegung) continue;
+        const auto fund=std::find_if(result.bewegungsstellungen.begin(),
+            result.bewegungsstellungen.end(),[&](const Bewegungsstellung& stellung) {
+                return stellung.element_id==element.id;
+            });
+        if(fund==result.bewegungsstellungen.end())
+            result.bewegungsstellungen.push_back({element.id,
+                element.bewegung->ruderwinkel?0.:100.});
+    }
+    std::vector<std::string> bewegte_ids;
+    for(const auto& stellung:result.bewegungsstellungen) {
+        const auto element=std::find_if(m.elemente.begin(),m.elemente.end(),
+            [&](const Element& candidate) { return candidate.id==stellung.element_id; });
+        if(element==m.elemente.end() || !element->bewegung ||
+            std::find(bewegte_ids.begin(),bewegte_ids.end(),stellung.element_id)!=bewegte_ids.end())
+            throw std::invalid_argument("CORE-MOD-0002: Ungueltige oder doppelte Bewegungsstellung: "+stellung.element_id);
+        const double minimum=element->bewegung->ruderwinkel?-90.:0.;
+        const double maximum=element->bewegung->ruderwinkel?90.:100.;
+        if(!std::isfinite(stellung.wert) || stellung.wert<minimum || stellung.wert>maximum)
+            throw std::invalid_argument("CORE-MOD-0002: Bewegungsstellung ausserhalb des zulaessigen Bereichs: "+stellung.element_id);
+        bewegte_ids.push_back(stellung.element_id);
+    }
+    auto context=std::make_shared<DynamischeFremdkraftKontext>();
+    context->konfiguration=config;
+    context->modell_fassung=m.fassung;
+    context->auswertung_schritt=s.schritt;
+    context->auswertung_zeit_s=s.zeit_s;
+    result.dynamische_fremdkraft=context;
+    result.dynamische_fremdkraft_erforderlich=true;
+    kraefte(m,result.pose,result.testantrieb.get(),1000.,9.81,result.geflutet,
+        result.hydrodynamik.get(),result.geschwindigkeit_welt_m_s,
+        result.omega_modell_rad_s,result.bewegungsstellungen,
+        result.dynamische_fremdkraft.get());
+    return result;
+}
+
 Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
     double rho,double g,const std::vector<std::string>& geflutet,
     const HydrodynamikKontext* hydro,const Vektor3& geschwindigkeit,
-    const Vektor3& omega,const std::vector<Bewegungsstellung>& bewegungsstellungen)
+    const Vektor3& omega,const std::vector<Bewegungsstellung>& bewegungsstellungen,
+    const DynamischeFremdkraftKontext* dynamische_fremdkraft)
 {
-    const auto physisches_modell = bewegtes_modell(m, bewegungsstellungen);
+    const auto physisches_modell = physisches_modell_fuer(m, bewegungsstellungen);
     auto k=hydrostatik(physisches_modell,p,rho,g,geflutet);
+    k.schwerpunkt_modell_m=physisches_modell.schwerpunkt_m;
     if(c) {
         testparameter(c->konfiguration);
         if(c->modell_fassung!=m.fassung)
@@ -2056,7 +2160,7 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
                 throw std::invalid_argument("CORE-SIM-0001: Horizontale Bugprojektion singulaer.");
             const Vektor3 f{c->konfiguration.kraft_n*bow[0]/norm,c->konfiguration.kraft_n*bow[1]/norm,0.};
             b.vektor=p.weltvektor_nach_modell(f);
-            b.moment_s_nm=moment_um(b.punkt_m,m.schwerpunkt_m,b.vektor);
+            b.moment_s_nm=moment_um(b.punkt_m,physisches_modell.schwerpunkt_m,b.vektor);
             b.zustand=Datenzustand::gueltig;
             k.kraft_welt_n=plus(k.kraft_welt_n,f);
             k.moment_modell_nm=plus(k.moment_modell_nm,b.moment_s_nm);
@@ -2099,25 +2203,52 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
             auto moment=[&](const char* id,const Vektor3& wert) {
                 Beitrag b;b.id=id;b.art="moment";b.quelle=Quelle::hydrodynamik;
                 b.gruppe="hydrodynamik";b.punktart=Punktart::bezugspunkt;
-                b.punkt_m=m.schwerpunkt_m;b.vektor=wert;b.moment_s_nm=wert;
+                b.punkt_m=physisches_modell.schwerpunkt_m;b.vektor=wert;b.moment_s_nm=wert;
                 b.modell_status="geschaetzt";b.modell_methode="lineare/quadratische Daempfung";
                 k.moment_modell_nm=plus(k.moment_modell_nm,wert);
                 k.beitraege.push_back(std::move(b));
             };
-            const double izz=m.traegheit_kg_m2[8]+ht->zusatzmasse[5].wert;
+            const double izz=physisches_modell.traegheit_kg_m2[8]+ht->zusatzmasse[5].wert;
             const double b1_gier=ht->gieren_linear.wert*izz;
             const double b2_gier=ht->gieren_quadratisch.wert;
             moment("daempfung:rollen",{-ht->b_rollen_nms*omega[0],0.,0.});
             moment("daempfung:stampfen",{0.,-ht->b_stampfen_nms*omega[1],0.});
             moment("daempfung:gieren",{0.,0.,-(b1_gier+b2_gier*std::abs(omega[2]))*omega[2]});
             Beitrag b;b.id="daempfung:tauchen";b.art="kraft";b.quelle=Quelle::hydrodynamik;
-            b.gruppe="hydrodynamik";b.punktart=Punktart::angriffspunkt;b.punkt_m=m.schwerpunkt_m;
+            b.gruppe="hydrodynamik";b.punktart=Punktart::angriffspunkt;
+            b.punkt_m=physisches_modell.schwerpunkt_m;
             const Vektor3 f{0.,0.,-ht->b_tauchen_ns_m*geschwindigkeit[2]};
             b.vektor=p.weltvektor_nach_modell(f);
             b.modell_status="geschaetzt";b.modell_methode="lineare Daempfung";
             k.kraft_welt_n=plus(k.kraft_welt_n,f);
             k.beitraege.push_back(std::move(b));
         }
+    }
+    if(dynamische_fremdkraft) {
+        const auto& config=dynamische_fremdkraft->konfiguration;
+        if(dynamische_fremdkraft->modell_fassung!=m.fassung ||
+            !endlich(config.kraft_modellfest_n) || !endlich(config.angriffspunkt_modell_m))
+            throw std::invalid_argument("CORE-SIM-0001: Ungueltiger dynamischer Fremdkraftkontext.");
+        if(config.aktiv && c && c->aktiv)
+            throw std::invalid_argument("CORE-SIM-0001: Fremdkraft und Testantrieb duerfen nicht gleichzeitig aktiv sein.");
+        const auto force_world=config.aktiv
+            ? p.modellvektor_nach_welt(config.kraft_modellfest_n) : Vektor3{};
+        const auto force_model=config.aktiv
+            ? p.weltvektor_nach_modell(force_world) : Vektor3{};
+        Beitrag b;
+        b.id="dynamisch.fremdkraft";
+        b.art="kraft";
+        b.quelle=Quelle::externe_kraft;
+        b.gruppe="dynamische_fremdkraft";
+        b.punkt_m=config.angriffspunkt_modell_m;
+        b.vektor=force_model;
+        b.moment_s_nm=config.aktiv
+            ? moment_um(b.punkt_m,physisches_modell.schwerpunkt_m,force_model) : Vektor3{};
+        b.zustand=!config.aktiv ? Datenzustand::deaktiviert :
+            dot(force_world,force_world)==0. ? Datenzustand::null : Datenzustand::gueltig;
+        k.kraft_welt_n=plus(k.kraft_welt_n,force_world);
+        k.moment_modell_nm=plus(k.moment_modell_nm,b.moment_s_nm);
+        k.beitraege.push_back(std::move(b));
     }
     for(auto& sum:k.beitraege) if(sum.rolle==Rolle::gesamtsumme) {
         sum.vektor=k.moment_modell_nm;sum.moment_s_nm=k.moment_modell_nm;
@@ -2227,6 +2358,9 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         }
         context->uebergang=TestantriebUebergang{s.schritt,s.schritt+1,s.zeit_s,dt,ereignisse,{}};
     }
+    std::shared_ptr<DynamischeFremdkraftKontext> fremdkraft_context;
+    if(s.dynamische_fremdkraft)
+        fremdkraft_context=std::make_shared<DynamischeFremdkraftKontext>(*s.dynamische_fremdkraft);
     auto bewegungsstellungen=s.bewegungsstellungen;
     for (const auto& element : modell.elemente) {
         if (!element.bewegung) continue;
@@ -2259,23 +2393,35 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
             throw std::invalid_argument("CORE-MOD-0002: Fehlende Bewegungsstellung: "+ereignis.element_id);
         fund->wert=ereignis.wert;
     }
+    if(fremdkraft_context && fremdkraft_context->konfiguration.aktiv &&
+        context && context->aktiv)
+        throw std::invalid_argument("CORE-SIM-0001: Fremdkraft und Testantrieb duerfen nicht gleichzeitig aktiv sein.");
+    const bool stellung_geaendert=!bewegungsereignisse.empty();
+    const auto physisches_modell=physisches_modell_fuer(modell,bewegungsstellungen);
     std::shared_ptr<HydrodynamikKontext> hydro_context;
     if(s.hydrodynamik)
         hydro_context=std::make_shared<HydrodynamikKontext>(*s.hydrodynamik);
+    if(hydro_context && hydro_context->konfiguration.zusatzmasse_daempfung &&
+        stellung_geaendert)
+        hydro_context->traegheit=std::make_shared<const HydrodynamischeTraegheit>(
+            berechne_hydrodynamische_traegheit(physisches_modell,s.pose,
+                hydro_context->konfiguration.rho_kg_m3,g));
     for(double value:s.geschwindigkeit_welt_m_s)
         if(!std::isfinite(value)) throw std::invalid_argument("CORE-SIM-0001: Geschwindigkeit nicht endlich.");
     for(double value:s.omega_modell_rad_s)
         if(!std::isfinite(value)) throw std::invalid_argument("CORE-SIM-0001: Winkelgeschwindigkeit nicht endlich.");
     if(!std::isfinite(s.zeit_s)) throw std::invalid_argument("CORE-SIM-0001: Simulationszeit nicht endlich.");
-    const auto& I=modell.traegheit_kg_m2;
+    const auto& I=physisches_modell.traegheit_kg_m2;
     // Positive definiteness is required, not a regularized inverse.
     if (I[0]<=0. || I[0]*I[4]-I[1]*I[3]<=0. ||
         I[0]*(I[4]*I[8]-I[5]*I[7])-I[1]*(I[3]*I[8]-I[5]*I[6])+I[2]*(I[3]*I[7]-I[4]*I[6])<=0.)
-        throw std::invalid_argument("CORE-SIM-0002: Dynamiktraegheit nicht positiv definit.");
-    const auto geflutet=flutung(modell,s.pose,s.geflutet);
+        throw std::invalid_argument("CORE-SIM-0002: Dynamiktraegheit nicht positiv definit fuer "+
+            modell.id+": "+std::to_string(I[0])+","+std::to_string(I[4])+","+std::to_string(I[8]));
+    const auto geflutet=flutung(physisches_modell,s.pose,s.geflutet);
     const HydrodynamischeTraegheit* ht=hydro_context?hydro_context->traegheit.get():nullptr;
     std::array<double,9> ieff=I;
-    Vektor3 mlin{modell.masse_kg,modell.masse_kg,modell.masse_kg};
+    Vektor3 mlin{physisches_modell.masse_kg,physisches_modell.masse_kg,
+        physisches_modell.masse_kg};
     if(ht) {
         for(std::size_t i=0;i<3;++i) {
             ieff[4*i]+=ht->zusatzmasse[3+i].wert;
@@ -2292,7 +2438,7 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         const Vektor3& om) {
         Beschleunigung r;
         if(!ht) {
-            r.linear_welt=mal(kr.kraft_welt_n,1./modell.masse_kg);
+            r.linear_welt=mal(kr.kraft_welt_n,1./physisches_modell.masse_kg);
             Vektor3 imp0{};
             for (std::size_t i=0;i<3;++i)
                 for (std::size_t j=0;j<3;++j) imp0[i]+=I[3*i+j]*om[j];
@@ -2314,7 +2460,8 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         return r;
     };
     const auto k=kraefte(modell,s.pose,context.get(),rho,g,geflutet,
-        hydro_context.get(),s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s,bewegungsstellungen);
+        hydro_context.get(),s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s,
+        bewegungsstellungen,fremdkraft_context.get());
     const auto beschl=beschleunigung(s.pose,k,s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s);
     const auto a=beschl.linear_welt;
     const auto alpha=beschl.winkel;
@@ -2326,26 +2473,27 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         dq={omega_mid[0]*factor,omega_mid[1]*factor,omega_mid[2]*factor,std::cos(angle/2)};
     }
     const auto qnew=produkt(s.pose.orientierung_xyzw(),dq);
-    const auto cg=s.pose.modellpunkt_nach_welt(modell.schwerpunkt_m);
+    const auto cg=s.pose.modellpunkt_nach_welt(physisches_modell.schwerpunkt_m);
     const auto midq=produkt(s.pose.orientierung_xyzw(),
         QuaternionXyzw{omega_mid[0]*dt/4,omega_mid[1]*dt/4,omega_mid[2]*dt/4,1.});
     const Pose midrotation{{},midq};
     const auto midcg=plus(plus(cg,mal(s.geschwindigkeit_welt_m_s,dt/2)),mal(a,dt*dt/8));
-    const Pose midpose{plus(midcg,mal(midrotation.modellvektor_nach_welt(modell.schwerpunkt_m),-1.)),midq};
+    const Pose midpose{plus(midcg,mal(midrotation.modellvektor_nach_welt(physisches_modell.schwerpunkt_m),-1.)),midq};
     const auto midvelocity=plus(s.geschwindigkeit_welt_m_s,mal(a,dt/2));
     const auto midforce=kraefte(modell,midpose,context.get(),rho,g,geflutet,
-        hydro_context.get(),midvelocity,omega_mid,bewegungsstellungen);
+        hydro_context.get(),midvelocity,omega_mid,bewegungsstellungen,
+        fremdkraft_context.get());
     const auto midbeschl=beschleunigung(midpose,midforce,midvelocity,omega_mid);
     const auto midalpha=midbeschl.winkel;
     const auto cgnew=plus(plus(cg,mal(s.geschwindigkeit_welt_m_s,dt)),mal(a,dt*dt/2));
     const Pose rotation{{},qnew};
     Zustand result;
-    result.pose=Pose{plus(cgnew,mal(rotation.modellvektor_nach_welt(modell.schwerpunkt_m),-1.)),qnew};
+    result.pose=Pose{plus(cgnew,mal(rotation.modellvektor_nach_welt(physisches_modell.schwerpunkt_m),-1.)),qnew};
     result.geschwindigkeit_welt_m_s=plus(s.geschwindigkeit_welt_m_s,
         mal(midbeschl.linear_welt,dt));
     result.omega_modell_rad_s=plus(s.omega_modell_rad_s,mal(midalpha,dt));
     result.zeit_s=s.zeit_s+dt;result.schritt=s.schritt+1;
-    result.geflutet=flutung(modell,result.pose,geflutet);
+    result.geflutet=flutung(physisches_modell,result.pose,geflutet);
     result.bewegungsstellungen=std::move(bewegungsstellungen);
     result.letzte_bewegungsereigniskennung=letzte_bewegungskennung;
     result.bewegungsuebergang=BewegungsUebergang{
@@ -2356,7 +2504,8 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         result.hydrodynamik=hydro_context;
         result.hydrodynamik_erforderlich=true;
         kraefte(modell,result.pose,context.get(),rho,g,result.geflutet,
-            hydro_context.get(),result.geschwindigkeit_welt_m_s,result.omega_modell_rad_s);
+            hydro_context.get(),result.geschwindigkeit_welt_m_s,result.omega_modell_rad_s,
+            result.bewegungsstellungen,fremdkraft_context.get());
     } else result.hydrodynamik_erforderlich=false;
     if(context) {
         auto& b=context->uebergang->begrenzung;
@@ -2370,9 +2519,10 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         }
         b.nachher_welt_m_s=result.geschwindigkeit_welt_m_s;
         if(b.wirksam) {
-            b.korrekturimpuls_ns=mal(plus(b.nachher_welt_m_s,mal(b.vorher_welt_m_s,-1.)),modell.masse_kg);
+            b.korrekturimpuls_ns=mal(plus(b.nachher_welt_m_s,mal(b.vorher_welt_m_s,-1.)),
+                physisches_modell.masse_kg);
             // Only XY changes; avoid cancellation of a large unchanged Z energy.
-            b.energieaenderung_j=.5*modell.masse_kg*
+            b.energieaenderung_j=.5*physisches_modell.masse_kg*
                 ((b.nachher_welt_m_s[0]*b.nachher_welt_m_s[0]+b.nachher_welt_m_s[1]*b.nachher_welt_m_s[1])-
                  (b.vorher_welt_m_s[0]*b.vorher_welt_m_s[0]+b.vorher_welt_m_s[1]*b.vorher_welt_m_s[1]));
         }
@@ -2383,8 +2533,17 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         context->auswertung_schritt=result.schritt;context->auswertung_zeit_s=result.zeit_s;
         result.testantrieb=context;result.testantrieb_erforderlich=true;
         if(context->aktiv&&context->konfiguration.kraft_n>0.)
-            kraefte(modell,result.pose,context.get(),rho,g,result.geflutet);
+            kraefte(modell,result.pose,context.get(),rho,g,result.geflutet,
+                hydro_context.get(),result.geschwindigkeit_welt_m_s,
+                result.omega_modell_rad_s,result.bewegungsstellungen,
+                fremdkraft_context.get());
     }
+    if(fremdkraft_context) {
+        fremdkraft_context->auswertung_schritt=result.schritt;
+        fremdkraft_context->auswertung_zeit_s=result.zeit_s;
+        result.dynamische_fremdkraft=fremdkraft_context;
+        result.dynamische_fremdkraft_erforderlich=true;
+    } else result.dynamische_fremdkraft_erforderlich=false;
     for(double value:result.geschwindigkeit_welt_m_s)
         if(!std::isfinite(value)) throw std::overflow_error("CORE-SIM-0001: Geschwindigkeitsueberlauf.");
     for(double value:result.omega_modell_rad_s)

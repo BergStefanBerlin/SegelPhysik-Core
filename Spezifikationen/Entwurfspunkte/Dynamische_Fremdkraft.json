@@ -1,0 +1,54 @@
+{
+  "status": "teilfinalisiert_core_mindestumfang",
+  "stand": "2026-11-03",
+  "spezifikation": "../Spezifikation_Dynamische_Fremdkraft.md",
+  "zielversion": "C-0.9 Arbeitsziel; keine Tag- oder Release-Freigabe",
+  "umsetzungsplan": "../../Umsetzungsplaene/Umsetzungsplan_C-0.9.md",
+  "herkunft": "GUI-Eingabeleiste laut Nutzerauftrag 03.11.2026 18:17; Spec fuer beide Projekte beauftragt 18:19.",
+  "punkte": [
+    {
+      "id": "IDEE-C-00088",
+      "status": "teilfinalisiert_core_mindestumfang",
+      "zugeordnete_anforderungen": ["A-C-00126"],
+      "abschnitt": "2",
+      "text": "Allgemeine dynamische Fremdkraft als eingefrorenen Rechenfall mit Aktivflag, Kraftvektor und Modellansatzpunkt einfuehren.",
+      "offen": [
+        "Die technische Core-Festlegung ist modellfest; GUI-Kamera bleibt eine unabhaengige Anzeigeentscheidung und ist nicht als Nutzerabnahme des Kamera-Verhaltens zu verstehen."
+      ]
+    },
+    {
+      "id": "IDEE-C-00089",
+      "status": "finalisiert_core_mindestumfang",
+      "zugeordnete_anforderungen": ["A-C-00127"],
+      "abschnitt": "3",
+      "text": "Kraft und Hebelarmmoment um S in den dynamischen Integrator aufnehmen; keine Testantriebsprojektion oder Geschwindigkeitsbegrenzung.",
+      "offen": []
+    },
+    {
+      "id": "IDEE-C-00090",
+      "status": "finalisiert_core_mindestumfang",
+      "zugeordnete_anforderungen": ["A-C-00128"],
+      "abschnitt": "4",
+      "text": "Vorgegebene feste Elementstellungen ab erstem Zustand in Geometrie, Masse, Schwerpunkt, Traegheit, allen Integratorstufen und Kraftausgaben konsistent wirksam machen.",
+      "offen": []
+    },
+    {
+      "id": "IDEE-C-00091",
+      "status": "finalisiert_core_mindestumfang",
+      "zugeordnete_anforderungen": ["A-C-00127"],
+      "abschnitt": "5",
+      "text": "Fremdkraft und Moment genau einmal bilanzieren; Live, Batch und historische Ausgabe konsistent und reproduzierbar halten.",
+      "offen": []
+    },
+    {
+      "id": "IDEE-C-00092",
+      "status": "blockiert_nicht_finalisiert",
+      "abschnitt": "6",
+      "text": "Vollstaendige Statik-zu-Dynamik-Matrix und Zeitintegrationskonvergenz nachweisen, keine stationaeren Suchheuristiken kopieren. Erst nach Mindestintegration und gemeinsamem Funktionsgate historische Core-Staende bis etwa 27.10.2026 bei vergleichbarem Physikumfang messen und Ursachen anhand dynamischer Codepfade belegen.",
+      "offen": [
+        "Vollstaendige fachliche Matrix und zusaetzliche Integrations-/Konvergenznachweise sind nicht freigegeben.",
+        "Historischer Performancevergleich und weitergehende Optimierungen sind bis persoenlicher GUI-Pruefung und erneutem ausdruecklichen Nutzer-Go blockiert."
+      ]
+    }
+  ]
+}

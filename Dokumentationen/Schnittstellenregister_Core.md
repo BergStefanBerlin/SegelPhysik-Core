@@ -139,3 +139,21 @@ Signatur einzeln registrieren, nicht unter einer Familienkennung.
 | CPPI-0102 | Ergebnisblock `druckpunkte.ersatz_segel` | implementiert | C-0.8 / A-C-00124, A-C-00125; Status, Quelle `fremdkraft` und optionaler modellfester Ansatzpunkt, keine Aerodynamik |
 | CPPI-0103 | `LateraldruckpunktPanelbilanz` | implementiert | C-0.8 / A-C-00123; aggregierte signierte Panelwerte Q/B/X/Z |
 | CPPI-0104 | `Beitrag::lateraldruckpunkt_panelbilanz` | implementiert | C-0.8 / A-C-00123; vor Bauteilaggregation berechnete Panelbilanz |
+
+## C-0.9: Dynamische Fremdkraft – freigegebener Core-Mindestvertrag
+
+Maßgeblich sind A-C-00126 bis A-C-00128 in der
+[Spezifikation Dynamische Fremdkraft](../Spezifikationen/Spezifikation_Dynamische_Fremdkraft.md).
+Nur der Core-Mindestvertrag ist implementiert; GUI-Integration,
+Vollständigkeitsmatrix und Performancevergleich bleiben offen.
+
+| CPPI-ID | C++-Schnittstelle | Status | Anforderung |
+|---|---|---|---|
+| CPPI-0105 | `DynamischeFremdkraftKonfiguration` | implementiert | C-0.9 / A-C-00126; Aktivflag, modellfester Kraftvektor und Ansatzpunkt |
+| CPPI-0106 | `DynamischeFremdkraftKontext` | implementiert | C-0.9 / A-C-00126; unveränderlicher Lauf- und Snapshotkontext |
+| CPPI-0107 | `Zustand::dynamische_fremdkraft` | implementiert | C-0.9 / A-C-00126; optionaler historischer Kontext |
+| CPPI-0108 | `Zustand::dynamische_fremdkraft_erforderlich` | implementiert | C-0.9 / A-C-00126; erkennt verlorenen Pflichtkontext |
+| CPPI-0109 | `dynamische_fremdkraft_start` | implementiert | C-0.9 / A-C-00126; Validierung und Bindung an Modell und Startzustand |
+| CPPI-0110 | `kraefte(..., DynamischeFremdkraftKontext*)` | implementiert | C-0.9 / A-C-00127; genau ein Beitrag mit Modellvektor, Ansatzpunkt und Moment |
+| CPPI-0111 | `Laufoptionen::dynamische_fremdkraft` | implementiert | C-0.9 / A-C-00126; optionale Batch-Laufkonfiguration |
+| CPPI-0112 | `Kraefte::schwerpunkt_modell_m` | implementiert | C-0.9 / A-C-00128; physischer Gesamtschwerpunkt fuer dieselbe Elementstellung |

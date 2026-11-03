@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <cmath>
 
@@ -49,6 +50,41 @@ int main(int argc,char* argv[])
             dynamic_v6_json.at("kursdrehrate_status") != "gueltig" ||
             !dynamic_v6_json.contains("kursdrehrate_rad_s"))
             throw std::runtime_error("Dynamischer V6-Defaultvertrag unvollstaendig");
+        const auto dynamic_force_path=base.string()+"-dynamic-force.jsonl";
+        segelphysik::Laufoptionen dynamic_force_run;
+        dynamic_force_run.dynamisch=true;
+        dynamic_force_run.dauer_s=.01;
+        dynamic_force_run.dt_s=.01;
+        segelphysik::DynamischeFremdkraftKonfiguration dynamic_force;
+        dynamic_force.aktiv=true;
+        dynamic_force.kraft_modellfest_n={100.,0.,0.};
+        dynamic_force.angriffspunkt_modell_m={0.,.1,0.};
+        dynamic_force_run.dynamische_fremdkraft=dynamic_force;
+        const auto dynamic_force_report=segelphysik::simulieren(
+            argv[1],dynamic_force_path,dynamic_force_run);
+        if(dynamic_force_report.status!="abgeschlossen" ||
+            dynamic_force_report.zustaende!=2)
+            throw std::runtime_error("Dynamischer Fremdkraft-Batchlauf fehlgeschlagen: "+
+                dynamic_force_report.diagnose);
+        {
+            std::ifstream force_file(dynamic_force_path);
+            std::string first_force_line,last_force_line;
+            std::getline(force_file,first_force_line);
+            std::getline(force_file,last_force_line);
+            const auto first_force_json=nlohmann::json::parse(first_force_line);
+            const auto last_force_json=nlohmann::json::parse(last_force_line);
+            if(first_force_json.at("vertragsversion")!="7" ||
+                !first_force_json.at("dynamische_fremdkraft").at("aktiv").get<bool>() ||
+                last_force_json.at("dynamische_fremdkraft").at("auswertung_schritt")!=1)
+                throw std::runtime_error("Dynamischer Fremdkraftkontext fehlt im Batch-Snapshot");
+            const auto count=std::count_if(last_force_json.at("vektoren").begin(),
+                last_force_json.at("vektoren").end(),[](const auto& contribution) {
+                    return contribution.at("id")=="dynamisch.fremdkraft";
+                });
+            if(count!=1)
+                throw std::runtime_error("Batch-Ergebnis muss genau einen Fremdkraftbeitrag enthalten");
+        }
+        std::filesystem::remove(dynamic_force_path);
         segelphysik::Zustand stationary_start;
         stationary_start.pose = segelphysik::Pose{{3., -4., 1.},
             {0., 0., std::sin(.4), std::cos(.4)}};

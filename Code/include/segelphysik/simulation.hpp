@@ -22,6 +22,7 @@ struct Laufoptionen {
     // Scheduled events are applied before the indicated source step.
     std::vector<std::pair<std::size_t, TestantriebEreignis>> testantrieb_ereignisse;
     std::vector<std::pair<std::size_t, Bewegungsereignis>> bewegungsereignisse;
+    std::optional<DynamischeFremdkraftKonfiguration> dynamische_fremdkraft;
 };
 struct Laufbericht {
     std::string status;

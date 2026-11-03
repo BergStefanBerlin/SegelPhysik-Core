@@ -101,6 +101,22 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
         s.hydrodynamik->auswertung_schritt!=s.schritt ||
         s.hydrodynamik->auswertung_zeit_s!=s.zeit_s))
         throw std::invalid_argument("CORE-HYD-0001: Historischer Hydrodynamikkontext passt nicht zum Zustand.");
+    if(s.dynamische_fremdkraft_erforderlich&&!s.dynamische_fremdkraft)
+        throw std::invalid_argument("CORE-SIM-0001: Erforderlicher Fremdkraftkontext fehlt.");
+    if(s.dynamische_fremdkraft &&
+        (s.dynamische_fremdkraft->modell_fassung!=m.fassung ||
+         s.dynamische_fremdkraft->auswertung_schritt!=s.schritt ||
+         s.dynamische_fremdkraft->auswertung_zeit_s!=s.zeit_s ||
+         !std::all_of(s.dynamische_fremdkraft->konfiguration.kraft_modellfest_n.begin(),
+             s.dynamische_fremdkraft->konfiguration.kraft_modellfest_n.end(),
+             [](double value) { return std::isfinite(value); }) ||
+         !std::all_of(s.dynamische_fremdkraft->konfiguration.angriffspunkt_modell_m.begin(),
+             s.dynamische_fremdkraft->konfiguration.angriffspunkt_modell_m.end(),
+             [](double value) { return std::isfinite(value); })))
+        throw std::invalid_argument("CORE-SIM-0001: Historischer Fremdkraftkontext passt nicht zum Zustand.");
+    if(s.dynamische_fremdkraft && s.dynamische_fremdkraft->konfiguration.aktiv &&
+        s.testantrieb && s.testantrieb->aktiv)
+        throw std::invalid_argument("CORE-SIM-0001: Fremdkraft und Testantrieb duerfen nicht gleichzeitig aktiv sein.");
     if(stationaer && !gleicher_stationaerer_snapshot(s, stationaer->zustand))
         throw std::invalid_argument("CORE-SIM-0001: Stationaerer Druckpunktsnapshot passt nicht zum serialisierten Zustand.");
     std::set<std::string> bewegte_ids;
@@ -117,7 +133,7 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
     }
     auto k=kraefte(m,s.pose,s.testantrieb.get(),1000.,9.81,s.geflutet,
         s.hydrodynamik.get(),s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s,
-        s.bewegungsstellungen);
+        s.bewegungsstellungen,s.dynamische_fremdkraft.get());
     if (stationaer && stationaer->status != "ungueltig") {
         const auto force_world = !stationaer->konfiguration.aktiv ? Vektor3{} :
             stationaer->konfiguration.modellfest
@@ -157,7 +173,8 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
     if (format == ErgebnisJsonFormat::V6 && stationaer && heading_rate_status == "gueltig") {
         heading_rate = stationaer->kursdrehrate_rad_s;
     }
-    const char* contract = format == ErgebnisJsonFormat::V6 ? "6" :
+    const char* contract = s.dynamische_fremdkraft ? "7" :
+        format == ErgebnisJsonFormat::V6 ? "6" :
         stationaer ? "5" : beweglich ? "4" : s.testantrieb ? "3" : "2";
     out<<"{\"vertragsversion\":"<<text(contract)<<",\"modell_id\":"<<text(m.id)
        <<",\"modell_fassung\":"<<text(m.fassung)
@@ -232,7 +249,7 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
     out<<"],\"moment_modell_nm\":";array(out,k.moment_modell_nm);
     out<<",\"moment_bezug_modell_m\":";
     if (stationaer) array(out, stationaer->schwerpunkt_modell_m);
-    else array(out,m.schwerpunkt_m);
+    else array(out,k.schwerpunkt_modell_m);
     if(beweglich) {
         out<<",\"bewegungen\":[";
         bool erste_bewegung=true;
@@ -414,6 +431,18 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
         }
         out<<'}';
     }
+    if(s.dynamische_fremdkraft) {
+        const auto& c=*s.dynamische_fremdkraft;
+        out<<",\"dynamische_fremdkraft\":{\"aktiv\":"
+           <<(c.konfiguration.aktiv?"true":"false")
+           <<",\"modellfest\":true,\"kraft_modellfest_n\":";
+        array(out,c.konfiguration.kraft_modellfest_n);
+        out<<",\"angriffspunkt_modell_m\":";
+        array(out,c.konfiguration.angriffspunkt_modell_m);
+        out<<",\"modell_fassung\":"<<text(c.modell_fassung)
+           <<",\"auswertung_schritt\":"<<c.auswertung_schritt
+           <<",\"auswertung_zeit_s\":"<<c.auswertung_zeit_s<<'}';
+    }
     if(s.hydrodynamik) {
         const auto& c=s.hydrodynamik->konfiguration;
         out<<",\"hydrodynamik\":{\"rho_kg_m3\":"<<c.rho_kg_m3
@@ -524,6 +553,8 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
                     element.bewegung->ruderwinkel?0.:100.});
         }
         if(o.testantrieb) s=testantrieb_start(m,s,*o.testantrieb,o.testantrieb_aktiv);
+        if(o.dynamische_fremdkraft && !o.dynamisch)
+            throw std::invalid_argument("CORE-SIM-0001: Dynamische Fremdkraft ist nur im dynamischen Lauf zulaessig.");
         const bool stationaer_aktiv = o.stationaer.has_value();
         if(o.hydrodynamik && !o.dynamisch && !stationaer_aktiv)
             throw std::invalid_argument("CORE-HYD-0001: Hydrodynamik ist nur fuer dynamische Laeufe verfuegbar.");
@@ -537,6 +568,8 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
             HydrodynamikKonfiguration standardwasser;
             s=hydrodynamik_start(m,s,standardwasser);
         }
+        if(o.dynamische_fremdkraft)
+            s=dynamische_fremdkraft_start(m,s,*o.dynamische_fremdkraft);
         if(!o.dynamisch && !stationaer_aktiv && (s.hydrodynamik || s.hydrodynamik_erforderlich))
             throw std::invalid_argument("CORE-HYD-0001: Hydrodynamikkontext in statischem Lauf.");
         if((!o.testantrieb&&!s.testantrieb) &&
@@ -618,6 +651,11 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
                 if(next.hydrodynamik) {
                     auto context=std::make_shared<HydrodynamikKontext>(*next.hydrodynamik);
                     context->auswertung_zeit_s=ziel;next.hydrodynamik=context;
+                }
+                if(next.dynamische_fremdkraft) {
+                    auto context=std::make_shared<DynamischeFremdkraftKontext>(
+                        *next.dynamische_fremdkraft);
+                    context->auswertung_zeit_s=ziel;next.dynamische_fremdkraft=context;
                 }
                 s=next;
                 if(s.schritt%o.ausgabe_intervall==0 && s.zeit_s<end) schreiben(s,"laufend");
