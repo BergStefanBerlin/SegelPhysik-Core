@@ -83,6 +83,20 @@ int main(int argc,char* argv[])
                 });
             if(count!=1)
                 throw std::runtime_error("Batch-Ergebnis muss genau einen Fremdkraftbeitrag enthalten");
+            for (const auto* snapshot : {&first_force_json, &last_force_json})
+                if(snapshot->at("bilanzstatus")!="vollstaendig" ||
+                    !snapshot->at("fehlende_beitraege").empty() ||
+                    std::find(snapshot->at("erwartete_beitraege").begin(),
+                        snapshot->at("erwartete_beitraege").end(),
+                        "dynamisch.fremdkraft")==snapshot->at("erwartete_beitraege").end())
+                    throw std::runtime_error("Dynamische Fremdkraft im Bilanzinventar falsch zugeordnet");
+            for (const auto* snapshot : {&first_force_json, &last_force_json}) {
+                const auto& sail = snapshot->at("druckpunkte").at("ersatz_segel");
+                if(sail.at("status")!="gueltig" || sail.at("quelle")!="fremdkraft" ||
+                    sail.at("position_modell_m").get<segelphysik::Vektor3>()!=
+                        dynamic_force.angriffspunkt_modell_m)
+                    throw std::runtime_error("Dynamischer Ersatz-SDP fehlt oder hat falschen Ansatzpunkt");
+            }
         }
         std::filesystem::remove(dynamic_force_path);
         segelphysik::Zustand stationary_start;

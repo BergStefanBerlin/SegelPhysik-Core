@@ -48,7 +48,7 @@ configure_file(src/fehlerkatalog.hpp.in generated/fehlerkatalog.hpp @ONLY)
 
 add_library(segelphysik_core STATIC src/core.cpp src/pose.cpp src/modell.cpp
     src/hydrostatik.cpp src/hydrotraegheit.cpp src/messung.cpp src/simulation.cpp src/katalog.cpp
-    src/inspektion.cpp)
+    src/inspektion.cpp src/aufbereitung.cpp)
 target_include_directories(segelphysik_core PUBLIC include)
 target_include_directories(segelphysik_core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(segelphysik_core PUBLIC nlohmann_json::nlohmann_json)
@@ -65,6 +65,26 @@ target_link_libraries(segelphysik_konvertieren PRIVATE segelphysik_core)
 
 set(core_targets segelphysik_core segelphysik_cli segelphysik_konvertieren)
 if(BUILD_TESTING)
+    add_executable(aufbereitung_tests tests/aufbereitung_tests.cpp)
+    target_link_libraries(aufbereitung_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets aufbereitung_tests)
+    add_test(NAME modellaufbereitung COMMAND aufbereitung_tests
+        "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/folkeboot/modell.json")
+    add_executable(aufbereitung_benchmark tests/aufbereitung_benchmark.cpp)
+    target_link_libraries(aufbereitung_benchmark PRIVATE segelphysik_core)
+    list(APPEND core_targets aufbereitung_benchmark)
+    set(SEGELPHYSIK_PERFORMANCE_BASELINE_LIBRARY "" CACHE FILEPATH
+        "Optional frozen C-0.9 library for the identical performance runner")
+    if(SEGELPHYSIK_PERFORMANCE_BASELINE_LIBRARY)
+        add_executable(aufbereitung_referenz tests/aufbereitung_benchmark.cpp)
+        target_include_directories(aufbereitung_referenz PRIVATE include)
+        target_compile_features(aufbereitung_referenz PRIVATE cxx_std_17)
+        target_compile_definitions(aufbereitung_referenz PRIVATE CORE_PERFORMANCE_BASELINE=1)
+        target_link_libraries(aufbereitung_referenz PRIVATE
+            "${SEGELPHYSIK_PERFORMANCE_BASELINE_LIBRARY}" nlohmann_json::nlohmann_json)
+        list(APPEND core_targets aufbereitung_referenz)
+    endif()
     add_executable(core_tests tests/core_tests.cpp)
     target_link_libraries(core_tests PRIVATE segelphysik_core)
     if(SEGELPHYSIK_TEST_INSTRUMENTATION)

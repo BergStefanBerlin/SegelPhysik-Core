@@ -1,4 +1,5 @@
 #include "segelphysik/simulation.hpp"
+#include "aufbereitung_intern.hpp"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -81,13 +82,9 @@ std::string pruefung_json(const std::filesystem::path& path,bool& gueltig)
             ",\"datei\":"+text(path.u8string())+",\"details\":"+text(diagnose)+"}]}";
     }
 }
-std::string zustand_json(const Modell& m,const Zustand& s,const std::string& status,
-    const std::string& diagnose,const Gleichgewichtsangaben* gg,
-    const StationaeresGleichgewichtErgebnis* stationaer, ErgebnisJsonFormat format)
+namespace detail {
+void pruefe_auswertungszustand(const Modell& m,const Zustand& s)
 {
-    if (format == ErgebnisJsonFormat::Kompatibel && stationaer &&
-        (stationaer->kurvenfahrt || stationaer->konfiguration.kurvenfahrt))
-        throw std::invalid_argument("CORE-SIM-0001: Stationaere Kurvenfahrt benoetigt ErgebnisJsonFormat::V6.");
     if(!std::isfinite(s.zeit_s))
         throw std::invalid_argument("CORE-SIM-0001: Simulationszeit nicht endlich.");
     if(s.testantrieb_erforderlich&&!s.testantrieb)
@@ -117,8 +114,6 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
     if(s.dynamische_fremdkraft && s.dynamische_fremdkraft->konfiguration.aktiv &&
         s.testantrieb && s.testantrieb->aktiv)
         throw std::invalid_argument("CORE-SIM-0001: Fremdkraft und Testantrieb duerfen nicht gleichzeitig aktiv sein.");
-    if(stationaer && !gleicher_stationaerer_snapshot(s, stationaer->zustand))
-        throw std::invalid_argument("CORE-SIM-0001: Stationaerer Druckpunktsnapshot passt nicht zum serialisierten Zustand.");
     std::set<std::string> bewegte_ids;
     for (const auto& stellung : s.bewegungsstellungen) {
         const auto element = std::find_if(m.elemente.begin(), m.elemente.end(),
@@ -131,6 +126,18 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
         if (!std::isfinite(stellung.wert) || stellung.wert < minimum || stellung.wert > maximum)
             throw std::invalid_argument("CORE-MOD-0002: Bewegungsstellung ausserhalb des zulaessigen Bereichs.");
     }
+}
+}
+std::string zustand_json(const Modell& m,const Zustand& s,const std::string& status,
+    const std::string& diagnose,const Gleichgewichtsangaben* gg,
+    const StationaeresGleichgewichtErgebnis* stationaer, ErgebnisJsonFormat format)
+{
+    if (format == ErgebnisJsonFormat::Kompatibel && stationaer &&
+        (stationaer->kurvenfahrt || stationaer->konfiguration.kurvenfahrt))
+        throw std::invalid_argument("CORE-SIM-0001: Stationaere Kurvenfahrt benoetigt ErgebnisJsonFormat::V6.");
+    detail::pruefe_auswertungszustand(m,s);
+    if(stationaer && !gleicher_stationaerer_snapshot(s, stationaer->zustand))
+        throw std::invalid_argument("CORE-SIM-0001: Stationaerer Druckpunktsnapshot passt nicht zum serialisierten Zustand.");
     auto k=kraefte(m,s.pose,s.testantrieb.get(),1000.,9.81,s.geflutet,
         s.hydrodynamik.get(),s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s,
         s.bewegungsstellungen,s.dynamische_fremdkraft.get());
@@ -481,7 +488,7 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
         }
     }
     const auto ldp=lateraldruckpunkt(m,s.pose,k,s.bewegungsstellungen);
-    if(ldp.vorhanden || stationaer) {
+    if(ldp.vorhanden || stationaer || s.dynamische_fremdkraft) {
         out<<",\"druckpunkte\":{";
         bool has_pressure_point = false;
         if(ldp.vorhanden) {
@@ -499,25 +506,29 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
             out<<"]}";
             has_pressure_point = true;
         }
-        if(stationaer) {
-            const auto& config = stationaer->konfiguration;
-            const bool finite_force = std::all_of(config.kraft_welt_n.begin(),
-                config.kraft_welt_n.end(), [](double value) { return std::isfinite(value); });
-            const bool finite_point = std::all_of(config.angriffspunkt_modell_m.begin(),
-                config.angriffspunkt_modell_m.end(),
+        if(stationaer || s.dynamische_fremdkraft) {
+            const auto& force = stationaer ? stationaer->konfiguration.kraft_welt_n
+                : s.dynamische_fremdkraft->konfiguration.kraft_modellfest_n;
+            const auto& point = stationaer ? stationaer->konfiguration.angriffspunkt_modell_m
+                : s.dynamische_fremdkraft->konfiguration.angriffspunkt_modell_m;
+            const bool active = stationaer ? stationaer->konfiguration.aktiv
+                : s.dynamische_fremdkraft->konfiguration.aktiv;
+            const bool finite_force = std::all_of(force.begin(),
+                force.end(), [](double value) { return std::isfinite(value); });
+            const bool finite_point = std::all_of(point.begin(), point.end(),
                 [](double value) { return std::isfinite(value); });
             if (!finite_force || !finite_point)
-                throw std::invalid_argument("CORE-SIM-0001: Stationaerer Fremdkraft-Snapshot ist nicht endlich.");
-            const bool force_null = std::all_of(config.kraft_welt_n.begin(),
-                config.kraft_welt_n.end(), [](double value) { return value == 0.; });
-            const char* ersatz_status = !config.aktiv ? "inaktiv" :
+                throw std::invalid_argument("CORE-SIM-0001: Fremdkraft-Snapshot ist nicht endlich.");
+            const bool force_null = std::all_of(force.begin(),
+                force.end(), [](double value) { return value == 0.; });
+            const char* ersatz_status = !active ? "inaktiv" :
                 force_null ? "kraft_null" : "gueltig";
             if (has_pressure_point) out<<',';
             out<<"\"ersatz_segel\":{\"status\":"<<text(ersatz_status)
                <<",\"quelle\":\"fremdkraft\"";
             if (std::string(ersatz_status) == "gueltig") {
                 out<<",\"position_modell_m\":";
-                array(out,config.angriffspunkt_modell_m);
+                array(out,point);
             }
             out<<'}';
         }
@@ -543,7 +554,9 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
             throw std::invalid_argument("CORE-SIM-0001: Ausgabedatei darf nicht Modelldatei sein.");
         if (std::filesystem::exists(ausgabe))
             throw std::invalid_argument("CORE-SIM-0001: Ausgabedatei existiert bereits; kein Ueberschreiben.");
-        const auto m=lade_modell(path);
+        Modellaufbereitung aufbereitung(lade_modell(path));
+        detail::Aufbereitungsbereich bereich(aufbereitung);
+        const auto& m=aufbereitung.modell();
         Zustand s=o.start;
         for(const auto& element:m.elemente) if(element.bewegung) {
             const auto fund=std::find_if(s.bewegungsstellungen.begin(),s.bewegungsstellungen.end(),
@@ -620,6 +633,7 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
             const Gleichgewichtsangaben* gg=nullptr,
             const StationaeresGleichgewichtErgebnis* stationaer=nullptr) {
             SEGEL_MESSUNG("ergebnisaufzeichnung");
+            bereich.zustand(s);
             if(!o.jsonl && result.zustaende) out<<',';
             out<<zustand_json(m,s,status,result.diagnose,gg,stationaer,o.ergebnis_json_format);
             if(o.jsonl) out<<'\n';
@@ -641,7 +655,7 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
                 std::vector<Bewegungsereignis> bewegungsereignisse;
                 for(const auto& e:o.bewegungsereignisse)
                     if(e.first==s.schritt) bewegungsereignisse.push_back(e.second);
-                auto next=dynamikschritt(m,s,dt,ereignisse,bewegungsereignisse);
+                auto next=aufbereitung.schritt(s,dt,ereignisse,bewegungsereignisse);
                 if(next.zeit_s<=s.zeit_s) throw std::runtime_error("CORE-SIM-0001: Kein Zeitfortschritt.");
                 next.zeit_s=ziel;
                 if(next.testantrieb) {

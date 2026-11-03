@@ -1,5 +1,6 @@
 #include "segelphysik/simulation.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -95,6 +96,34 @@ void ids_und_zustaende(const Modell& m)
     pruefe(bilanz(m, kopie).status == "vollstaendig", "deaktiviert ist keine Luecke");
 }
 
+void fremdkraft_inventar(const Modell& m)
+{
+    for (const auto* id : {"stationaer.fremdkraft", "dynamisch.fremdkraft"})
+        for (const auto status : {Datenzustand::gueltig, Datenzustand::null,
+                Datenzustand::deaktiviert, Datenzustand::nicht_berechnet,
+                Datenzustand::ungueltig}) {
+            auto k = hydrostatik(m, Zustand{}.pose);
+            Beitrag force;
+            force.id = id;
+            force.art = "kraft";
+            force.quelle = Quelle::externe_kraft;
+            force.gruppe = "fremdkraft";
+            force.zustand = status;
+            k.beitraege.push_back(force);
+            const auto result = bilanz(m, k.beitraege);
+            pruefe(std::count(result.erwartete_beitraege.begin(),
+                    result.erwartete_beitraege.end(), id) == 1,
+                "Fremdkraft-Inventar muss die wirkliche Beitrags-ID verwenden");
+            const bool missing = status == Datenzustand::nicht_berechnet
+                || status == Datenzustand::ungueltig;
+            pruefe(result.fehlende_beitraege == (missing
+                    ? std::vector<std::string>{id} : std::vector<std::string>{}),
+                "Fremdkraft-Inventar erfindet eine andere fehlende Kraft");
+            pruefe(result.status == (missing ? "teilsumme" : "vollstaendig"),
+                "Fremdkraft-Bilanzstatus stimmt nicht mit Datenzustand ueberein");
+        }
+}
+
 void summen_und_paritaet(const Modell& m)
 {
     for (const auto& pose : {Pose{{0., 0., -0.9}, {0., 0., 0., 1.}},
@@ -163,6 +192,7 @@ int main(int argc, char* argv[])
         const auto m = lade_modell(argv[1]);
         referenzfaelle();
         ids_und_zustaende(m);
+        fremdkraft_inventar(m);
         summen_und_paritaet(m);
         gleichgewichtsangaben(m);
     } catch (const std::exception& e) {

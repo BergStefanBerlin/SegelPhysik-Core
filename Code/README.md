@@ -130,3 +130,29 @@ verwenden kein Python.
 
 Der [Umsetzungsplan](../Umsetzungsplaene/Umsetzungsplan_Hydrostatikkern.md)
 enthält Umfang, Abhängigkeiten und tatsächlichen Fortschritt.
+# Laufgebundene Performanceaufbereitung (C-0.10)
+
+`segelphysik/aufbereitung.hpp` stellt `Modellaufbereitung` bereit.
+Der Kontext kopiert das validierte Modell einmal in eine unveraenderliche
+Momentaufnahme. Pro Worker/Lauf einen Kontext anlegen; bei Modell-,
+Geometrie- oder Ableitungswechsel einen neuen erzeugen. Aenderungen am
+urspruenglichen `Modell` veraendern einen vorhandenen Kontext nicht.
+
+```cpp
+segelphysik::Modellaufbereitung lauf(modell);
+auto s = segelphysik::hydrodynamik_start(lauf.modell(), start, wasser);
+s = lauf.schritt(s, .01, testereignisse, bewegungsereignisse);
+auto json = lauf.json(s, "laufend");
+```
+
+`auswertung(s, rho, g)` liefert dieselben vollstaendigen Kraefte wie
+`kraefte`; `json` behaelt alle bisherigen Formate, Diagnosen und
+historischen Kontextpruefungen. Auch historische Zustaende duerfen mit
+dem Kontext ausgewertet werden; ihre eigenen Stellungen sind massgeblich.
+Konfigurations-, Pose-, Geschwindigkeits-, Flutungs- und Kraftwechsel
+werden nicht als identische Auswertung behandelt. Es gibt nur eine
+physische Stellungsfassung und eine letzte Kraftauswertung je Kontext,
+keinen Cache fuer den gesamten Verlauf. Gleichzeitige Aufrufe desselben
+Kontexts sind serialisiert; getrennte Kontexte teilen keine mutable Daten.
+Die bisherigen freien Funktionen bleiben verfuegbar. `simulieren`
+verwendet den Kontext intern; Live-Anwendungen muessen ihn explizit halten.

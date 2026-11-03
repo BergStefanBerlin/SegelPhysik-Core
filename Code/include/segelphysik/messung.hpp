@@ -24,7 +24,9 @@ private:
 }
 
 #ifdef SEGELPHYSIK_TEST_INSTRUMENTATION
-#define SEGEL_MESSUNG(name) segelphysik::Messbereich segel_messbereich{name}
+#define SEGEL_MESSNAME_IMPL(zeile) segel_messbereich_##zeile
+#define SEGEL_MESSNAME(zeile) SEGEL_MESSNAME_IMPL(zeile)
+#define SEGEL_MESSUNG(name) segelphysik::Messbereich SEGEL_MESSNAME(__LINE__){name}
 #else
 #define SEGEL_MESSUNG(name) static_cast<void>(0)
 #endif

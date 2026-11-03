@@ -157,3 +157,17 @@ Vollständigkeitsmatrix und Performancevergleich bleiben offen.
 | CPPI-0110 | `kraefte(..., DynamischeFremdkraftKontext*)` | implementiert | C-0.9 / A-C-00127; genau ein Beitrag mit Modellvektor, Ansatzpunkt und Moment |
 | CPPI-0111 | `Laufoptionen::dynamische_fremdkraft` | implementiert | C-0.9 / A-C-00126; optionale Batch-Laufkonfiguration |
 | CPPI-0112 | `Kraefte::schwerpunkt_modell_m` | implementiert | C-0.9 / A-C-00128; physischer Gesamtschwerpunkt fuer dieselbe Elementstellung |
+
+## C-0.10: Laufgebundene Modellaufbereitung
+
+Vor Implementierung am 03.11.2026 nach Freigabe 20:45 Uhr vergeben.
+Die bisherigen freien Funktionen bleiben kompatibel.
+
+| CPPI-ID | C++-Schnittstelle | Status | Anforderung |
+|---|---|---|---|
+| CPPI-0113 | `Modellaufbereitung` | implementiert | A-C-00129; nicht kopierbarer, begrenzter Laufkontext, keine globale Cacheverwaltung |
+| CPPI-0114 | `Modellaufbereitung::Modellaufbereitung(const Modell&)` | implementiert | A-C-00129; eigene unveraenderliche Momentaufnahme, neuer Kontext bei Modell-/Ableitungswechsel |
+| CPPI-0115 | `Modellaufbereitung::modell() const` | implementiert | A-C-00129; konstante Referenz fuer bestehende Start-/Solverfunktionen |
+| CPPI-0116 | `Modellaufbereitung::schritt(const Zustand&, double, const vector<TestantriebEreignis>&, const vector<Bewegungsereignis>&, double, double)` | implementiert | A-C-00130, A-C-00131; gleiche Integrationssemantik, Standardereignisse leer, rho=1000, g=9.81 |
+| CPPI-0117 | `Modellaufbereitung::auswertung(const Zustand&, double, double)` | implementiert | A-C-00131, A-C-00133; vollstaendige Kraefte, nur exakt identische wirksame Eingaben wiederverwenden |
+| CPPI-0118 | `Modellaufbereitung::json(const Zustand&, const string&, const string&, const Gleichgewichtsangaben*, const StationaeresGleichgewichtErgebnis*, ErgebnisJsonFormat)` | implementiert | A-C-00133; identischer JSON-Vertrag samt Pflicht-/Historienvalidierung, Standard V6 |

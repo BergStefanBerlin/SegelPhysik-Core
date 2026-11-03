@@ -1,5 +1,6 @@
 #include "segelphysik/hydrostatik.hpp"
 #include "segelphysik/messung.hpp"
+#include "aufbereitung_intern.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -67,24 +68,36 @@ Vektor3 bewegungspunkt(const Vektor3& punkt, const Element& eigentuemer,
         mal(achse, dot(achse, rel) * (1. - std::cos(winkel))));
     return plus(bewegung.drehpunkt_modell_m, gedreht);
 }
-Mesh bewegtes_mesh(const Mesh& mesh, const Element& eigentuemer, double wert)
-{
-    Mesh result = mesh;
-    for (auto& punkt : result.punkte) punkt = bewegungspunkt(punkt, eigentuemer, wert);
-    return result;
-}
 Vektor3 bewegungsvektor(const Vektor3& vektor, const Element& eigentuemer, double wert);
-Modell bewegtes_modell(const Modell& modell,
-    const std::vector<Bewegungsstellung>& stellungen)
+void aktualisiere_bewegtes_modell(const Modell& modell, Modell& result,
+    const std::vector<Bewegungsstellung>& stellungen,
+    const std::vector<Bewegungsstellung>* vorher = nullptr)
 {
-    Modell result = modell;
-    for (auto& element : result.elemente) {
+    SEGEL_MESSUNG("stellungsaufbereitung");
+    for (std::size_t index=0;index<result.elemente.size();++index) {
+        auto& element=result.elemente[index];
         const auto* eigentuemer = bewegungseigentuemer(modell, element.id);
         if (!eigentuemer) continue;
         const double wert = bewegungswert(*eigentuemer, stellungen);
+        if(vorher && wert==bewegungswert(*eigentuemer,*vorher)) continue;
+        if(vorher) {
+            if(auto* cache=detail::aktive_aufbereitung) {
+                if(element.volumen) cache->weltmeshes.erase(&*element.volumen);
+                if(element.massen_mesh) cache->weltmeshes.erase(&*element.massen_mesh);
+            }
+            SEGEL_MESSUNG("element_geometriekopie");
+            detail::zaehle_meshkopien(modell.elemente[index]);
+            element=modell.elemente[index];
+        }
         element.schwerpunkt_m = bewegungspunkt(element.schwerpunkt_m, *eigentuemer, wert);
-        if (element.volumen) element.volumen = bewegtes_mesh(*element.volumen, *eigentuemer, wert);
-        if (element.massen_mesh) element.massen_mesh = bewegtes_mesh(*element.massen_mesh, *eigentuemer, wert);
+        auto transformieren=[&](std::optional<Mesh>& mesh) {
+            if(!mesh) return;
+            SEGEL_MESSUNG("mesh_transformation");
+            for(auto& punkt:mesh->punkte)
+                punkt=bewegungspunkt(punkt,*eigentuemer,wert);
+        };
+        transformieren(element.volumen);
+        transformieren(element.massen_mesh);
         for (auto& point : element.massenpunkte_m)
             point = bewegungspunkt(point, *eigentuemer, wert);
         for (auto& point : element.flutrand_m)
@@ -122,15 +135,50 @@ Modell bewegtes_modell(const Modell& modell,
                 result.traegheit_kg_m2[3 * row + col] += element.traegheit_kg_m2[3 * row + col] +
                     element.masse_kg * ((row == col ? d2 : 0.) - offset[row] * offset[col]);
     }
+}
+Modell bewegtes_modell(const Modell& modell,
+    const std::vector<Bewegungsstellung>& stellungen)
+{
+    SEGEL_MESSUNG("modell_geometriekopie");
+    detail::zaehle_meshkopien(modell);
+    Modell result=modell;
+    aktualisiere_bewegtes_modell(modell,result,stellungen);
     return result;
 }
-Modell physisches_modell_fuer(const Modell& modell,
+std::shared_ptr<const Modell> physisches_modell_fuer(const Modell& modell,
     const std::vector<Bewegungsstellung>& stellungen)
 {
     if(std::none_of(modell.elemente.begin(),modell.elemente.end(),
         [](const Element& element) { return element.bewegung.has_value(); }))
-        return modell;
-    auto result=bewegtes_modell(modell,stellungen);
+        return std::shared_ptr<const Modell>(&modell,[](const Modell*){});
+    auto* cache=detail::aktive_aufbereitung;
+    if(cache && &cache->basis!=&modell) cache=nullptr;
+    if(cache && cache->physisch &&
+       std::all_of(modell.elemente.begin(),modell.elemente.end(),[&](const Element& e) {
+           return !e.bewegung ||
+               bewegungswert(e,stellungen)==bewegungswert(e,cache->stellungen);
+       })) {
+        SEGEL_MESSUNG("stellung_wiederverwendung");
+        return cache->physisch;
+    }
+    std::shared_ptr<Modell> vorbereitet;
+    if(cache && cache->physisch) {
+        vorbereitet=cache->physisch;
+        try {
+            aktualisiere_bewegtes_modell(modell,*vorbereitet,stellungen,&cache->stellungen);
+        } catch(...) {
+            cache->physisch.reset();
+            cache->stellungen.clear();
+            cache->weltmeshes.clear();
+            throw;
+        }
+    } else {
+        SEGEL_MESSUNG("modell_geometriekopie");
+        detail::zaehle_meshkopien(modell);
+        vorbereitet=std::make_shared<Modell>(modell);
+        aktualisiere_bewegtes_modell(modell,*vorbereitet,stellungen);
+    }
+    auto& result=*vorbereitet;
     auto positiv_definit=[](const std::array<double,9>& inertia) {
         return inertia[0]>0. && inertia[0]*inertia[4]-inertia[1]*inertia[3]>0. &&
             inertia[0]*(inertia[4]*inertia[8]-inertia[5]*inertia[7])-
@@ -161,7 +209,11 @@ Modell physisches_modell_fuer(const Modell& modell,
         for(std::size_t i=0;i<result.traegheit_kg_m2.size();++i)
             result.traegheit_kg_m2[i]+=neue_parallel[i]-alte_parallel[i];
     }
-    return result;
+    if(cache) {
+        cache->physisch=vorbereitet;
+        cache->stellungen=stellungen;
+    }
+    return vorbereitet;
 }
 Vektor3 bewegungsvektor(const Vektor3& vektor, const Element& eigentuemer, double wert)
 {
@@ -233,12 +285,36 @@ struct Nasspanel {
 
 std::vector<Nasspanel> nasspanels(const Mesh& mesh, const Pose& pose)
 {
+    SEGEL_MESSUNG("nasspanels");
+    auto* cache=detail::aktive_aufbereitung;
+    auto besitzt=[&](const Modell& m) {
+        return std::any_of(m.elemente.begin(),m.elemente.end(),[&](const Element& e) {
+            return (e.volumen && &*e.volumen==&mesh) ||
+                (e.massen_mesh && &*e.massen_mesh==&mesh);
+        });
+    };
+    if(cache && !besitzt(cache->basis) &&
+       (!cache->physisch || !besitzt(*cache->physisch))) cache=nullptr;
+    detail::Weltmesh lokal;
+    auto& welt=cache?cache->weltmeshes[&mesh]:lokal;
+    if(!welt.gueltig || welt.position!=pose.position_m() ||
+       welt.orientierung!=pose.orientierung_xyzw()) {
+        SEGEL_MESSUNG("weltmesh_transformation");
+        welt.gueltig=false;
+        welt.punkte.resize(mesh.punkte.size());
+        std::transform(mesh.punkte.begin(),mesh.punkte.end(),welt.punkte.begin(),
+            [&](const Vektor3& p) {return pose.modellpunkt_nach_welt(p);});
+        welt.position=pose.position_m();
+        welt.orientierung=pose.orientierung_xyzw();
+        welt.gueltig=true;
+    }
     std::vector<Nasspanel> result;
+    result.reserve(mesh.dreiecke.size());
     for (const auto& triangle : mesh.dreiecke) {
         std::array<Vektor3, 3> vertices{
-            pose.modellpunkt_nach_welt(mesh.punkte.at(triangle[0])),
-            pose.modellpunkt_nach_welt(mesh.punkte.at(triangle[1])),
-            pose.modellpunkt_nach_welt(mesh.punkte.at(triangle[2]))};
+            welt.punkte.at(triangle[0]),
+            welt.punkte.at(triangle[1]),
+            welt.punkte.at(triangle[2])};
         std::array<Vektor3, 4> clipped{};
         std::size_t count = 0;
         for (std::size_t i = 0; i < vertices.size(); ++i) {
@@ -576,10 +652,24 @@ Beitrag seitenkraftbeitrag(const Element& element, const Modell& modell,
         if (candidate.id == element.id && candidate.volumen) reference_mesh = &*candidate.volumen;
     if (!reference_mesh)
         throw std::invalid_argument("CORE-HYD-0001: Seitenkraft ohne physisches Volumenmesh: " + element.id);
-    for (const auto& point : reference_mesh->punkte) {
-        low_x = std::min(low_x, point[0]); high_x = std::max(high_x, point[0]);
-        low_y = std::min(low_y, point[1]); high_y = std::max(high_y, point[1]);
-        low_z = std::min(low_z, point[2]); high_z = std::max(high_z, point[2]);
+    auto* aufbereitung=detail::aktive_aufbereitung;
+    if(aufbereitung && &aufbereitung->basis!=&geometrie) aufbereitung=nullptr;
+    const auto bounds=aufbereitung
+        ? aufbereitung->lokale_bounds.find(reference_mesh)
+        : std::map<const Mesh*,std::array<double,6>>::iterator{};
+    if(aufbereitung && bounds!=aufbereitung->lokale_bounds.end()) {
+        low_x=bounds->second[0]; high_x=bounds->second[1];
+        low_y=bounds->second[2]; high_y=bounds->second[3];
+        low_z=bounds->second[4]; high_z=bounds->second[5];
+    } else {
+        SEGEL_MESSUNG("lokale_mesh_bounds");
+        for (const auto& point : reference_mesh->punkte) {
+            low_x = std::min(low_x, point[0]); high_x = std::max(high_x, point[0]);
+            low_y = std::min(low_y, point[1]); high_y = std::max(high_y, point[1]);
+            low_z = std::min(low_z, point[2]); high_z = std::max(high_z, point[2]);
+        }
+        if(aufbereitung) aufbereitung->lokale_bounds[reference_mesh]=
+            {low_x,high_x,low_y,high_y,low_z,high_z};
     }
     const double span = high_z - low_z;
     const double thickness_ratio = (high_y - low_y) / std::max(high_x - low_x, high_z - low_z);
@@ -839,7 +929,7 @@ Kraefte hydrostatik(const Modell& modell,const Pose& pose,double rho,double g,
     SEGEL_MESSUNG("hydrostatikauswertung");
     if (!bewegungsstellungen.empty()) {
         const auto bewegt = physisches_modell_fuer(modell, bewegungsstellungen);
-        return hydrostatik(bewegt, pose, rho, g, geflutet, {});
+        return hydrostatik(*bewegt, pose, rho, g, geflutet, {});
     }
     positiv(rho);positiv(g);positiv(modell.masse_kg);
     Kraefte result;
@@ -940,9 +1030,9 @@ Bilanz bilanz(const Modell& modell,std::vector<Beitrag>& beitraege,bool hydrodyn
     if(std::any_of(beitraege.begin(),beitraege.end(),
         [](const Beitrag& b){return b.quelle==Quelle::testantrieb;}))
         result.erwartete_beitraege.push_back("testantrieb.bug.kraft");
-    if(std::any_of(beitraege.begin(),beitraege.end(),
-        [](const Beitrag& b){return b.quelle==Quelle::externe_kraft;}))
-        result.erwartete_beitraege.push_back("stationaer.fremdkraft");
+    for (const auto& b : beitraege)
+        if (b.quelle == Quelle::externe_kraft && b.rolle == Rolle::einzelbeitrag)
+            result.erwartete_beitraege.push_back(b.id);
     for (const auto& e : modell.elemente) {
         result.erwartete_beitraege.push_back(e.id+":gewicht");
         if (e.volumen) result.erwartete_beitraege.push_back(e.id+":auftrieb");
@@ -2070,7 +2160,8 @@ Zustand hydrodynamik_start(const Modell& m,const Zustand& s,
     context->modell_fassung=m.fassung;
     context->auswertung_schritt=s.schritt;
     context->auswertung_zeit_s=s.zeit_s;
-    const auto physisches_modell=physisches_modell_fuer(m,s.bewegungsstellungen);
+    const auto vorbereitet=physisches_modell_fuer(m,s.bewegungsstellungen);
+    const auto& physisches_modell=*vorbereitet;
     if(config.zusatzmasse_daempfung)
         context->traegheit=std::make_shared<const HydrodynamischeTraegheit>(
             berechne_hydrodynamische_traegheit(physisches_modell,s.pose,config.rho_kg_m3,9.81));
@@ -2133,13 +2224,88 @@ Zustand dynamische_fremdkraft_start(const Modell& m,const Zustand& s,
     return result;
 }
 
+namespace {
+template<class T> void schluesselwert(std::string& key,const T& value)
+{
+    key.append(reinterpret_cast<const char*>(&value),sizeof(value));
+}
+void schluesseltext(std::string& key,const std::string& value)
+{
+    schluesselwert(key,value.size());
+    key.append(value);
+}
+std::string kraftschluessel(const Pose& p,const TestantriebKontext* c,
+    double rho,double g,const std::vector<std::string>& geflutet,
+    const HydrodynamikKontext* hydro,const Vektor3& geschwindigkeit,
+    const Vektor3& omega,const std::vector<Bewegungsstellung>& stellungen,
+    const DynamischeFremdkraftKontext* fremd)
+{
+    std::string key;
+    schluesselwert(key,p.position_m()); schluesselwert(key,p.orientierung_xyzw());
+    schluesselwert(key,rho); schluesselwert(key,g);
+    schluesselwert(key,geschwindigkeit); schluesselwert(key,omega);
+    schluesselwert(key,geflutet.size());
+    for(const auto& id:geflutet) schluesseltext(key,id);
+    schluesselwert(key,stellungen.size());
+    for(const auto& s:stellungen) { schluesseltext(key,s.element_id); schluesselwert(key,s.wert); }
+    schluesselwert(key,c!=nullptr);
+    if(c) {
+        schluesselwert(key,c->aktiv);
+        schluesselwert(key,c->konfiguration.kraft_n);
+        schluesselwert(key,c->konfiguration.grenze_m_s);
+        schluesselwert(key,c->zugpunkt_modell_m.has_value());
+        if(c->zugpunkt_modell_m) schluesselwert(key,*c->zugpunkt_modell_m);
+        schluesseltext(key,c->modell_fassung);
+    }
+    schluesselwert(key,hydro!=nullptr);
+    if(hydro) {
+        const auto& config=hydro->konfiguration;
+        schluesselwert(key,config.rho_kg_m3); schluesselwert(key,config.nu_m2_s);
+        schluesselwert(key,config.fluidgeschwindigkeit_welt_m_s);
+        schluesselwert(key,config.zusatzmasse_daempfung);
+        schluesseltext(key,hydro->modell_fassung);
+        schluesselwert(key,hydro->traegheit!=nullptr);
+        if(const auto* ht=hydro->traegheit.get()) {
+            schluesselwert(key,ht->zusatzmasse[5].wert);
+            schluesselwert(key,ht->gieren_linear.wert);
+            schluesselwert(key,ht->gieren_quadratisch.wert);
+            schluesselwert(key,ht->b_rollen_nms);
+            schluesselwert(key,ht->b_stampfen_nms);
+            schluesselwert(key,ht->b_tauchen_ns_m);
+        }
+    }
+    schluesselwert(key,fremd!=nullptr);
+    if(fremd) {
+        schluesselwert(key,fremd->konfiguration.aktiv);
+        schluesselwert(key,fremd->konfiguration.kraft_modellfest_n);
+        schluesselwert(key,fremd->konfiguration.angriffspunkt_modell_m);
+        schluesseltext(key,fremd->modell_fassung);
+    }
+    return key;
+}
+}
 Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
     double rho,double g,const std::vector<std::string>& geflutet,
     const HydrodynamikKontext* hydro,const Vektor3& geschwindigkeit,
     const Vektor3& omega,const std::vector<Bewegungsstellung>& bewegungsstellungen,
     const DynamischeFremdkraftKontext* dynamische_fremdkraft)
 {
-    const auto physisches_modell = physisches_modell_fuer(m, bewegungsstellungen);
+    auto* cache=detail::aktive_aufbereitung;
+    if(cache && &cache->basis!=&m) cache=nullptr;
+    std::string key;
+    if(cache) {
+        key=kraftschluessel(p,c,rho,g,geflutet,hydro,geschwindigkeit,omega,
+            bewegungsstellungen,dynamische_fremdkraft);
+        schluesselwert(key,cache->zeit_s);
+        schluesselwert(key,cache->schritt);
+        if(cache->kraft && key==cache->kraftschluessel) {
+            SEGEL_MESSUNG("kraft_ergebnis_wiederverwendung");
+            return *cache->kraft;
+        }
+    }
+    SEGEL_MESSUNG("kraftauswertung");
+    const auto vorbereitet = physisches_modell_fuer(m, bewegungsstellungen);
+    const auto& physisches_modell = *vorbereitet;
     auto k=hydrostatik(physisches_modell,p,rho,g,geflutet);
     k.schwerpunkt_modell_m=physisches_modell.schwerpunkt_m;
     if(c) {
@@ -2173,15 +2339,12 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
             throw std::invalid_argument("CORE-HYD-0001: Falsche Hydrodynamik-Modellfassung.");
         if(!endlich(geschwindigkeit) || !endlich(omega))
             throw std::invalid_argument("CORE-HYD-0001: Lineare und Winkelgeschwindigkeit muessen endlich sein.");
-        for(const auto& e:m.elemente) {
+        for(std::size_t index=0;index<m.elemente.size();++index) {
+            const auto& e=m.elemente[index];
             if(!e.hydrodynamik_rolle) continue;
             if(!e.volumen)
                 throw std::invalid_argument("CORE-HYD-0001: Hydrodynamikrolle ohne physisches Volumenmesh: " + e.id);
-            Element hydrodynamik_element=e;
-            if(const auto* eigentuemer=bewegungseigentuemer(m,e.id)) {
-                hydrodynamik_element.volumen=bewegtes_mesh(*e.volumen,*eigentuemer,
-                    bewegungswert(*eigentuemer,bewegungsstellungen));
-            }
+            const auto& hydrodynamik_element=physisches_modell.elemente[index];
             const auto panels=nasspanels(*hydrodynamik_element.volumen,p);
             auto add=[&](Beitrag b) {
                 if(b.zustand==Datenzustand::gueltig) {
@@ -2190,13 +2353,13 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
                 }
                 k.beitraege.push_back(std::move(b));
             };
-            add(reibungsbeitrag(hydrodynamik_element,physisches_modell,p,
+            add(reibungsbeitrag(e,physisches_modell,p,
                 hydro->konfiguration,geschwindigkeit,omega,panels));
             if(*e.hydrodynamik_rolle==HydrodynamikRolle::rumpf)
-                add(druckbeitrag(hydrodynamik_element,physisches_modell,p,
+                add(druckbeitrag(e,physisches_modell,p,
                     hydro->konfiguration,geschwindigkeit,omega,panels));
             else
-                add(seitenkraftbeitrag(hydrodynamik_element,physisches_modell,m,p,hydro->konfiguration,
+                add(seitenkraftbeitrag(e,physisches_modell,m,p,hydro->konfiguration,
                     geschwindigkeit,omega,panels,bewegungsstellungen));
         }
         if(const auto* ht=hydro->traegheit.get()) {
@@ -2253,6 +2416,10 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
     for(auto& sum:k.beitraege) if(sum.rolle==Rolle::gesamtsumme) {
         sum.vektor=k.moment_modell_nm;sum.moment_s_nm=k.moment_modell_nm;
     }
+    if(cache) {
+        cache->kraft=k;
+        cache->kraftschluessel=std::move(key);
+    }
     return k;
 }
 
@@ -2295,12 +2462,10 @@ Lateraldruckpunkt lateraldruckpunkt(const Modell& m,const Pose& p,const Kraefte&
         return result;
     }
     double flaeche=0.,fx=0.,fz=0.;
-    for(const auto& e:m.elemente) {
+    const auto vorbereitet=physisches_modell_fuer(m,bewegungsstellungen);
+    for(const auto& e:vorbereitet->elemente) {
         if(!e.hydrodynamik_rolle||!e.volumen) continue;
-        Mesh mesh=*e.volumen;
-        if(const auto* eigentuemer=bewegungseigentuemer(m,e.id))
-            mesh=bewegtes_mesh(mesh,*eigentuemer,bewegungswert(*eigentuemer,bewegungsstellungen));
-        for(const auto& panel:nasspanels(mesh,p)) {
+        for(const auto& panel:nasspanels(*e.volumen,p)) {
             const double lateral=panel.flaeche_m2*std::abs(p.weltvektor_nach_modell(panel.normale_welt)[1]);
             const auto punkt=p.weltpunkt_nach_modell(panel.punkt_welt);
             flaeche+=lateral;fx+=lateral*punkt[0];fz+=lateral*punkt[2];
@@ -2397,7 +2562,8 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         context && context->aktiv)
         throw std::invalid_argument("CORE-SIM-0001: Fremdkraft und Testantrieb duerfen nicht gleichzeitig aktiv sein.");
     const bool stellung_geaendert=!bewegungsereignisse.empty();
-    const auto physisches_modell=physisches_modell_fuer(modell,bewegungsstellungen);
+    const auto vorbereitet=physisches_modell_fuer(modell,bewegungsstellungen);
+    const auto& physisches_modell=*vorbereitet;
     std::shared_ptr<HydrodynamikKontext> hydro_context;
     if(s.hydrodynamik)
         hydro_context=std::make_shared<HydrodynamikKontext>(*s.hydrodynamik);
@@ -2480,6 +2646,9 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
     const auto midcg=plus(plus(cg,mal(s.geschwindigkeit_welt_m_s,dt/2)),mal(a,dt*dt/8));
     const Pose midpose{plus(midcg,mal(midrotation.modellvektor_nach_welt(physisches_modell.schwerpunkt_m),-1.)),midq};
     const auto midvelocity=plus(s.geschwindigkeit_welt_m_s,mal(a,dt/2));
+    auto* aufbereitung=detail::aktive_aufbereitung;
+    if(aufbereitung && &aufbereitung->basis!=&modell) aufbereitung=nullptr;
+    if(aufbereitung) aufbereitung->zeit_s=s.zeit_s+dt/2.;
     const auto midforce=kraefte(modell,midpose,context.get(),rho,g,geflutet,
         hydro_context.get(),midvelocity,omega_mid,bewegungsstellungen,
         fremdkraft_context.get());
@@ -2498,6 +2667,10 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
     result.letzte_bewegungsereigniskennung=letzte_bewegungskennung;
     result.bewegungsuebergang=BewegungsUebergang{
         s.schritt,s.schritt+1,s.zeit_s,dt,bewegungsereignisse};
+    if(aufbereitung) {
+        aufbereitung->zeit_s=result.zeit_s;
+        aufbereitung->schritt=result.schritt;
+    }
     if(hydro_context) {
         hydro_context->auswertung_schritt=result.schritt;
         hydro_context->auswertung_zeit_s=result.zeit_s;

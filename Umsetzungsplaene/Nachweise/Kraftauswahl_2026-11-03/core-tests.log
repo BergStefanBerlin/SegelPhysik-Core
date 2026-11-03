@@ -1,0 +1,78 @@
+Start testing: Nov 03 22:31 Mitteleuropäische Zeit
+----------------------------------------------------------
+1/22 Testing: modellaufbereitung
+1/22 Test: modellaufbereitung
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/aufbereitung_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/420/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/folkeboot/modell.json"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"modellaufbereitung" start time: Nov 03 22:31 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+ungebunden.dynamischer_zeitschritt: 4
+ungebunden.ebenenschnitt: 80
+ungebunden.hydrostatikauswertung: 20
+ungebunden.kraftauswertung: 20
+ungebunden.lokale_mesh_bounds: 40
+ungebunden.mesh_transformation: 128
+ungebunden.meshkopie: 320
+ungebunden.modell_geometriekopie: 32
+ungebunden.nasspanels: 84
+ungebunden.stellungsaufbereitung: 32
+ungebunden.weltmesh_transformation: 84
+dynamischer_zeitschritt: 4
+ebenenschnitt: 36
+hydrostatikauswertung: 9
+kraft_ergebnis_wiederverwendung: 11
+kraftauswertung: 9
+lokale_mesh_bounds: 2
+mesh_transformation: 4
+meshkopie: 20
+modell_geometriekopie: 1
+modellbasis_aufbau: 1
+nasspanels: 51
+stellung_wiederverwendung: 20
+stellungsaufbereitung: 1
+weltmesh_transformation: 27
+Modellaufbereitung: alle Referenzen bestanden
+<end of output>
+Test time =   4.24 sec
+----------------------------------------------------------
+Test Passed.
+"modellaufbereitung" end time: Nov 03 22:31 Mitteleuropäische Zeit
+"modellaufbereitung" time elapsed: 00:00:04
+----------------------------------------------------------
+
+9/22 Testing: simulation_gesamtlauf
+9/22 Test: simulation_gesamtlauf
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/simulation_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/quader/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/tests/testdata/stationaere_referenz/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/420/modell.json"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"simulation_gesamtlauf" start time: Nov 03 22:31 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+Stationaer analytisch: v=1.118035272 m/s, max|F|=0.00344304548 N, max|M|=0.001032913644 Nm, ftol=0.05 N, mtol=0.05 Nm
+Exzentrische Kraft: Moment um S=[6.074006715e-10,450,0] Nm
+Galilei: delta Relativgeschwindigkeit=1.281878563e-06 m/s
+Mehrfachstellungen 420: status=konvergiert, iter=0
+<end of output>
+Test time =   1.41 sec
+----------------------------------------------------------
+Test Passed.
+"simulation_gesamtlauf" end time: Nov 03 22:31 Mitteleuropäische Zeit
+"simulation_gesamtlauf" time elapsed: 00:00:01
+----------------------------------------------------------
+
+13/22 Testing: kraft_momentenbilanz
+13/22 Test: kraft_momentenbilanz
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/bilanz_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/quader/modell.json"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"kraft_momentenbilanz" start time: Nov 03 22:31 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"kraft_momentenbilanz" end time: Nov 03 22:31 Mitteleuropäische Zeit
+"kraft_momentenbilanz" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 03 22:31 Mitteleuropäische Zeit

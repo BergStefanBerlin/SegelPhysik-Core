@@ -1,0 +1,44 @@
+Start testing: Nov 03 21:54 Mitteleuropäische Zeit
+----------------------------------------------------------
+1/22 Testing: modellaufbereitung
+1/22 Test: modellaufbereitung
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/aufbereitung_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/420/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/folkeboot/modell.json"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"modellaufbereitung" start time: Nov 03 21:54 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+ungebunden.dynamischer_zeitschritt: 4
+ungebunden.ebenenschnitt: 80
+ungebunden.hydrostatikauswertung: 20
+ungebunden.kraftauswertung: 20
+ungebunden.lokale_mesh_bounds: 40
+ungebunden.mesh_transformation: 128
+ungebunden.meshkopie: 320
+ungebunden.modell_geometriekopie: 32
+ungebunden.nasspanels: 84
+ungebunden.stellungsaufbereitung: 32
+ungebunden.weltmesh_transformation: 84
+dynamischer_zeitschritt: 4
+ebenenschnitt: 36
+hydrostatikauswertung: 9
+kraft_ergebnis_wiederverwendung: 11
+kraftauswertung: 9
+lokale_mesh_bounds: 2
+mesh_transformation: 4
+meshkopie: 20
+modell_geometriekopie: 1
+modellbasis_aufbau: 1
+nasspanels: 51
+stellung_wiederverwendung: 20
+stellungsaufbereitung: 1
+weltmesh_transformation: 27
+Modellaufbereitung: alle Referenzen bestanden
+<end of output>
+Test time =   3.70 sec
+----------------------------------------------------------
+Test Passed.
+"modellaufbereitung" end time: Nov 03 21:54 Mitteleuropäische Zeit
+"modellaufbereitung" time elapsed: 00:00:03
+----------------------------------------------------------
+
+End testing: Nov 03 21:54 Mitteleuropäische Zeit

@@ -1,0 +1,16 @@
+{
+  "status": "finalisiert_umsetzung_freigegeben_2026-11-03_2045",
+  "stand": "2026-11-03",
+  "spezifikation": "../Spezifikation_Performance_Modellaufbereitung.md",
+  "zielversion": "C-0.10",
+  "herkunft": "Nutzerabgrenzung 20:37 Uhr; Auftrag zu getrennten Spezifikationen und Performanceplaenen 20:40 Uhr.",
+  "punkte": [
+    {"id": "IDEE-C-00093", "status": "angenommen_finalisiert", "anforderung": "A-C-00129", "abschnitt": "2", "text": "Unveraenderliche Modellbasis und exakte Meshvorarbeiten einmal je Modellfassung aufbereiten und begrenzt halten."},
+    {"id": "IDEE-C-00094", "status": "angenommen_finalisiert", "anforderung": "A-C-00130", "abschnitt": "3", "text": "Stellungsabhaengige physische Geometrie, CG und Traegheit teilen; bei Ereignissen nur betroffene Abhaengigkeiten erneuern."},
+    {"id": "IDEE-C-00095", "status": "angenommen_finalisiert", "anforderung": "A-C-00131", "abschnitt": "4", "text": "Pose-, Fluid-, Kraft- und Zeitzustandsabhaengigkeiten exakt unterscheiden; keine ungueltige Wiederverwendung zwischen Integratorstufen."},
+    {"id": "IDEE-C-00096", "status": "angenommen_finalisiert", "anforderung": "A-C-00132", "abschnitt": "5", "text": "Komplexe Meshes ohne Vereinfachung durch weniger Kopien, Transformationen und identische Vorarbeiten beschleunigen."},
+    {"id": "IDEE-C-00097", "status": "angenommen_finalisiert", "anforderung": "A-C-00133", "abschnitt": "6", "text": "Vollstaendige identische Kraft-/Bilanzauswertung fuer Batch und Live-JSON wiederverwenden; Rueckblick unveraendert."},
+    {"id": "IDEE-C-00098", "status": "angenommen_finalisiert", "anforderung": "A-C-00134", "abschnitt": "7", "text": "Zaehler-, Physik-, Lebensdauer- und Performancebelege gegen unveraenderten Ausgangsstand liefern."}
+  ],
+  "offen": []
+}

@@ -989,9 +989,60 @@ Elementstellungen; dieser Schwerpunkt steht in
 `moment_bezug_modell_m`. Die Kraft wirkt in den Kraftauswertungen des
 Integrators, nicht nur in dieser Projektion.
 
+Das Bilanzinventar nennt dieselbe Einzelbeitrags-ID
+`dynamisch.fremdkraft`, nicht `stationaer.fremdkraft`. Ein gueltiger,
+deaktivierter oder aktiver Nullbeitrag macht die ansonsten vollstaendige
+Bilanz nicht unvollstaendig.
+
+Auch dynamische Fremdkraft-Snapshots liefern
+`druckpunkte.ersatz_segel` mit `quelle: "fremdkraft"`. Bei aktiver,
+von null verschiedener Kraft gilt `status: "gueltig"` und
+`position_modell_m` ist exakt der konfigurierte modellfeste
+`angriffspunkt_modell_m`. Bei deaktivierter Kraft gilt `inaktiv`,
+bei aktiver Nullkraft `kraft_null`; beide enthalten keine Position.
+Dies ist der Ersatz-Ansatzpunkt fuer die Darstellung, kein durch
+Windphysik berechneter Segeldruckpunkt. Historische Snapshots verwenden
+ihren eigenen eingefrorenen Kraftkontext.
+
 U-C-000112 bis U-C-000114 und technische Core-Tests sind abgeschlossen.
 Der GUI-Adapter muss Vertragsversion 7 akzeptieren und `externe_kraft`
 als Quelle der dynamischen Fremdkraft darstellen. GUI-Integration,
 persönliche Prüfung sowie Performancevergleich sind getrennte,
 noch nicht abgeschlossene Gates; der Performancevergleich ist bis zu
 erneuter ausdrücklicher Nutzerfreigabe blockiert.
+# C-0.10: explizite Aufbereitung fuer Live und Batch
+
+Additiver C++-Vertrag CPPI-0113..0118, Header
+`segelphysik/aufbereitung.hpp`: `Modellaufbereitung` besitzt eine
+unveraenderliche Momentaufnahme des geladenen Modells und lebt genau so
+lange wie der zugehoerige Lauf/Worker. Keine implizite Wiederverwendung
+anhand von Dateiname oder Modell-ID. Beim Austausch von Modellinhalt,
+Topologie oder Ableitungsdefinition einen neuen Kontext anlegen.
+
+Die Startfunktionen weiterhin mit `kontext.modell()` aufrufen.
+Im Livepfad `kontext.schritt(...)` statt `dynamikschritt(modell,...)`
+und `kontext.json(...)` statt `zustand_json(modell,...)` verwenden.
+Ereignisargumente, rho/g und JSON-Format behalten ihre bisherigen
+Defaults und Bedeutung. `kontext.auswertung(zustand,rho,g)` liefert eine
+vollstaendige `Kraefte`-Kopie; Aenderungen daran beeinflussen den Cache nicht.
+Auswertung und JSON pruefen die historischen Pflichtkontexte identisch.
+Alte Zustaende werden anhand ihrer eigenen Stellungen aufbereitet,
+nicht anhand der zuletzt vom Worker verwendeten Geometrie.
+
+Eine feste Stellung wird einmal vorbereitet. Effektive Stellungswechsel
+kopieren/transformieren nur den Eigentuemer und seine mitbewegten
+Elemente; Schwerpunkt und Traegheit werden konsistent neu aggregiert.
+Die bestehende Zusatztraegheitsaktualisierung bei Ereignissen bleibt
+erhalten, auch wenn ein Ereignis denselben Stellwert bestaetigt.
+Gleiche Stellungen bedeuten keine gleichen Posen: Nasspanels, Schnitte
+und Flutung werden weiterhin pro wirksamem Zustand bestimmt.
+Der Kontext haelt hoechstens eine physische Stellungsfassung, lokale
+Bounds der Basis, einen letzten Weltpunktestand je eigenem Mesh und
+eine vollstaendige letzte Kraftauswertung. Keine Verlaufscaches.
+Eigene Kontexte fuer verschiedene Worker/Laeufe verwenden.
+
+`simulieren` verwendet den Kontext intern; seine JSON-Struktur,
+Zustandsfolge und Ausgabedichte bleiben unveraendert. Bestehende freie
+APIs sind weiter verfuegbar. Die statischen Solveralgorithmen,
+Integratorgleichungen, Physikmeshes und fachlichen Toleranzen aendern
+sich nicht.

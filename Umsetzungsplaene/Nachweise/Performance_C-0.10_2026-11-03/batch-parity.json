@@ -1,0 +1,16 @@
+[
+  {
+    "model": "420",
+    "states": 4,
+    "exact_full_json_parity": true,
+    "dt_s": 0.01,
+    "duration_s": 0.03
+  },
+  {
+    "model": "folkeboot",
+    "states": 4,
+    "exact_full_json_parity": true,
+    "dt_s": 0.01,
+    "duration_s": 0.03
+  }
+]
