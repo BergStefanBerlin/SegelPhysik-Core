@@ -149,6 +149,7 @@ void reference_models(const fs::path& source, const fs::path& output)
         }
         const auto old_document = Json::parse(original);
         const auto new_document = Json::parse(read(new_file));
+        require(new_document.at("schema_version") == "2", "Schema-2 version missing");
         for (const auto* key : {"name", "status", "entwurf", "Hydrodynamische_Traegheit"})
             if (old_document.contains(key))
                 require(old_document[key] == new_document[key], "Original metadata changed");
@@ -156,6 +157,13 @@ void reference_models(const fs::path& source, const fs::path& output)
             for (std::size_t i = 0; i < group["elemente"].size(); ++i) {
                 const auto& x = group["elemente"][i];
                 const auto& y = new_document["gruppen"][group_name]["elemente"][i];
+                for (const auto* role : {"volumen", "masse"})
+                    if (y.contains("Hydrostatik") && y["Hydrostatik"].contains(role))
+                        require(!y["Hydrostatik"][role].contains("ableitung"),
+                            "Schema-3 derivation leaked into schema 2");
+                if (y.contains("Darstellung"))
+                    require(!y["Darstellung"].contains("ableitung"),
+                        "Display derivation leaked into schema 2");
                 for (const auto* key : {"Hydrodynamik", "Bewegung"})
                     if (x.contains(key)) require(x[key] == y[key], "Physical domain data changed");
             }
@@ -204,14 +212,14 @@ void reference_models(const fs::path& source, const fs::path& output)
         std::cout << name << ": exact physics/display/movement equivalence\n";
     }
 }
-void schema_v3_migration(const fs::path& source, const fs::path& output)
+void schema_v3_migration(const fs::path& output)
 {
     const std::set<std::string> conflicted{"420", "folkeboot", "optimist"};
     const auto v3_output = output / "schema-v3-modelle";
     fs::create_directory(v3_output);
     for (const auto* name : {"bleistift", "kegel", "kugel", "platte", "pyramide",
         "quader", "rolle", "unregelmaessig", "420", "folkeboot", "optimist"}) {
-        const auto old_file = source / name / "modell.json";
+        const auto old_file = output / name / "modell.json";
         const auto target = v3_output / name;
         const auto original = read(old_file);
         if (conflicted.count(name)) {
@@ -260,7 +268,7 @@ void schema_v3_migration(const fs::path& source, const fs::path& output)
     same_model(lade_modell(v2_file), lade_modell(v2_target / "modell.json"));
 }
 
-void derived_migration(const fs::path& source, const fs::path& output)
+void derived_migration(const fs::path& output)
 {
     const auto converted = output / "schema-v3-derived";
     fs::create_directory(converted);
@@ -269,7 +277,7 @@ void derived_migration(const fs::path& source, const fs::path& output)
             field + ": " + std::to_string(a) + " vs " + std::to_string(b));
     };
     for (const auto* name : {"420", "folkeboot", "optimist"}) {
-        const auto old_file = source / name / "modell.json";
+        const auto old_file = output / name / "modell.json";
         const auto target = converted / name;
         const auto original = read(old_file);
         konvertiere_modell_v3(old_file, target, true);
@@ -497,8 +505,8 @@ int main(int argc, char* argv[])
         if (fs::exists(output)) fs::remove_all(output);
         fs::create_directory(output);
         reference_models(argv[1], output);
-        schema_v3_migration(argv[1], output);
-        derived_migration(argv[1], output);
+        schema_v3_migration(output);
+        derived_migration(output);
         validation(output);
         return 0;
     } catch (const std::exception& e) {

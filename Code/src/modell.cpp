@@ -1842,23 +1842,42 @@ void konvertiere_modell_v2(const std::filesystem::path& quelle,
     obj.imbue(std::locale::classic());
     obj << std::setprecision(std::numeric_limits<double>::max_digits10);
     std::size_t offset = 1;
-    for (const auto& q : beschreibung.quellmeshes) {
-        obj << "o " << q.id << '\n';
-        for (const auto& p : q.mesh.punkte) obj << "v " << p[0] << ' ' << p[1] << ' ' << p[2] << '\n';
-        for (const auto& t : q.mesh.dreiecke)
+    auto mesh_schreiben = [&](const std::string& id, const Mesh& mesh) {
+        obj << "o " << id << '\n';
+        for (const auto& p : mesh.punkte) obj << "v " << p[0] << ' ' << p[1] << ' ' << p[2] << '\n';
+        for (const auto& t : mesh.dreiecke)
             obj << "f " << t[0]+offset << ' ' << t[1]+offset << ' ' << t[2]+offset << '\n';
-        offset += q.mesh.punkte.size();
+        offset += mesh.punkte.size();
+    };
+    std::set<std::string> mesh_ids;
+    for (const auto& q : beschreibung.quellmeshes) {
+        mesh_schreiben(q.id, q.mesh);
+        mesh_ids.insert(q.id);
     }
+    std::size_t ableitungsnummer = 0;
     for (auto& gruppe : dokument["gruppen"]) for (auto& element : gruppe["elemente"]) {
         const auto id = element.at("id").get<std::string>();
         const auto e = std::find_if(beschreibung.elemente.begin(), beschreibung.elemente.end(),
             [&](const ElementBeschreibung& kandidat) { return kandidat.id == id; });
         auto referenz_ersetzen = [&](nlohmann::json& block, const std::optional<std::string>& mesh_id) {
-            if (!mesh_id || std::none_of(beschreibung.quellmeshes.begin(), beschreibung.quellmeshes.end(),
-                [&](const QuellMesh& q) { return q.id == *mesh_id; }))
+            const auto source = std::find_if(beschreibung.quellmeshes.begin(), beschreibung.quellmeshes.end(),
+                [&](const QuellMesh& q) { return mesh_id && q.id == *mesh_id; });
+            if (source == beschreibung.quellmeshes.end())
                 throw std::runtime_error("CORE-MOD-0006: Quellmesh nicht lesbar: " + id);
             block.erase("datei");
             block["mesh"] = *mesh_id;
+            if (block.contains("ableitung")) {
+                const auto encoded = block.at("ableitung").dump();
+                const auto location = quelle.u8string() + ", Element " + id + ".ableitung";
+                const auto mesh = geometrie_ableiten(source->mesh, Parser(encoded, location).lesen(), location);
+                std::string derived_id;
+                do {
+                    derived_id = "abgeleitet_" + std::to_string(++ableitungsnummer);
+                } while (!mesh_ids.insert(derived_id).second);
+                mesh_schreiben(derived_id, mesh);
+                block["mesh"] = derived_id;
+                block.erase("ableitung");
+            }
         };
         if (element.contains("Darstellung")) referenz_ersetzen(element["Darstellung"], e->darstellung_mesh);
         if (element.contains("Hydrostatik")) {

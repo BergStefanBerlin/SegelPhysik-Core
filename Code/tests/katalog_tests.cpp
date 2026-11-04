@@ -2,6 +2,7 @@
 #include "segelphysik/hydrostatik.hpp"
 #include "segelphysik/simulation.hpp"
 
+#include <nlohmann/json.hpp>
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -120,7 +121,8 @@ void details(const fs::path& quelle, const fs::path& tmp)
         "mitbewegte_elemente", "gesamtmasse_kg", "huellquader_m", "min", "max"},
         ordner);
     const auto geometrie = darstellungsgeometrie(katalog, "quader", fassung);
-    const auto erwartet = obj_zahlen(ordner / "q" / "meshes" / "gui" / "rumpf.obj");
+    const auto erwartet = obj_zahlen(ordner / "q" / "boot.obj");
+    pruefe(erwartet.first > 0 && erwartet.second > 0, "Referenzgeometrie fehlt");
     pruefe(geometrie.teile.size() == 1 && geometrie.teile[0].herkunft == "darstellung" &&
         geometrie.teile[0].punkte_m.size() == erwartet.first &&
         geometrie.teile[0].dreiecke.size() == erwartet.second, "Darstellungsgeometrie weicht ab");
@@ -166,11 +168,14 @@ void farben(const fs::path& quelle, const fs::path& tmp)
     fs::copy(quelle / "quader", ordner / "q", fs::copy_options::recursive);
     const auto datei = ordner / "q" / "modell.json";
     // Vorlage ohne Darstellungsstil: farbe/oberflaeche der Beispieldatei entfernen.
-    const auto original = std::regex_replace(lesen(datei),
-        std::regex(R"re(,\s*"(farbe|oberflaeche)": "[^"]*")re"), "");
+    auto vorlage = nlohmann::json::parse(lesen(datei));
+    auto& darstellung = vorlage["gruppen"]["rumpf"]["elemente"][0]["Darstellung"];
+    darstellung.erase("farbe");
+    darstellung.erase("oberflaeche");
+    const auto original = vorlage.dump(2);
     schreiben(datei, original);
-    const std::string feld = "\"datei\": \"meshes/gui/rumpf.obj\"";
-    pruefe(original.find(feld) != std::string::npos, "Testvorlage ohne Darstellungsdatei");
+    const std::string feld = "\"mesh\": \"" + darstellung.at("mesh").get<std::string>() + "\"";
+    pruefe(original.find(feld) != std::string::npos, "Testvorlage ohne Darstellungsmesh");
     const auto physik_original = lade_modell(datei);
     const Pose pruefpose({0., 0., -.2}, {0., 0., 0., 1.});
     const auto kraefte_original = hydrostatik(physik_original, pruefpose);
@@ -291,7 +296,17 @@ void fehlerfaelle(const fs::path& quelle, const fs::path& tmp)
     auto json = lesen(ordner / "c" / "modell.json");
     json.replace(json.find("\"id\": \"quader\""), 14, "\"id\": \"quader_c\"");
     schreiben(ordner / "c" / "modell.json", json);
-    fs::remove(ordner / "c" / "meshes" / "masse" / "rumpf.obj");
+    auto defekt = nlohmann::json::parse(json);
+    defekt["schema_version"] = "0.1-entwurf";
+    defekt.erase("geometrie");
+    auto& element = defekt["gruppen"]["rumpf"]["elemente"][0];
+    for (auto* block : {&element["Darstellung"], &element["Hydrostatik"]["volumen"],
+             &element["Hydrostatik"]["masse"]}) {
+        block->erase("mesh");
+        (*block)["datei"] = "boot.obj";
+    }
+    element["Hydrostatik"]["masse"]["datei"] = "fehlende-masse.obj";
+    schreiben(ordner / "c" / "modell.json", defekt.dump(2));
 
     const auto katalog = modellkatalog(ordner);
     pruefe(katalog.eintraege().size() == 4, "Unterordner ohne modell.json mitgezaehlt");

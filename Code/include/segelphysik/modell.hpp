@@ -200,6 +200,7 @@ std::string modell_fassung(const std::filesystem::path& datei);
 
 // Creates a new directory containing modell.json and boot.obj. Never overwrites
 // an existing destination; originals are read only. Uses the regular importer.
+// Schema-3 derivations become explicit source meshes in schema 2.
 void konvertiere_modell_v2(const std::filesystem::path& quelle,
                           const std::filesystem::path& zielordner);
 // Explicit opt-in permits validated source-derived surface selections/plane

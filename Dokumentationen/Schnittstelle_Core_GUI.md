@@ -928,6 +928,9 @@ erwartungsgemäß; sie hasht das gesamte einzelne OBJ und das JSON.
 ```
 
 Alternativ CPPI-0065 `konvertiere_modell_v2(quelle, zielordner)`.
+Bei Schema-3-Quellen werden vorhandene Geometrieableitungen exakt als
+eigene OBJ-Quellnetze materialisiert; Schema 2 enthaelt keine
+`ableitung`-Felder. Physik und effektive Darstellungsgeometrie bleiben erhalten.
 Der Zielordner darf nicht existieren; sein Elternordner muss existieren.
 Originale werden nur gelesen, nie verändert. Ergebnis sind genau
 `modell.json` und `boot.obj`; der normale Katalog-/Inspektionsimport kann
@@ -1003,6 +1006,20 @@ bei aktiver Nullkraft `kraft_null`; beide enthalten keine Position.
 Dies ist der Ersatz-Ansatzpunkt fuer die Darstellung, kein durch
 Windphysik berechneter Segeldruckpunkt. Historische Snapshots verwenden
 ihren eigenen eingefrorenen Kraftkontext.
+
+Nach Nutzerfreigabe vom 04.11.2026 kann ein laufender Aufrufer mit
+`dynamische_fremdkraft_aendern(modell, zustand, konfiguration)` (CPPI-0119)
+einen neuen unveraenderlichen Kontext fuer den naechsten Integrationsschritt
+erzeugen. Die Funktion aendert weder Pose/Zeit noch den uebergebenen Zustand.
+Der Aufrufer ersetzt damit nur seinen noch nicht veroeffentlichten
+Schrittstart; gespeicherte Zustaende bleiben unveraendert. Ein vorhandener
+passender Fremdkraftkontext ist erforderlich. Nichtendliche Werte und ein
+gleichzeitig aktiver Testantrieb bleiben Fehler. Keine neue Batch-Zeitplanung
+oder Aenderung des JSON-Formats. Ruder/Schwert verwenden weiterhin
+`Bewegungsereignis`; deren bestehende Geometrie-/Traegheitsinvalidierung
+bleibt massgeblich. Der GUI-Adapter puffert bis zur naechsten Schrittgrenze
+den letzten vollstaendigen Kraft-Eingabestand und meldet nicht mehr
+angewandte Aenderungen bei Laufende.
 
 U-C-000112 bis U-C-000114 und technische Core-Tests sind abgeschlossen.
 Der GUI-Adapter muss Vertragsversion 7 akzeptieren und `externe_kraft`
