@@ -221,6 +221,8 @@ Zustand hydrodynamik_start(const Modell&, const Zustand&,
     const HydrodynamikKonfiguration&);
 Zustand dynamische_fremdkraft_start(const Modell&, const Zustand&,
     const DynamischeFremdkraftKonfiguration&);
+Zustand dynamische_fremdkraft_aendern(const Modell&, const Zustand&,
+    const DynamischeFremdkraftKonfiguration&);
 Kraefte kraefte(const Modell&, const Pose&, const TestantriebKontext*,
     double rho = 1000., double g = 9.81,
     const std::vector<std::string>& geflutet = {},

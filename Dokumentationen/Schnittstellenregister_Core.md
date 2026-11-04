@@ -171,3 +171,9 @@ Die bisherigen freien Funktionen bleiben kompatibel.
 | CPPI-0116 | `Modellaufbereitung::schritt(const Zustand&, double, const vector<TestantriebEreignis>&, const vector<Bewegungsereignis>&, double, double)` | implementiert | A-C-00130, A-C-00131; gleiche Integrationssemantik, Standardereignisse leer, rho=1000, g=9.81 |
 | CPPI-0117 | `Modellaufbereitung::auswertung(const Zustand&, double, double)` | implementiert | A-C-00131, A-C-00133; vollstaendige Kraefte, nur exakt identische wirksame Eingaben wiederverwenden |
 | CPPI-0118 | `Modellaufbereitung::json(const Zustand&, const string&, const string&, const Gleichgewichtsangaben*, const StationaeresGleichgewichtErgebnis*, ErgebnisJsonFormat)` | implementiert | A-C-00133; identischer JSON-Vertrag samt Pflicht-/Historienvalidierung, Standard V6 |
+
+## Laufende Fremdkraftaenderung (Freigabe 04.11.2026)
+
+| CPPI-ID | C++-Schnittstelle | Status | Anforderung |
+|---|---|---|---|
+| CPPI-0119 | `dynamische_fremdkraft_aendern(const Modell&, const Zustand&, const DynamischeFremdkraftKonfiguration&)` | implementiert | A-C-00135; validierter neuer unveraenderlicher Kraftkontext am folgenden Schritt, keine Mutation der Historie |

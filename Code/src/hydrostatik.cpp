@@ -2174,6 +2174,23 @@ Zustand hydrodynamik_start(const Modell& m,const Zustand& s,
     return result;
 }
 
+Zustand dynamische_fremdkraft_aendern(const Modell& m,const Zustand& s,
+    const DynamischeFremdkraftKonfiguration& config)
+{
+    kontextpruefung(m,s);
+    if(!s.dynamische_fremdkraft || !s.dynamische_fremdkraft_erforderlich)
+        throw std::invalid_argument("CORE-SIM-0001: Fremdkraftaenderung benoetigt einen gueltigen Fremdkraftkontext.");
+    if(!endlich(config.kraft_modellfest_n) || !endlich(config.angriffspunkt_modell_m))
+        throw std::invalid_argument("CORE-SIM-0001: Fremdkraft und Ansatzpunkt muessen endlich sein.");
+    if(config.aktiv && s.testantrieb && s.testantrieb->aktiv)
+        throw std::invalid_argument("CORE-SIM-0001: Fremdkraft und Testantrieb duerfen nicht gleichzeitig aktiv sein.");
+    auto result=s;
+    auto context=std::make_shared<DynamischeFremdkraftKontext>(*s.dynamische_fremdkraft);
+    context->konfiguration=config;
+    result.dynamische_fremdkraft=std::move(context);
+    return result;
+}
+
 Zustand dynamische_fremdkraft_start(const Modell& m,const Zustand& s,
     const DynamischeFremdkraftKonfiguration& config)
 {

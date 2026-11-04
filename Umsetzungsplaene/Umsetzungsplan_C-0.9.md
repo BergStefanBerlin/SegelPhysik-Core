@@ -1,5 +1,39 @@
 # Umsetzungsplan Core: dynamische Fremdkraft und Versionsvergleich
 
+## Nutzerabnahme 04.11.2026
+
+**Nutzerabnahmen: done.** Ausdruecklicher Nutzerauftrag vom 04.11.2026,
+09:16 Uhr fuer den gelieferten Stand einschliesslich laufender Eingaben
+U-C-000121. Dieser datierte Abschluss ersetzt alle aelteren offenen
+Nutzerabnahmestaende in diesem Plan; historische Nachweise bleiben erhalten.
+Technische Testluecken und nicht finalisierte Zusatzumfaenge werden dadurch
+nicht als nachgewiesen ausgegeben. Kein Commit, Tag oder Push beauftragt.
+
+## Datierter fachlicher Nachtrag 04.11.2026: laufende Eingaben
+
+Dieser Nachtrag fuehrt das bestehende Fremdkraftthema fort; alte
+Abschlussnachweise und der separate reine Performanceplan bleiben
+unveraendert abgegrenzt.
+
+**U-C-000121 / A-C-00135:** Nutzerfreigabe 08:52 Uhr.
+Vor Implementierung CPPI-0119 vergeben; danach validierten
+Kontextwechsel ohne Historienmutation implementieren, anschliessend
+physikalische Wirkung und exakte Cacheinvalidierung pruefen, zuletzt
+in den GUI-Schrittuebergang integrieren (U-G-000145).
+
+Technisch umgesetzt: neuer unveraenderlicher Kontext durch
+`dynamische_fremdkraft_aendern`, bisherige Modell-/Zeitvalidierung
+und Endlichkeitspruefung erhalten. Ruder/Schwert verwenden unveraendert
+die vorhandenen Bewegungsereignisse und selektive stellungsabhaengige
+Massen-/Traegheits-/Meshaufbereitung. Keine neuen Modellnetze,
+keine Aenderung an Integrator, Zeitschritt oder stationaerem Solver.
+`simulation_gesamtlauf` (1,49 s) prueft geaenderte Translation/Rotation,
+unveraenderte historische JSON-Ausgabe, Ablehnung nichtendlicher Werte
+und exakte Gleichheit vorbereiteter/ungebundener Ausgabe nach Kraftwechsel.
+`modellaufbereitung` (4,14 s) bestanden. GUI-Adapter bestaetigt zusaetzlich
+laufende Ruder-/Schwerttransformationen und unveraenderte Historie.
+Nutzerabnahme offen, keine Git-/Release-Aktion.
+
 **Status:** C-0.9 Core-Mindestumfang technisch umgesetzt und gezielt
 geprueft; priorisierte Ursachenanalyse und Messvergleich am 03.11.2026
 abgeschlossen. GUI-Ergebnisse siehe G-0.10-Plan, Abschnitte 13.7–13.8.

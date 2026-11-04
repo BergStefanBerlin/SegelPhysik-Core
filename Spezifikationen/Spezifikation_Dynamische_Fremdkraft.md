@@ -1,5 +1,26 @@
 # Spezifikation Core: Allgemeine Fremdkraft im dynamischen Lauf
 
+## Freigegebener Nachtrag 04.11.2026: laufende Eingaben
+
+**A-C-00135:** Nutzerfreigabe 08:52 Uhr erweitert die bisher fuer
+den Lauf eingefrorene Fremdkraft: Aktivierung, modellfeste XYZ-Kraft
+und modellfester Ansatzpunkt duerfen zwischen Integrationsschritten
+geaendert werden. Die neue Konfiguration gilt fuer den naechsten noch
+nicht berechneten Schritt, niemals rueckwirkend. Alte Zustandskontexte
+bleiben unveraenderlich. Endliche Eingaben, Modell-/Zeitbindung und
+Ausschluss eines gleichzeitig aktiven Testantriebs bleiben verbindlich.
+Bestehende Bewegungsereignisse fuer Ruder/Schwert sind ebenfalls
+waehrend des Laufs erlaubt. Physische Geometrie, Masse/Traegheit,
+Kraefte und ausgegebene Elementtransformationen muessen dieselben
+bestätigten Stellungen verwenden; stellungsabhaengige Caches sind zu
+invalidieren, unveraenderte Basisnetze bleiben wiederverwendbar.
+Abnahme: geaenderte Kraefte/Momente beeinflussen die Folgedynamik,
+alte JSON-Zustaende bleiben exakt gleich; ungueltige/verspaetete
+Eingaben werden mit Diagnose abgelehnt. Keine neue Windphysik.
+Dieser datierte Nachtrag ersetzt nur die bisherige Unveraenderlichkeit
+der gesamten Laufkonfiguration, nicht die Unveraenderlichkeit einzelner
+historischer Snapshots. Kein Git-/Release-Auftrag.
+
 **Status:** Teilfinalisiert fuer den Core-Mindestvertrag in Abschnitt 8.
 Priorisierte Ursachenanalyse und Messlaeufe sind nach Abschluss der
 GUI-Messungen und ausdruecklicher Freigabe des Core-Messfensters am

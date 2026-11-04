@@ -1,4 +1,5 @@
 #include "segelphysik/simulation.hpp"
+#include "segelphysik/aufbereitung.hpp"
 #include <algorithm>
 #include <chrono>
 #include <fstream>
@@ -99,6 +100,36 @@ int main(int argc,char* argv[])
             }
         }
         std::filesystem::remove(dynamic_force_path);
+        {
+            const auto original = segelphysik::dynamische_fremdkraft_start(
+                modell, segelphysik::Zustand{}, dynamic_force);
+            const auto original_json = segelphysik::zustand_json(modell, original, "laufend");
+            auto replacement = dynamic_force;
+            replacement.kraft_modellfest_n = {25., 10., -2.};
+            replacement.angriffspunkt_modell_m = {.3, -.2, 1.};
+            const auto changed = segelphysik::dynamische_fremdkraft_aendern(
+                modell, original, replacement);
+            segelphysik::Modellaufbereitung prepared(modell);
+            prepared.auswertung(original);
+            const auto next = segelphysik::dynamikschritt(modell, changed, .01);
+            const auto prepared_next = prepared.schritt(changed, .01);
+            if(prepared.json(prepared_next, "laufend")!=
+                segelphysik::zustand_json(modell, next, "laufend"))
+                throw std::runtime_error("Kraftwechsel muss Aufbereitung exakt invalidieren");
+            const auto unchanged = segelphysik::dynamikschritt(modell, original, .01);
+            if(segelphysik::zustand_json(modell, original, "laufend")!=original_json ||
+                changed.dynamische_fremdkraft==original.dynamische_fremdkraft ||
+                next.dynamische_fremdkraft->konfiguration.kraft_modellfest_n!=replacement.kraft_modellfest_n ||
+                next.geschwindigkeit_welt_m_s==unchanged.geschwindigkeit_welt_m_s ||
+                next.omega_modell_rad_s==unchanged.omega_modell_rad_s)
+                throw std::runtime_error("Laufende Fremdkraftaenderung muss Physik aendern, Historie erhalten");
+            auto invalid = replacement;
+            invalid.kraft_modellfest_n[0]=std::numeric_limits<double>::quiet_NaN();
+            bool rejected=false;
+            try { segelphysik::dynamische_fremdkraft_aendern(modell, next, invalid); }
+            catch(const std::invalid_argument&) { rejected=true; }
+            if(!rejected) throw std::runtime_error("Nichtendliche Fremdkraftaenderung akzeptiert");
+        }
         segelphysik::Zustand stationary_start;
         stationary_start.pose = segelphysik::Pose{{3., -4., 1.},
             {0., 0., std::sin(.4), std::cos(.4)}};
