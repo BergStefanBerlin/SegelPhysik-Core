@@ -1,5 +1,25 @@
 # Umsetzungsplan C-0.8: Modellinspektion und stationaeres Fahrtgleichgewicht
 
+## Nutzerabnahme 04.11.2026
+
+**Nutzerabnahmen: done.** Ausdruecklicher Nutzerauftrag vom 04.11.2026,
+09:16 Uhr fuer den gelieferten Stand. Dieser datierte Abschluss ersetzt
+alle aelteren offenen Nutzerabnahmestaende in diesem Plan; historische
+Nachweise bleiben erhalten. Technische Testluecken und nicht finalisierte
+Zusatzumfaenge werden dadurch nicht als nachgewiesen ausgegeben.
+Kein Commit, Tag oder Push beauftragt.
+
+**Regressionsnachtrag 04.11.2026 zu CPPI-0065 / A-C-00109:**
+Der Schema-2-Konverter materialisiert vorhandene Schema-3-Ableitungen
+exakt als eigene Quellnetze, statt ungueltige `ableitung`-Felder zu
+kopieren. Die bestehende Referenzmodellpruefung vergleicht weiterhin
+Modellphysik und effektive Darstellung exakt. Die anschliessenden
+Schema-3-Migrationstests verwenden nun explizit die erzeugten
+Schema-2-Quellen; die Ablehnung konkurrierender Quellen und die
+Opt-in-Ableitung bleiben geprueft. Vollstaendige Standard- und
+Instrumentierungslaeufe jeweils 22/22 bestanden, siehe
+[aktuellen Regressionsnachweis](Umsetzungsplan_C-0.10.md#revisionsvorbereitung-04112026-vollstaendige-regression).
+
 ## Korrekter LDP und Ersatz-SDP
 
 **Status:** Spezifikation am 02.11.2026 finalisiert und Umsetzung

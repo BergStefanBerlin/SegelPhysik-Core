@@ -1,0 +1,54 @@
+[OUTPUT] 
+Internal ctest changing into directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+
+[HANDLER_OUTPUT] 
+Test project C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+
+      Start  1: modellaufbereitung
+ 1/22 Test  #1: modellaufbereitung ...............   Passed    3.76 sec
+      Start  2: pose_transformations
+ 2/22 Test  #2: pose_transformations .............   Passed    0.04 sec
+      Start  3: hydrostatik_referenzen
+ 3/22 Test  #3: hydrostatik_referenzen ...........   Passed    0.05 sec
+      Start  4: hydrodynamik_referenzen
+ 4/22 Test  #4: hydrodynamik_referenzen ..........   Passed    0.06 sec
+      Start  5: hydrodynamik_referenzmodelle
+ 5/22 Test  #5: hydrodynamik_referenzmodelle .....   Passed    2.94 sec
+      Start  6: lateraldruckpunkt
+ 6/22 Test  #6: lateraldruckpunkt ................   Passed    0.05 sec
+      Start  7: hydrodynamik_traegheit
+ 7/22 Test  #7: hydrodynamik_traegheit ...........   Passed    2.04 sec
+      Start  8: temporaerer_testantrieb
+ 8/22 Test  #8: temporaerer_testantrieb ..........   Passed    1.34 sec
+      Start  9: simulation_gesamtlauf
+ 9/22 Test  #9: simulation_gesamtlauf ............   Passed    1.39 sec
+      Start 10: stationaere_kurvenfahrt
+10/22 Test #10: stationaere_kurvenfahrt ..........   Passed   25.68 sec
+      Start 11: modell_import
+11/22 Test #11: modell_import ....................   Passed    0.40 sec
+      Start 12: core_build_configuration
+12/22 Test #12: core_build_configuration .........   Passed    0.04 sec
+      Start 13: kraft_momentenbilanz
+13/22 Test #13: kraft_momentenbilanz .............   Passed    0.05 sec
+      Start 14: modellkatalog_schnittstelle
+14/22 Test #14: modellkatalog_schnittstelle ......   Passed    5.23 sec
+      Start 15: modellinspektion_c08
+15/22 Test #15: modellinspektion_c08 .............   Passed    8.61 sec
+      Start 16: modell_geometrie_v2
+16/22 Test #16: modell_geometrie_v2 ..............   Passed   67.29 sec
+      Start 17: cli_help
+17/22 Test #17: cli_help .........................   Passed    0.09 sec
+      Start 18: cli_build_info
+18/22 Test #18: cli_build_info ...................   Passed    0.05 sec
+      Start 19: cli_error_catalog
+19/22 Test #19: cli_error_catalog ................   Passed    0.04 sec
+      Start 20: cli_no_arguments
+20/22 Test #20: cli_no_arguments .................   Passed    0.05 sec
+      Start 21: cli_invalid_argument
+21/22 Test #21: cli_invalid_argument .............   Passed    0.05 sec
+      Start 22: cli_extra_argument
+22/22 Test #22: cli_extra_argument ...............   Passed    0.05 sec
+
+100% tests passed, 0 tests failed out of 22
+
+Total Test time (real) = 119.35 sec

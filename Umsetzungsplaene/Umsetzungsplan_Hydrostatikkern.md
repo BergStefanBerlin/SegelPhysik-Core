@@ -1,5 +1,14 @@
 # Umsetzungsplan: erste Core-Ausbaustufe Hydrostatikkern
 
+## Nutzerabnahme 04.11.2026
+
+**Nutzerabnahmen: done.** Ausdruecklicher Nutzerauftrag vom 04.11.2026,
+09:16 Uhr fuer den gelieferten Stand. Dieser datierte Abschluss ersetzt
+alle aelteren offenen Nutzerabnahmestaende in diesem Plan; historische
+Nachweise bleiben erhalten. Technische Testluecken und nicht finalisierte
+Zusatzumfaenge werden dadurch nicht als nachgewiesen ausgegeben.
+Kein Commit, Tag oder Push beauftragt.
+
 ## 1. Status und Geltungsbereich
 
 **Stand: 26.10.2026.** Auf Nutzerauftrag erstellter Umsetzungsplan.

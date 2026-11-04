@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Win32-MSBuild"
+	tests="22"
+	failures="0"
+	disabled="0"
+	skipped="0"
+	hostname="KleinerSchwarzer"
+	time="119"
+	timestamp="2026-11-04T09:35:43"
+	>
+	<testcase name="modellaufbereitung" classname="modellaufbereitung" time="3.76134" status="run">
+		<properties/>
+		<system-out>ungebunden.dynamischer_zeitschritt: 4
+ungebunden.ebenenschnitt: 80
+ungebunden.hydrostatikauswertung: 20
+ungebunden.kraftauswertung: 20
+ungebunden.lokale_mesh_bounds: 40
+ungebunden.mesh_transformation: 128
+ungebunden.meshkopie: 320
+ungebunden.modell_geometriekopie: 32
+ungebunden.nasspanels: 84
+ungebunden.stellungsaufbereitung: 32
+ungebunden.weltmesh_transformation: 84
+dynamischer_zeitschritt: 4
+ebenenschnitt: 36
+hydrostatikauswertung: 9
+kraft_ergebnis_wiederverwendung: 11
+kraftauswertung: 9
+lokale_mesh_bounds: 2
+mesh_transformation: 4
+meshkopie: 20
+modell_geometriekopie: 1
+modellbasis_aufbau: 1
+nasspanels: 51
+stellung_wiederverwendung: 20
+stellungsaufbereitung: 1
+weltmesh_transformation: 27
+Modellaufbereitung: alle Referenzen bestanden
+</system-out>
+	</testcase>
+	<testcase name="pose_transformations" classname="pose_transformations" time="0.0400497" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="hydrostatik_referenzen" classname="hydrostatik_referenzen" time="0.0498933" status="run">
+		<properties/>
+		<system-out>Stationaere Flutung: repeats=1, geflutet=Rumpf
+</system-out>
+	</testcase>
+	<testcase name="hydrodynamik_referenzen" classname="hydrodynamik_referenzen" time="0.0567725" status="run">
+		<properties/>
+		<system-out>Hydrodynamiktests bestanden
+</system-out>
+	</testcase>
+	<testcase name="hydrodynamik_referenzmodelle" classname="hydrodynamik_referenzmodelle" time="2.93814" status="run">
+		<properties/>
+		<system-out>Hydrodynamiktests bestanden
+</system-out>
+	</testcase>
+	<testcase name="lateraldruckpunkt" classname="lateraldruckpunkt" time="0.0492877" status="run">
+		<properties/>
+		<system-out>Lateraldruckpunkttests bestanden
+</system-out>
+	</testcase>
+	<testcase name="hydrodynamik_traegheit" classname="hydrodynamik_traegheit" time="2.04014" status="run">
+		<properties/>
+		<system-out>Traegheitstests bestanden
+</system-out>
+	</testcase>
+	<testcase name="temporaerer_testantrieb" classname="temporaerer_testantrieb" time="1.33533" status="run">
+		<properties/>
+		<system-out>Testantrieb: Geometrie, Kraft/Moment, Integration, Grenze, Ereignisse, V2/V3, Batch und 420 bestanden.
+</system-out>
+	</testcase>
+	<testcase name="simulation_gesamtlauf" classname="simulation_gesamtlauf" time="1.39491" status="run">
+		<properties/>
+		<system-out>Stationaer analytisch: v=1.118035272 m/s, max|F|=0.00344304548 N, max|M|=0.001032913644 Nm, ftol=0.05 N, mtol=0.05 Nm
+Exzentrische Kraft: Moment um S=[6.074006715e-10,450,0] Nm
+Galilei: delta Relativgeschwindigkeit=1.281878563e-06 m/s
+Mehrfachstellungen 420: status=konvergiert, iter=0
+</system-out>
+	</testcase>
+	<testcase name="stationaere_kurvenfahrt" classname="stationaere_kurvenfahrt" time="25.6771" status="run">
+		<properties/>
+		<system-out>420 0 deg: konvergiert, r=0.000125892 rad/s, iterations=2, seconds=1.63947, F=0.000124304,-6.6533e-06,1.34089e-05, M=4.74069e-06,-7.01489e-05,8.33111e-05, 
+420 1 deg: konvergiert, r=-0.010865 rad/s, iterations=2, seconds=2.17733, F=0.000164649,5.01914e-05,4.52377e-05, M=1.43374e-05,-0.000119522,0.000189722, 
+420 -1 deg: konvergiert, r=0.0111172 rad/s, iterations=2, seconds=2.5746, F=-0.00012214,-7.69421e-05,2.45391e-05, M=-1.23954e-05,2.05982e-05,-2.01869e-05, 
+420 12 deg: konvergiert, r=-0.179273 rad/s, iterations=3, seconds=2.69121, F=-0.00250876,-0.00380587,0.00128035, M=-0.00317244,-0.00169538,-0.00353405, 
+420 -12 deg: konvergiert, r=0.181387 rad/s, iterations=3, seconds=3.12272, F=-0.00270342,0.00365266,0.00170046, M=0.00139339,-0.000528963,0.000897333, 
+420 24 deg: konvergiert, r=-0.301538 rad/s, iterations=4, seconds=3.05824, F=-0.0160358,-1.05843e-05,0.00568496, M=-0.00211987,0.0060477,-0.00461406, 
+420 -24 deg: konvergiert, r=0.305284 rad/s, iterations=4, seconds=2.39854, F=-0.00117913,-0.00059618,0...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="modell_import" classname="modell_import" time="0.398226" status="run">
+		<properties/>
+		<system-out>Modellimport: alle Pruefungen bestanden.
+</system-out>
+	</testcase>
+	<testcase name="core_build_configuration" classname="core_build_configuration" time="0.0372665" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="kraft_momentenbilanz" classname="kraft_momentenbilanz" time="0.0502409" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="modellkatalog_schnittstelle" classname="modellkatalog_schnittstelle" time="5.23428" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="modellinspektion_c08" classname="modellinspektion_c08" time="8.60844" status="run">
+		<properties/>
+		<system-out>Core inspection contracts passed
+</system-out>
+	</testcase>
+	<testcase name="modell_geometrie_v2" classname="modell_geometrie_v2" time="67.2929" status="run">
+		<properties/>
+		<system-out>optimist: exact physics/display/movement equivalence
+420: exact physics/display/movement equivalence
+folkeboot: exact physics/display/movement equivalence
+bleistift: exact physics/display/movement equivalence
+kegel: exact physics/display/movement equivalence
+kugel: exact physics/display/movement equivalence
+platte: exact physics/display/movement equivalence
+pyramide: exact physics/display/movement equivalence
+quader: exact physics/display/movement equivalence
+rolle: exact physics/display/movement equivalence
+unregelmaessig: exact physics/display/movement equivalence
+420: derived source regression; maximum wet volume delta=0 m3, maximum state component delta=0
+folkeboot: derived source regression; maximum wet volume delta=0 m3, maximum state component delta=0
+optimist: derived source regression; maximum wet volume delta=0 m3, maximum state component delta=0
+</system-out>
+	</testcase>
+	<testcase name="cli_help" classname="cli_help" time="0.0899642" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="cli_build_info" classname="cli_build_info" time="0.045938" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="cli_error_catalog" classname="cli_error_catalog" time="0.0447386" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="cli_no_arguments" classname="cli_no_arguments" time="0.0519144" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="cli_invalid_argument" classname="cli_invalid_argument" time="0.052294" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="cli_extra_argument" classname="cli_extra_argument" time="0.0544463" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+</testsuite>

@@ -1,5 +1,14 @@
 # Umsetzungsplan C-0.7: Dreidimensionale Hydrodynamik
 
+## Nutzerabnahme 04.11.2026
+
+**Nutzerabnahmen: done.** Ausdruecklicher Nutzerauftrag vom 04.11.2026,
+09:16 Uhr fuer den gelieferten Stand einschliesslich Hydrostatik und
+Hydrodynamik. Dieser datierte Abschluss ersetzt alle aelteren offenen
+Nutzerabnahmestaende in diesem Plan; historische Nachweise bleiben erhalten.
+Technische Testluecken und nicht finalisierte Zusatzumfaenge werden dadurch
+nicht als nachgewiesen ausgegeben. Kein Commit, Tag oder Push beauftragt.
+
 **Status: in Umsetzung; Build und 16/16 Core-CTest-Prüfungen bestanden.
 Technische Gesamt- und fachliche Abnahme sind noch offen.**
 

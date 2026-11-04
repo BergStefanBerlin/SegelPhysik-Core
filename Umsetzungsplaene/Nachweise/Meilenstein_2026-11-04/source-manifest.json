@@ -1,0 +1,266 @@
+﻿{
+    "generated":  "2026-11-04T10:00:39.4240640+01:00",
+    "repository":  "SegelPhysik-Core",
+    "gitHead":  "a8c1ddcdab75366f6eed16b91e672fd4168273ef",
+    "workingTree":  "uncommitted",
+    "configurations":  [
+                           "Release; BUILD_TESTING=ON; SEGELPHYSIK_TEST_INSTRUMENTATION=OFF",
+                           "Release; BUILD_TESTING=ON; SEGELPHYSIK_TEST_INSTRUMENTATION=ON"
+                       ],
+    "testsuites":  [
+                       {
+                           "file":  "core-tests.xml",
+                           "count":  22,
+                           "failures":  0,
+                           "skipped":  0,
+                           "disabled":  0
+                       },
+                       {
+                           "file":  "core-instrumented-tests.xml",
+                           "count":  22,
+                           "failures":  0,
+                           "skipped":  0,
+                           "disabled":  0
+                       }
+                   ],
+    "binaries":  [
+                     {
+                         "path":  "build\\standard\\Release\\segelphysik_cli.exe",
+                         "sha256":  "F10AD5313C7C669F2EC4BFC42CA677971EFD1D235A35A604A8E3ADDFB988915F"
+                     },
+                     {
+                         "path":  "build\\standard\\Release\\segelphysik_konvertieren.exe",
+                         "sha256":  "DE06964172FA57BCE0B95E4BE03EB6C10EADDA845E7DD8AD4ADEC1CF67E2E00F"
+                     },
+                     {
+                         "path":  "build\\standard\\Release\\segelphysik_core.lib",
+                         "sha256":  "C2D81D08A05AA18238D4211272415480ABCDA0054D892E9AB346E1CA87C470C0"
+                     },
+                     {
+                         "path":  "build\\c010\\Release\\segelphysik_cli.exe",
+                         "sha256":  "9802166388FE5C8C8F52C4726A90E7DEE16D9C8AB693092D9D57E331ED8AEFE4"
+                     },
+                     {
+                         "path":  "build\\c010\\Release\\segelphysik_konvertieren.exe",
+                         "sha256":  "8A6B1D3F45CEDDC2A5A9B01F89F87A5A5EADCF16D3A678B99FAFFD64E3B95C74"
+                     },
+                     {
+                         "path":  "build\\c010\\Release\\segelphysik_core.lib",
+                         "sha256":  "D4174C18189AAED9BD7FCF61C3263E1247DE9D0C974D4A07C87D09188E6831D4"
+                     }
+                 ],
+    "sources":  [
+                    {
+                        "path":  "Code\\CMakeLists.txt",
+                        "sha256":  "8B2F4D53B24FE6E192FEFD3116546A996959606EDEB6DD32B99723C1ABFC05EA"
+                    },
+                    {
+                        "path":  "Code\\README.md",
+                        "sha256":  "A9C26A4969610E58BC7F987D84F2B23740F9D2F384A8E1996B2B0FB2C6ECF371"
+                    },
+                    {
+                        "path":  "Code\\include\\segelphysik\\aufbereitung.hpp",
+                        "sha256":  "D417C68F54F4C52E510AAEEEA416A5A539CBE0F4CAEA69794AFD6B5D61FE84E1"
+                    },
+                    {
+                        "path":  "Code\\include\\segelphysik\\core.hpp",
+                        "sha256":  "6B221167F32123E6EC8210E0B0278D7162378C77D57D0908BB8B2ECA8EC1E315"
+                    },
+                    {
+                        "path":  "Code\\include\\segelphysik\\hydrostatik.hpp",
+                        "sha256":  "703F4C15077F4D08204986BFF013AC7B731660A84F20E216DD6A97029B606FFF"
+                    },
+                    {
+                        "path":  "Code\\include\\segelphysik\\inspektion.hpp",
+                        "sha256":  "9EB253B73AF0B3434A7D254AC725FF530DE6B5D379355B7D21204C8AACC6264E"
+                    },
+                    {
+                        "path":  "Code\\include\\segelphysik\\katalog.hpp",
+                        "sha256":  "A8F2A9038949A19B6FECC04EA0E7D53F9DC265163E387D7991756154232D3C12"
+                    },
+                    {
+                        "path":  "Code\\include\\segelphysik\\messung.hpp",
+                        "sha256":  "EB9C83297CE136E94A1534999329CB219172D87ED754FAFBFE534295154BF997"
+                    },
+                    {
+                        "path":  "Code\\include\\segelphysik\\modell.hpp",
+                        "sha256":  "C14934E1D2127479C1D166E3778E5FBB05C1617967FD31164C1D002A568EDEA8"
+                    },
+                    {
+                        "path":  "Code\\include\\segelphysik\\pose.hpp",
+                        "sha256":  "38C574D368CC82D048A98E7E31DB35DABE0BD6FF06D635EA53AF4D932F7211FA"
+                    },
+                    {
+                        "path":  "Code\\include\\segelphysik\\simulation.hpp",
+                        "sha256":  "F103CCC25A925F9A387D1E518A493ED9D3D026175346C43BAD11BA6C0EBA21E1"
+                    },
+                    {
+                        "path":  "Code\\ressourcen\\fehlerkatalog.json",
+                        "sha256":  "570359F7E1E473638E9AF0CB9AA02720CFEAE2D0C11FED86A8631625A9B2B1D7"
+                    },
+                    {
+                        "path":  "Code\\src\\aufbereitung.cpp",
+                        "sha256":  "77B601E73024027A491AE2546DC50BD8D55143FC4FC69EC8F02A55DECDAC0FEF"
+                    },
+                    {
+                        "path":  "Code\\src\\aufbereitung_intern.hpp",
+                        "sha256":  "CDA2251C8CD14DBF7E98EDD34128854BA4908B2F49EF51F9BF54B59198D68732"
+                    },
+                    {
+                        "path":  "Code\\src\\cli.cpp",
+                        "sha256":  "1D4BF95DC90AA11E321FDB38BD826235080F2DBAF313CCF346E17F3624DB0778"
+                    },
+                    {
+                        "path":  "Code\\src\\core.cpp",
+                        "sha256":  "CC7030AD7E178188BDA4824B9176035134135E8EF92190865E3D2088D4D3E1C4"
+                    },
+                    {
+                        "path":  "Code\\src\\fehlerkatalog.hpp.in",
+                        "sha256":  "9E1228069DBFA37E9B2A1652C8C6932B30BED6B108DEF6C7C656D467366CBDF3"
+                    },
+                    {
+                        "path":  "Code\\src\\hydrostatik.cpp",
+                        "sha256":  "D50F840FF68E63659602F322142C6F48A97804BF3B73E2454F8A252AB726CD63"
+                    },
+                    {
+                        "path":  "Code\\src\\hydrotraegheit.cpp",
+                        "sha256":  "019988D8B0208840D67AB8B6D9C8F0FC271717899EF3893F74BD93DFF124C2D4"
+                    },
+                    {
+                        "path":  "Code\\src\\inspektion.cpp",
+                        "sha256":  "1837AB284018F43793F98A8A15E04DF9D36069C460AFCB892A95F644823F7C23"
+                    },
+                    {
+                        "path":  "Code\\src\\katalog.cpp",
+                        "sha256":  "313A0BCEC5A845A03C3D3BA89C84F4311DCCA0D329D41959C780E298FF04F040"
+                    },
+                    {
+                        "path":  "Code\\src\\katalog_intern.hpp",
+                        "sha256":  "4B29E9B547ECC60C816FDE48EEBA2C07CFEA7D9EECAAA9348FFDC828EF271C9A"
+                    },
+                    {
+                        "path":  "Code\\src\\konvertieren.cpp",
+                        "sha256":  "11EBCB7E49A294D6A4B57863BEC4F994991A5B583F8AD310F2AD2155DC3145CB"
+                    },
+                    {
+                        "path":  "Code\\src\\messung.cpp",
+                        "sha256":  "BD7104BC9DE6759C89B404F47F2E05AE9D54F861EF1ACD83B6A610B495BF2B50"
+                    },
+                    {
+                        "path":  "Code\\src\\modell.cpp",
+                        "sha256":  "3FAE631D19D1AEB154773FCBC2E7D681DC7C91510AAAB70149A4601B5757A59F"
+                    },
+                    {
+                        "path":  "Code\\src\\modell_intern.hpp",
+                        "sha256":  "8B5EAC576BB95E385633A5F041F3E48C4E1C6749DF8C6633A0A88E62BDF663BA"
+                    },
+                    {
+                        "path":  "Code\\src\\pose.cpp",
+                        "sha256":  "037AD39233FF418AC169F196A7316A7A3F54117253D31C9CAB8B9F0AFF53461D"
+                    },
+                    {
+                        "path":  "Code\\src\\simulation.cpp",
+                        "sha256":  "A0F1651E79C29B7D06555119A2A1791AB0790242F311D355FE442077B1E71F93"
+                    },
+                    {
+                        "path":  "Code\\tests\\aufbereitung_benchmark.cpp",
+                        "sha256":  "D9487D5B17AC3196F57973D1CD58A77A6D3AA8786F3A70552435BAE99BFCA287"
+                    },
+                    {
+                        "path":  "Code\\tests\\aufbereitung_matrix.py",
+                        "sha256":  "89ED3915BD7F7688C41ECC01F107EC9D2650D8A4C9A41474B52FA4C7B9520876"
+                    },
+                    {
+                        "path":  "Code\\tests\\aufbereitung_tests.cpp",
+                        "sha256":  "ACCC9F9E7C1BA69CF026DC40A8CFFF061B77B0F3AFBC28995519B488AAFC5A45"
+                    },
+                    {
+                        "path":  "Code\\tests\\benchmark.cpp",
+                        "sha256":  "5F3F988DFA0C49A8B5A037B81FA2C53C00D8BF2E6A22DBB5CA3099F77AF3F039"
+                    },
+                    {
+                        "path":  "Code\\tests\\benchmark_suite.ps1",
+                        "sha256":  "30F52C81AE9CAFD151B2344533D1BBF4680AF28B3E9D9FE73A2C2613B2D43F99"
+                    },
+                    {
+                        "path":  "Code\\tests\\bilanz_tests.cpp",
+                        "sha256":  "07BC5E565914C9D4C4BFD91ED8A4753D8122640CDA6F30F4295150891BC7B6EC"
+                    },
+                    {
+                        "path":  "Code\\tests\\cli_test.cmake",
+                        "sha256":  "A13352183C783AAE3FEB3C341E99C10F07B9C4E7C1C77C8B98B5CA084DE95401"
+                    },
+                    {
+                        "path":  "Code\\tests\\core_tests.cpp",
+                        "sha256":  "B589D2190C1C203C5875512BB164E2181B19D0290E11E94399A34391456E3539"
+                    },
+                    {
+                        "path":  "Code\\tests\\hydrodynamik_tests.cpp",
+                        "sha256":  "474588A179825BE8275921594626205C64CD6AFEE4C6C5F903D9E768F9FF52BF"
+                    },
+                    {
+                        "path":  "Code\\tests\\inspektion_tests.cpp",
+                        "sha256":  "2D1FDD5B61DFED59C4DB76B5D0D223E66436DAAF3D68C3CECE385ED1E076E459"
+                    },
+                    {
+                        "path":  "Code\\tests\\katalog_tests.cpp",
+                        "sha256":  "A0B310402ADA4687DF9FDFACD58DA4642FDCAC75B6CDAE7644CB5A6C17556607"
+                    },
+                    {
+                        "path":  "Code\\tests\\lateraldruckpunkt_tests.cpp",
+                        "sha256":  "071FDC9398C17F3979CC876899375378FE979F88F976E55A8C99094BD9203B70"
+                    },
+                    {
+                        "path":  "Code\\tests\\modell_tests.cpp",
+                        "sha256":  "76E3F688C6F21F3E985BD0099D8A7E7AE6434A2F430218C8CC31F31958E8D341"
+                    },
+                    {
+                        "path":  "Code\\tests\\modell_v2_tests.cpp",
+                        "sha256":  "0BFF3574EFD668E07ECBC6EE7E930CC278D92E2D8F77A963199E7AF025572F8D"
+                    },
+                    {
+                        "path":  "Code\\tests\\physik_tests.cpp",
+                        "sha256":  "537E232500562D9F866E96CD645AD5777C3F82EDDFB5C9949D655650152D78C9"
+                    },
+                    {
+                        "path":  "Code\\tests\\pose_tests.cpp",
+                        "sha256":  "3FBD1FF8A885EFE0E52E1B0B5A3C41042A265DEE823A6EE9A48158D29E5B8D56"
+                    },
+                    {
+                        "path":  "Code\\tests\\simulation_tests.cpp",
+                        "sha256":  "1FA45FA1D5F5A5546092811A6B1C3C87BBA4E9AF7AA53FBDE316E43ABFE4B89B"
+                    },
+                    {
+                        "path":  "Code\\tests\\stationaere_kurvenfahrt_tests.cpp",
+                        "sha256":  "31D2F7F530A518D5E8E072B5C2703DF18547C4AF58CF512CA45998A9D8EC08B8"
+                    },
+                    {
+                        "path":  "Code\\tests\\testantrieb_tests.cpp",
+                        "sha256":  "008E1E68A295E1E66D53F249FB3857586B4CF0637835A23C8CEA955CE78429DC"
+                    },
+                    {
+                        "path":  "Code\\tests\\testdata\\stationaere_kurvenreferenz\\box.obj",
+                        "sha256":  "C69DF7D023397F723A72B50955B6DF8BAFF0A1BF41B70B7AA2B1441346D68E02"
+                    },
+                    {
+                        "path":  "Code\\tests\\testdata\\stationaere_kurvenreferenz\\kreisfall.json",
+                        "sha256":  "451C83AD9737109CED5D953030E902AFC57ABAAD8D143884062C344031B7C3AC"
+                    },
+                    {
+                        "path":  "Code\\tests\\testdata\\stationaere_kurvenreferenz\\modell.json",
+                        "sha256":  "6EE46FE7D42D63225D1D5D7D0CBB4E59C5FFAD2406D06EEB2C3D41AF04AE0ACA"
+                    },
+                    {
+                        "path":  "Code\\tests\\testdata\\stationaere_referenz\\fin.obj",
+                        "sha256":  "62760BD8A5F0445165F08DD6E4FE7F33345A8376F05631DC813467D2221F8CF0"
+                    },
+                    {
+                        "path":  "Code\\tests\\testdata\\stationaere_referenz\\modell.json",
+                        "sha256":  "AB9CF1E9C8685481DB7E5BD888FEB1CA501F104A60D348E80B2D13266BB5D8B0"
+                    },
+                    {
+                        "path":  "Code\\tests\\traegheit_tests.cpp",
+                        "sha256":  "37F82BB7FEB5C38206A82DA701E91D626F50E0AA5E8F4A98ABB812BE2F77B5A3"
+                    }
+                ]
+}

@@ -1,5 +1,14 @@
 # Umsetzungsplan C-0.6: Hydrodynamik im CORE
 
+## Nutzerabnahme 04.11.2026
+
+**Nutzerabnahmen: done.** Ausdruecklicher Nutzerauftrag vom 04.11.2026,
+09:16 Uhr fuer den gelieferten Stand. Dieser datierte Abschluss ersetzt
+alle aelteren offenen Nutzerabnahmestaende in diesem Plan; historische
+Nachweise bleiben erhalten. Technische Testluecken und nicht finalisierte
+Zusatzumfaenge werden dadurch nicht als nachgewiesen ausgegeben.
+Kein Commit, Tag oder Push beauftragt.
+
 **Status: freigegeben und in Umsetzung; keine Git-Veröffentlichungsfreigabe.**
 
 **Stand: 27.10.2026.** C-0.6 ist der nächste CORE-Arbeitsschritt nach C-0.5.

@@ -1,5 +1,52 @@
 # Core-Plan C-0.10: ausschliesslich Performance der Aufbereitung
 
+## Nutzerabnahme 04.11.2026
+
+**Nutzerabnahmen: done.** Ausdruecklicher Nutzerauftrag vom 04.11.2026,
+09:16 Uhr fuer den gelieferten Stand einschliesslich Performance.
+Dieser datierte Abschluss ersetzt alle aelteren offenen
+Nutzerabnahmestaende in diesem Plan; historische Nachweise bleiben erhalten.
+Technische Testluecken und nicht finalisierte Zusatzumfaenge werden dadurch
+nicht als nachgewiesen ausgegeben. Kein Commit, Tag oder Push beauftragt.
+
+## Revisionsvorbereitung 04.11.2026: vollstaendige Regression
+
+Auf ausdruecklichen Nutzerauftrag wurden die vorhandenen vollstaendigen
+nativen Testsuiten nach dem Neubau ausgefuehrt, ohne Testausschluesse:
+
+| Konfiguration | Ergebnis | Laufzeit | Nachweis |
+|---|---|---|---|
+| Release, `build\standard`, Instrumentierung AUS | **22/22 bestanden**, 0 Fehler, 0 uebersprungen | 96,26 s | [CTest](Nachweise/Meilenstein_2026-11-04/core-tests.log), [Detailprotokoll](Nachweise/Meilenstein_2026-11-04/core-tests-detail.log), [JUnit](Nachweise/Meilenstein_2026-11-04/core-tests.xml) |
+| Release, `build\c010`, Instrumentierung EIN | **22/22 bestanden**, 0 Fehler, 0 uebersprungen | 119,35 s | [CTest](Nachweise/Meilenstein_2026-11-04/core-instrumented-tests.log), [Detailprotokoll](Nachweise/Meilenstein_2026-11-04/core-instrumented-tests-detail.log), [JUnit](Nachweise/Meilenstein_2026-11-04/core-instrumented-tests.xml) |
+
+Buildprotokolle: [Standard](Nachweise/Meilenstein_2026-11-04/core-build.log),
+[instrumentiert](Nachweise/Meilenstein_2026-11-04/core-instrumented-build.log).
+Reproduzierbarer Aufruf je Buildordner:
+`cmake --build <Buildordner> --config Release --parallel 3`,
+danach `ctest --test-dir <Buildordner> -C Release --output-on-failure`.
+Beide Builds haben `BUILD_TESTING=ON`.
+
+Die beiden zuvor bekannten Altfehler sind damit geschlossen:
+`modellkatalog_schnittstelle` verwendete alte Dateipfade und
+Darstellungs-/Fehlerfixtures. Diese sind auf die reale Einzelquelle
+umgestellt; der Fehlfall mit fehlender Massendatei bleibt als explizites
+Legacy-Modell mit weiterhin lesbarer Darstellung erhalten.
+`modell_geometrie_v2` deckte einen echten Konverterfehler auf:
+Schema-3-Ableitungen wurden unveraendert in Schema 2 kopiert.
+CPPI-0065 materialisiert sie jetzt exakt als eigene Quellnetze.
+Die Tests pruefen unveraenderte Originale, exakte Modellphysik und
+Darstellung sowie Schema-2-zu-3-Migration mit/ohne Ableitungsfreigabe.
+Dies ist eine Bestandsfehlerkorrektur, keine Erweiterung des
+Performanceumfangs oder der Physikvertraege.
+
+Gepruefte Git-Basis: `a8c1ddcdab75366f6eed16b91e672fd4168273ef`
+auf `main`, mit den uncommittierten Aenderungen vom 04.11.2026.
+Die aelteren Fehlerprotokolle weiter unten bleiben historische Nachweise,
+nicht der aktuelle Teststatus. Gruene vorhandene Tests ersetzen keine
+externen physikalischen Referenzmessungen oder die weiterhin nicht
+finalisierte erweiterte Physikmatrix. Windphysik ist nicht Teil dieses
+Revisionspunkts. Keine Git-Veroeffentlichung ausgefuehrt.
+
 **Stand:** 03.11.2026, Nutzerfreigabe 20:45 Uhr.
 **Status:** Finalisiert, Core technisch umgesetzt und nachgewiesen.
 GUI-Integration G-0.11 technisch nachgewiesen (Abschnitt 9.4);

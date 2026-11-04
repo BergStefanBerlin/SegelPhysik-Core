@@ -25,7 +25,9 @@ Gezielter Nachweis im Release-Build:
 `ctest --test-dir build\c05 --output-on-failure -R "temporaerer_testantrieb|hydrostatik_referenzen|kraft_momentenbilanz|modell_import"`.
 `temporaerer_testantrieb` erzeugt im Buildordner die reproduzierbare
 `testantrieb-420-referenz.jsonl` einschließlich Ein/Aus-Ereignissen und
-Begrenzung. Technisch getestet, Nutzerabnahme weiterhin offen.
+Begrenzung. Nutzerabnahme am 04.11.2026 ausdruecklich abgeschlossen
+(`done`); aktuelle vollstaendige Testnachweise siehe
+[Revisionsvorbereitung](../Umsetzungsplaene/Umsetzungsplan_C-0.10.md#revisionsvorbereitung-04112026-vollstaendige-regression).
 
 Eigenständige C++17-Bibliothek und CLI ohne Python, pybind11 oder GUI.
 Implementiert sind Modellimport/-prüfung, Massenintegration,

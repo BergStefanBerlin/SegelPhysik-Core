@@ -1,0 +1,394 @@
+Start testing: Nov 04 09:35 Mitteleuropäische Zeit
+----------------------------------------------------------
+1/22 Testing: modellaufbereitung
+1/22 Test: modellaufbereitung
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/aufbereitung_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/420/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/folkeboot/modell.json"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"modellaufbereitung" start time: Nov 04 09:35 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+ungebunden.dynamischer_zeitschritt: 4
+ungebunden.ebenenschnitt: 80
+ungebunden.hydrostatikauswertung: 20
+ungebunden.kraftauswertung: 20
+ungebunden.lokale_mesh_bounds: 40
+ungebunden.mesh_transformation: 128
+ungebunden.meshkopie: 320
+ungebunden.modell_geometriekopie: 32
+ungebunden.nasspanels: 84
+ungebunden.stellungsaufbereitung: 32
+ungebunden.weltmesh_transformation: 84
+dynamischer_zeitschritt: 4
+ebenenschnitt: 36
+hydrostatikauswertung: 9
+kraft_ergebnis_wiederverwendung: 11
+kraftauswertung: 9
+lokale_mesh_bounds: 2
+mesh_transformation: 4
+meshkopie: 20
+modell_geometriekopie: 1
+modellbasis_aufbau: 1
+nasspanels: 51
+stellung_wiederverwendung: 20
+stellungsaufbereitung: 1
+weltmesh_transformation: 27
+Modellaufbereitung: alle Referenzen bestanden
+<end of output>
+Test time =   3.76 sec
+----------------------------------------------------------
+Test Passed.
+"modellaufbereitung" end time: Nov 04 09:35 Mitteleuropäische Zeit
+"modellaufbereitung" time elapsed: 00:00:03
+----------------------------------------------------------
+
+2/22 Testing: pose_transformations
+2/22 Test: pose_transformations
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/pose_tests.exe"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"pose_transformations" start time: Nov 04 09:35 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"pose_transformations" end time: Nov 04 09:35 Mitteleuropäische Zeit
+"pose_transformations" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/22 Testing: hydrostatik_referenzen
+3/22 Test: hydrostatik_referenzen
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/physik_tests.exe"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"hydrostatik_referenzen" start time: Nov 04 09:35 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+Stationaere Flutung: repeats=1, geflutet=Rumpf
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"hydrostatik_referenzen" end time: Nov 04 09:35 Mitteleuropäische Zeit
+"hydrostatik_referenzen" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/22 Testing: hydrodynamik_referenzen
+4/22 Test: hydrodynamik_referenzen
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/hydrodynamik_tests.exe"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"hydrodynamik_referenzen" start time: Nov 04 09:35 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+Hydrodynamiktests bestanden
+<end of output>
+Test time =   0.06 sec
+----------------------------------------------------------
+Test Passed.
+"hydrodynamik_referenzen" end time: Nov 04 09:35 Mitteleuropäische Zeit
+"hydrodynamik_referenzen" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/22 Testing: hydrodynamik_referenzmodelle
+5/22 Test: hydrodynamik_referenzmodelle
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/hydrodynamik_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/optimist/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/420/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/folkeboot/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/bleistift/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/kegel/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/kugel/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/platte/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/pyramide/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/quader/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/rolle/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/unregelmaessig/modell.json"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"hydrodynamik_referenzmodelle" start time: Nov 04 09:35 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+Hydrodynamiktests bestanden
+<end of output>
+Test time =   2.94 sec
+----------------------------------------------------------
+Test Passed.
+"hydrodynamik_referenzmodelle" end time: Nov 04 09:35 Mitteleuropäische Zeit
+"hydrodynamik_referenzmodelle" time elapsed: 00:00:02
+----------------------------------------------------------
+
+6/22 Testing: lateraldruckpunkt
+6/22 Test: lateraldruckpunkt
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/lateraldruckpunkt_tests.exe"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"lateraldruckpunkt" start time: Nov 04 09:35 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+Lateraldruckpunkttests bestanden
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"lateraldruckpunkt" end time: Nov 04 09:35 Mitteleuropäische Zeit
+"lateraldruckpunkt" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/22 Testing: hydrodynamik_traegheit
+7/22 Test: hydrodynamik_traegheit
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/traegheit_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/quader/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/kugel/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/optimist/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/420/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/folkeboot/modell.json"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"hydrodynamik_traegheit" start time: Nov 04 09:35 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+Traegheitstests bestanden
+<end of output>
+Test time =   2.04 sec
+----------------------------------------------------------
+Test Passed.
+"hydrodynamik_traegheit" end time: Nov 04 09:35 Mitteleuropäische Zeit
+"hydrodynamik_traegheit" time elapsed: 00:00:02
+----------------------------------------------------------
+
+8/22 Testing: temporaerer_testantrieb
+8/22 Test: temporaerer_testantrieb
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/testantrieb_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/quader/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/420/modell.json"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"temporaerer_testantrieb" start time: Nov 04 09:35 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+Testantrieb: Geometrie, Kraft/Moment, Integration, Grenze, Ereignisse, V2/V3, Batch und 420 bestanden.
+<end of output>
+Test time =   1.34 sec
+----------------------------------------------------------
+Test Passed.
+"temporaerer_testantrieb" end time: Nov 04 09:35 Mitteleuropäische Zeit
+"temporaerer_testantrieb" time elapsed: 00:00:01
+----------------------------------------------------------
+
+9/22 Testing: simulation_gesamtlauf
+9/22 Test: simulation_gesamtlauf
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/simulation_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/quader/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/tests/testdata/stationaere_referenz/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/420/modell.json"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"simulation_gesamtlauf" start time: Nov 04 09:35 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+Stationaer analytisch: v=1.118035272 m/s, max|F|=0.00344304548 N, max|M|=0.001032913644 Nm, ftol=0.05 N, mtol=0.05 Nm
+Exzentrische Kraft: Moment um S=[6.074006715e-10,450,0] Nm
+Galilei: delta Relativgeschwindigkeit=1.281878563e-06 m/s
+Mehrfachstellungen 420: status=konvergiert, iter=0
+<end of output>
+Test time =   1.39 sec
+----------------------------------------------------------
+Test Passed.
+"simulation_gesamtlauf" end time: Nov 04 09:35 Mitteleuropäische Zeit
+"simulation_gesamtlauf" time elapsed: 00:00:01
+----------------------------------------------------------
+
+10/22 Testing: stationaere_kurvenfahrt
+10/22 Test: stationaere_kurvenfahrt
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/stationaere_kurvenfahrt_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/tests/testdata/stationaere_kurvenreferenz/modell.json" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/420/modell.json"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"stationaere_kurvenfahrt" start time: Nov 04 09:35 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+420 0 deg: konvergiert, r=0.000125892 rad/s, iterations=2, seconds=1.63947, F=0.000124304,-6.6533e-06,1.34089e-05, M=4.74069e-06,-7.01489e-05,8.33111e-05, 
+420 1 deg: konvergiert, r=-0.010865 rad/s, iterations=2, seconds=2.17733, F=0.000164649,5.01914e-05,4.52377e-05, M=1.43374e-05,-0.000119522,0.000189722, 
+420 -1 deg: konvergiert, r=0.0111172 rad/s, iterations=2, seconds=2.5746, F=-0.00012214,-7.69421e-05,2.45391e-05, M=-1.23954e-05,2.05982e-05,-2.01869e-05, 
+420 12 deg: konvergiert, r=-0.179273 rad/s, iterations=3, seconds=2.69121, F=-0.00250876,-0.00380587,0.00128035, M=-0.00317244,-0.00169538,-0.00353405, 
+420 -12 deg: konvergiert, r=0.181387 rad/s, iterations=3, seconds=3.12272, F=-0.00270342,0.00365266,0.00170046, M=0.00139339,-0.000528963,0.000897333, 
+420 24 deg: konvergiert, r=-0.301538 rad/s, iterations=4, seconds=3.05824, F=-0.0160358,-1.05843e-05,0.00568496, M=-0.00211987,0.0060477,-0.00461406, 
+420 -24 deg: konvergiert, r=0.305284 rad/s, iterations=4, seconds=2.39854, F=-0.00117913,-0.00059618,0.000983243, M=0.000281722,-0.000530183,0.000380897, 
+420 36 deg: konvergiert, r=-0.374608 rad/s, iterations=7, seconds=3.74227, F=-0.00102293,0.000864748,0.000198798, M=0.000176022,-9.47567e-07,-0.000650044, 
+420 -36 deg: konvergiert, r=0.379516 rad/s, iterations=7, seconds=3.11587, F=-0.000103198,-0.00016833,6.84479e-05, M=-3.46096e-05,-1.62964e-07,7.63974e-05, 
+<end of output>
+Test time =  25.68 sec
+----------------------------------------------------------
+Test Passed.
+"stationaere_kurvenfahrt" end time: Nov 04 09:36 Mitteleuropäische Zeit
+"stationaere_kurvenfahrt" time elapsed: 00:00:25
+----------------------------------------------------------
+
+11/22 Testing: modell_import
+11/22 Test: modell_import
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/modell_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/quader/modell.json"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"modell_import" start time: Nov 04 09:36 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+Modellimport: alle Pruefungen bestanden.
+<end of output>
+Test time =   0.40 sec
+----------------------------------------------------------
+Test Passed.
+"modell_import" end time: Nov 04 09:36 Mitteleuropäische Zeit
+"modell_import" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/22 Testing: core_build_configuration
+12/22 Test: core_build_configuration
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/core_tests.exe"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"core_build_configuration" start time: Nov 04 09:36 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"core_build_configuration" end time: Nov 04 09:36 Mitteleuropäische Zeit
+"core_build_configuration" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/22 Testing: kraft_momentenbilanz
+13/22 Test: kraft_momentenbilanz
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/bilanz_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle/quader/modell.json"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"kraft_momentenbilanz" start time: Nov 04 09:36 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"kraft_momentenbilanz" end time: Nov 04 09:36 Mitteleuropäische Zeit
+"kraft_momentenbilanz" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/22 Testing: modellkatalog_schnittstelle
+14/22 Test: modellkatalog_schnittstelle
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/katalog_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"modellkatalog_schnittstelle" start time: Nov 04 09:36 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   5.23 sec
+----------------------------------------------------------
+Test Passed.
+"modellkatalog_schnittstelle" end time: Nov 04 09:36 Mitteleuropäische Zeit
+"modellkatalog_schnittstelle" time elapsed: 00:00:05
+----------------------------------------------------------
+
+15/22 Testing: modellinspektion_c08
+15/22 Test: modellinspektion_c08
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/inspektion_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"modellinspektion_c08" start time: Nov 04 09:36 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+Core inspection contracts passed
+<end of output>
+Test time =   8.61 sec
+----------------------------------------------------------
+Test Passed.
+"modellinspektion_c08" end time: Nov 04 09:36 Mitteleuropäische Zeit
+"modellinspektion_c08" time elapsed: 00:00:08
+----------------------------------------------------------
+
+16/22 Testing: modell_geometrie_v2
+16/22 Test: modell_geometrie_v2
+Command: "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/modell_v2_tests.exe" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/../../Modelle" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"modell_geometrie_v2" start time: Nov 04 09:36 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+optimist: exact physics/display/movement equivalence
+420: exact physics/display/movement equivalence
+folkeboot: exact physics/display/movement equivalence
+bleistift: exact physics/display/movement equivalence
+kegel: exact physics/display/movement equivalence
+kugel: exact physics/display/movement equivalence
+platte: exact physics/display/movement equivalence
+pyramide: exact physics/display/movement equivalence
+quader: exact physics/display/movement equivalence
+rolle: exact physics/display/movement equivalence
+unregelmaessig: exact physics/display/movement equivalence
+420: derived source regression; maximum wet volume delta=0 m3, maximum state component delta=0
+folkeboot: derived source regression; maximum wet volume delta=0 m3, maximum state component delta=0
+optimist: derived source regression; maximum wet volume delta=0 m3, maximum state component delta=0
+<end of output>
+Test time =  67.29 sec
+----------------------------------------------------------
+Test Passed.
+"modell_geometrie_v2" end time: Nov 04 09:37 Mitteleuropäische Zeit
+"modell_geometrie_v2" time elapsed: 00:01:07
+----------------------------------------------------------
+
+17/22 Testing: cli_help
+17/22 Test: cli_help
+Command: "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" "-DCLI=C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/segelphysik_cli.exe" "-DSCENARIO=help" "-DINSTRUMENTATION=ON" "-DCATALOG=C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/ressourcen/fehlerkatalog.json" "-P" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/tests/cli_test.cmake"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"cli_help" start time: Nov 04 09:37 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"cli_help" end time: Nov 04 09:37 Mitteleuropäische Zeit
+"cli_help" time elapsed: 00:00:00
+----------------------------------------------------------
+
+18/22 Testing: cli_build_info
+18/22 Test: cli_build_info
+Command: "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" "-DCLI=C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/segelphysik_cli.exe" "-DSCENARIO=build_info" "-DINSTRUMENTATION=ON" "-DCATALOG=C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/ressourcen/fehlerkatalog.json" "-P" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/tests/cli_test.cmake"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"cli_build_info" start time: Nov 04 09:37 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"cli_build_info" end time: Nov 04 09:37 Mitteleuropäische Zeit
+"cli_build_info" time elapsed: 00:00:00
+----------------------------------------------------------
+
+19/22 Testing: cli_error_catalog
+19/22 Test: cli_error_catalog
+Command: "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" "-DCLI=C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/segelphysik_cli.exe" "-DSCENARIO=error_catalog" "-DINSTRUMENTATION=ON" "-DCATALOG=C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/ressourcen/fehlerkatalog.json" "-P" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/tests/cli_test.cmake"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"cli_error_catalog" start time: Nov 04 09:37 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"cli_error_catalog" end time: Nov 04 09:37 Mitteleuropäische Zeit
+"cli_error_catalog" time elapsed: 00:00:00
+----------------------------------------------------------
+
+20/22 Testing: cli_no_arguments
+20/22 Test: cli_no_arguments
+Command: "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" "-DCLI=C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/segelphysik_cli.exe" "-DSCENARIO=no_arguments" "-DINSTRUMENTATION=ON" "-DCATALOG=C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/ressourcen/fehlerkatalog.json" "-P" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/tests/cli_test.cmake"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"cli_no_arguments" start time: Nov 04 09:37 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"cli_no_arguments" end time: Nov 04 09:37 Mitteleuropäische Zeit
+"cli_no_arguments" time elapsed: 00:00:00
+----------------------------------------------------------
+
+21/22 Testing: cli_invalid_argument
+21/22 Test: cli_invalid_argument
+Command: "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" "-DCLI=C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/segelphysik_cli.exe" "-DSCENARIO=invalid_argument" "-DINSTRUMENTATION=ON" "-DCATALOG=C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/ressourcen/fehlerkatalog.json" "-P" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/tests/cli_test.cmake"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"cli_invalid_argument" start time: Nov 04 09:37 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"cli_invalid_argument" end time: Nov 04 09:37 Mitteleuropäische Zeit
+"cli_invalid_argument" time elapsed: 00:00:00
+----------------------------------------------------------
+
+22/22 Testing: cli_extra_argument
+22/22 Test: cli_extra_argument
+Command: "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" "-DCLI=C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010/Release/segelphysik_cli.exe" "-DSCENARIO=extra_argument" "-DINSTRUMENTATION=ON" "-DCATALOG=C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/ressourcen/fehlerkatalog.json" "-P" "C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/Code/tests/cli_test.cmake"
+Directory: C:/_DATEN/Code/Python/Organisierter Code/Segelphysik/CORE/build/c010
+"cli_extra_argument" start time: Nov 04 09:37 Mitteleuropäische Zeit
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"cli_extra_argument" end time: Nov 04 09:37 Mitteleuropäische Zeit
+"cli_extra_argument" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 04 09:37 Mitteleuropäische Zeit
