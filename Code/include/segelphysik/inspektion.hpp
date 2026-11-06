@@ -52,6 +52,17 @@ struct InspectionProperty {
     std::string area;
 };
 
+struct MontageReferenz {
+    std::string element_id;
+    Vektor3 bezugspunkt_lokal_m{};
+    Vektor3 laengsrichtung_lokal{0., 0., 1.};
+    Vektor3 querrichtung_lokal{-1., 0., 0.};
+    QuaternionXyzw rotation_xyzw{0., 0., 0., 1.};
+    Vektor3 translation_m{};
+    std::string herkunft;
+    std::string quellen_fingerprint;
+};
+
 struct InspectionMesh {
     std::string id;
     std::string element_id;
@@ -67,6 +78,7 @@ struct InspectionMesh {
     std::string provenance;
     std::string derivation;
     std::vector<std::string> element_ids;
+    std::optional<MontageReferenz> montage;
 };
 
 struct InspectionMovementPose {

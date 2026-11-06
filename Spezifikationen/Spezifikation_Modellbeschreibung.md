@@ -2,6 +2,32 @@
 
 ## Status und Geltungsbereich
 
+**Autorisierte Montage-Ablageaenderung 06.11.2026:** Aktive Dateien heissen
+`bootsmodell.json`. Jedes vorhandene Element darf ein `setting` direkt
+neben `id` und `Darstellung` tragen: `translation_m`, `rotation_xyzw`,
+`konfiguriert`. Default ist Identitaet/false; endliche Translation und
+normiertes Quaternion werden fuer alle Elemente validiert. Unbekannte
+Setting-Felder bleiben beim Speichern erhalten. Nur Segel ergaenzen
+`original_buglage` und `quellen_fingerprint`; ihre intrinsische Quelle
+und Lookup werden genau einmal als `Segel.quelle_datei` und
+`Segel.lookup_datei` am bestehenden Element referenziert. Ohne tatsaechliche
+Lookup bleibt `lookup_datei` aus; es wird keine neue Kopplung erfunden.
+Es entstehen keine neuen Objekt-IDs oder zentralen Elementmaps.
+Gemeinsame Revision/Fingerprints liegen in `konfiguration`.
+Der verbindliche Persistenz-/Montagevertrag steht in
+[Spezifikation Segelkonfigurator, Abschnitt 4](Spezifikation_Segelkonfigurator.md).
+Bestaetigte generische Montageposen werden in der Darstellung angewendet.
+420-Segelquellen bleiben fuer die bestehende GUI-Kopplung unmontiert und
+werden in der Segel-API montiert; Folk-/Opti-OBJ-Segel sind im
+Inspektionsmesh bereits montiert. Die Segel-API laedt fuer diese Modelle
+die unveraenderte Quellgeometrie erneut und montiert sie genau einmal.
+`Montage` am bestehenden Element dokumentiert verifizierte OBJ-Eckbezüge
+der neutralen Mittschiffsbasis; Mast-/Vorliekneigung bleibt erhalten.
+Physische Netze, Massen und Traegheit
+werden dadurch nicht implizit transformiert; dynamische Winkel bleiben
+getrennt. Der gemeinsame Basisfingerprint blendet nur echte
+Element-Settings und gemeinsame Konfigurationsmetadaten aus.
+
 Die Koordinatenanforderungen A-C-00001 bis A-C-00003 wurden am
 26.10.2026 vom Nutzer ausdrücklich final freigegeben.
 Zusätzlich wurde am selben Tag der vorhandene Beispielaufbau als
@@ -367,9 +393,9 @@ Abfragen mit alter Katalogfassung.
 ### A-C-00109: Explizite, geschützte Migration
 
 `konvertiere_modell_v2(quelle, zielordner)` sowie das Kommando
-`segelphysik_konvertieren <modell.json> <neuer Zielordner>` lesen über die
+`segelphysik_konvertieren <bootsmodell.json> <neuer Zielordner>` lesen über die
 gemeinsamen Importer und erzeugen ausschließlich einen neuen Zielordner
-mit `modell.json` und `boot.obj`. Ein existierender Zielordner wird
+mit `bootsmodell.json` und `boot.obj`. Ein existierender Zielordner wird
 abgelehnt, auch bei identischem Inhalt. Originaldateien bleiben
 unverändert. Der Konverter übernimmt vorhandene Geometrievarianten,
 Material-/Farbmetadaten, Bewegungen und explizite physikalische Daten.

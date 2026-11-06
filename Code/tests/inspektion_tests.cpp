@@ -137,7 +137,7 @@ void verify_snapshot(const fs::path& models, const fs::path& scratch)
         total_mass->status == "vorhanden", "total mass property missing or mistyped");
     require(bounds && bounds->value_type == "object" && bounds->unit == "m",
         "bounds property missing or mistyped");
-    const auto source_document = Json::parse(read_file(scratch / "420" / "modell.json"));
+    const auto source_document = Json::parse(read_file(scratch / "420" / "bootsmodell.json"));
     std::set<std::string> source_keys;
     collect_keys(source_document, source_keys);
     std::set<std::string> represented;
@@ -258,10 +258,10 @@ void verify_snapshot(const fs::path& models, const fs::path& scratch)
     require(legacy_display.teile.size() == old_display.teile.size(),
         "legacy display API changed");
 
-    const auto model_json = scratch / "420" / "modell.json";
+    const auto model_json = scratch / "420" / "bootsmodell.json";
     write_file(model_json, read_file(model_json) + "\n");
-    for (const auto& path : {scratch / "420" / "meshes" / "gui" / "rumpf.obj",
-             scratch / "420" / "meshes" / "masse" / "rumpf.obj"}) {
+    for (const auto& path : {scratch / "420" / "modells" / "gui" / "rumpf.obj",
+             scratch / "420" / "modells" / "masse" / "rumpf.obj"}) {
         std::error_code ignored;
         fs::remove(path, ignored);
     }
@@ -296,7 +296,7 @@ void verify_partial_and_unreadable(const fs::path& models, const fs::path& scrat
     const auto partial_folder = scratch / "partial";
     fs::create_directories(partial_folder);
     fs::copy(models / "quader", partial_folder / "quader", fs::copy_options::recursive);
-    const auto partial_file = partial_folder / "quader" / "modell.json";
+    const auto partial_file = partial_folder / "quader" / "bootsmodell.json";
     auto document = Json::parse(read_file(partial_file));
     auto& mass = document["gruppen"]["rumpf"]["elemente"][0]["Hydrostatik"]["masse"];
     mass["dichte_kg_pro_m3"] = -1;
@@ -309,7 +309,7 @@ void verify_partial_and_unreadable(const fs::path& models, const fs::path& scrat
         has_diagnostic(partial->info(), "CORE-INSP-0004"),
         "invalid physics did not produce a partial view diagnostic");
     const auto partial_info = inspectionInfoJson(*partial);
-    require(partial_info.find("modell.json") == std::string::npos &&
+    require(partial_info.find("bootsmodell.json") == std::string::npos &&
         partial_info.find(scratch.u8string()) == std::string::npos &&
         partial_info.find("\\\\") == std::string::npos,
         "partial-view diagnostics leaked a source path");
@@ -325,7 +325,7 @@ void verify_partial_and_unreadable(const fs::path& models, const fs::path& scrat
 
     const auto unreadable_folder = scratch / "unreadable";
     fs::create_directories(unreadable_folder / "broken");
-    write_file(unreadable_folder / "broken" / "modell.json", "{");
+    write_file(unreadable_folder / "broken" / "bootsmodell.json", "{");
     const auto unreadable_catalogue = modellkatalog(unreadable_folder);
     const auto* unreadable_entry = unreadable_catalogue.eintrag("broken");
     require(unreadable_entry != nullptr, "unreadable model missing from catalogue");

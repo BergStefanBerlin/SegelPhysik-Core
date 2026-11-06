@@ -7,7 +7,7 @@ Weiterentwicklung erhalten.
 | CPPI-ID | C++-Schnittstelle | Status | Version/Anforderung | Bemerkung |
 |---|---|---|---|---|
 | CPPI-0001 | `HydrodynamikRolle` | implementiert | C-0.6 / A-C-00061 | Rollen `rumpf`, `kiel`, `ruder` |
-| CPPI-0002 | `Element::hydrodynamik_rolle` | implementiert | C-0.6 / A-C-00061 | Optionale importierte Rolle aus `modell.json` |
+| CPPI-0002 | `Element::hydrodynamik_rolle` | implementiert | C-0.6 / A-C-00061 | Optionale importierte Rolle aus `bootsmodell.json` |
 | CPPI-0003 | `HydrodynamikKonfiguration` | implementiert | C-0.6 / A-C-00072 | Fluiddichte, kinematische Viskosität und Weltgeschwindigkeit |
 | CPPI-0004 | `HydrodynamikKontext` | implementiert | C-0.6 / A-C-00072 | Unveränderliche Konfiguration mit Modellfassung und Auswertungszustand |
 | CPPI-0005 | `Zustand::hydrodynamik` | implementiert | C-0.6 / A-C-00072 | Historischer, unveränderlicher Laufkontext |
@@ -177,3 +177,38 @@ Die bisherigen freien Funktionen bleiben kompatibel.
 | CPPI-ID | C++-Schnittstelle | Status | Anforderung |
 |---|---|---|---|
 | CPPI-0119 | `dynamische_fremdkraft_aendern(const Modell&, const Zustand&, const DynamischeFremdkraftKonfiguration&)` | implementiert | A-C-00135; validierter neuer unveraenderlicher Kraftkontext am folgenden Schritt, keine Mutation der Historie |
+
+## C-0.12: Persistente Segel-Einbaulage
+
+Autorisierte 0-Grad-Grundstellungsrevision vom 06.11.2026: bestehende
+Segel-Interfaces unter ihren Kennungen unveraendert weitergefuehrt.
+420/Folkeboot/Optimist verwenden neutrale Montagebasis getrennt von
+Betriebswinkel delta; Folk/Opti liefern belegte OBJ-Referenzen und
+`CORE-SEG-0030` fuer die nicht kompatible intrinsische Kopplung.
+Keine neuen Objekt-IDs oder neuen exportierten Interfaces.
+
+Maßgeblich ist [Spezifikation Segelkonfigurator](../Spezifikationen/Spezifikation_Segelkonfigurator.md).
+Die Schnittstellen ergänzen den unveränderlichen Inspektionssnapshot.
+
+| CPPI-ID | C++-Schnittstelle | Status | Anforderung |
+|---|---|---|---|
+| CPPI-0120 | `SegelArt` | implementiert | A-C-00136; Großsegel/Fock getrennte Fachidentität |
+| CPPI-0121 | `SegelBuglage` | implementiert | A-C-00147; unbekannt, Backbord oder Steuerbord als Originalquellseite |
+| CPPI-0122 | `SegelEbene` | implementiert | A-C-00139; XY/XZ/YZ in Modellachsen |
+| CPPI-0123 | `SegelEcke` | implementiert | A-C-00139; semantischer Griff-/Pivotbezug |
+| CPPI-0124 | `SegelAktion` | implementiert | A-C-00137 bis A-C-00141, A-C-00147; Automatik, starre Translation/Rotation, absoluter Fockversatz, Originalbuglage |
+| CPPI-0125 | `SegelKonfigurationsStatus` | implementiert | A-C-00143; nicht konfiguriert, bereit oder Fehler |
+| CPPI-0126 | `SegelErgebnisStatus` | implementiert | A-C-00143; Vorschau, gespeichert oder Fehler |
+| CPPI-0127 | `SegelEcken` | implementiert | A-C-00136; Hals, Schothorn, vorderer und optional hinterer Kopf |
+| CPPI-0128 | `SegelReferenz` | implementiert | A-C-00136, A-C-00145; explizite Quellen-/Element-/Lookup-/Riggzuordnung und Fingerprint |
+| CPPI-0129 | `SegelLage` | implementiert | A-C-00137 bis A-C-00141, A-C-00147; normierte starre Lage, abgeleiteter Fockversatz, Originalbuglage |
+| CPPI-0130 | `SegelDiagnose` | implementiert | A-C-00143; maschinenlesbarer Code, Meldung und Elementbezug |
+| CPPI-0131 | `SegelKonfigurationSnapshot` | implementiert | A-C-00141, A-C-00143; Modellfassung, Revision, Referenzen, bestätigte Lagen und Ausgangsmeshes |
+| CPPI-0132 | `SegelAktionAnforderung` | implementiert | A-C-00137 bis A-C-00141, A-C-00147; typisierte Modellachsen-/Ecken-/cm-/Originalseitenanforderung |
+| CPPI-0133 | `SegelKonfigurationErgebnis` | implementiert | A-C-00143; Status, Revision, Lage, betroffene Meshkopien und Diagnosen |
+| CPPI-0134 | `leseSegelKonfiguration(const Modellkatalog&, const ModelInspection&)` | implementiert | A-C-00136, A-C-00141, A-C-00143; fehlende Konfiguration ist kein Fehler, Quellen-/Versionskonflikte werden diagnostiziert |
+| CPPI-0135 | `leseKonfigurierteSegelgeometrie(const SegelKonfigurationSnapshot&)` | implementiert | A-C-00142, A-C-00143; read-only Meshes aller Segel mit bestätigter Lage |
+| CPPI-0136 | `pruefeSegelAktion(const SegelKonfigurationSnapshot&, const SegelAktionAnforderung&)` | implementiert | A-C-00137 bis A-C-00141, A-C-00143; persistenzfreie Vorschau, nur betroffene Segelmeshes |
+| CPPI-0137 | `bestaetigeSegelAktion(const Modellkatalog&, const ModelInspection&, const SegelKonfigurationSnapshot&, const SegelAktionAnforderung&, const string&)` | implementiert | A-C-00141, A-C-00143; Prozesssperre, Revisions-/Quellprüfung und atomare Transaktion |
+| CPPI-0138 | `stelleSegelStellwinkelVorschauDar(const SegelKonfigurationSnapshot&, const string&, double)` | implementiert | A-C-00146, A-C-00147; 420 lokale Achse -Z, Folk/Opti belegte Kopf-zum-Hals-Achse, delta=0 neutrale Montage, Gradkonvention und bedingte Konturspiegelung |
+| CPPI-0139 | `MontageReferenz` | implementiert | A-C-00136, A-C-00143; gemeinsamer Objektbezug in `InspectionMesh.montage` und `SegelReferenz.montage`, lokale semantische Basis, starre Lage, Herkunft und Quellfingerprint; keine neue Objekt-ID |

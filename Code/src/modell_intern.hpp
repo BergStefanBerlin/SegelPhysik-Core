@@ -14,6 +14,11 @@ Mesh lade_quellmesh(const std::filesystem::path& datei,
 const nlohmann::json* geometrieableitung(const ModellBeschreibung& beschreibung,
     const std::string& element_id, const std::string& verwendung);
 Mesh abgeleitetes_mesh(const Mesh& quelle, const nlohmann::json& definition);
+const nlohmann::json* element_setting(const nlohmann::json& dokument,
+                                     const std::string& element_id);
+Pose setting_pose(const nlohmann::json& setting);
+void validiere_element_settings(const nlohmann::json& dokument,
+                                const std::string& kontext = "bootsmodell.json");
 
 struct ModellInspektionsImport {
     ModellBeschreibung beschreibung;

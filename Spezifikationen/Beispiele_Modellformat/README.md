@@ -24,7 +24,7 @@ Repository, sondern im gemeinsamen Ordner
 `SEGELPHYSIK_MODELLE_DIR`. Die Pfadangaben `modelle/...` in den
 historischen Nachweisdateien beziehen sich auf diesen Ordner.
 
-Jedes der elf Modelle besitzt eine eigene `modell.json`: acht einfache
+Jedes der elf Modelle besitzt eine eigene `bootsmodell.json`: acht einfache
 Koerper (Bleistift, Kegel, Kugel, Platte, Pyramide, Quader, Rolle,
 unregelmaessiger Koerper), Folkeboot, Optimist und 420er.
 
@@ -35,7 +35,7 @@ gibt es in der Modell-JSON nicht mehr.
 ```text
 Modelle/
   folkeboot/
-    modell.json
+    bootsmodell.json
     meshes/
       gui/
         rumpf.obj

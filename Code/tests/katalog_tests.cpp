@@ -141,8 +141,17 @@ void details(const fs::path& quelle, const fs::path& tmp)
     const auto modell = katalogmodell(katalog, "quader", fassung);
     pruefe(gleichgewicht(modell, Zustand{}).status == "konvergiert", "Lauf ueber Modell-ID fehlgeschlagen");
 
-    // Changed model file: the old version is rejected, a new catalogue works.
-    schreiben(ordner / "q" / "modell.json", lesen(ordner / "q" / "modell.json") + "\n");
+    // Formatting and embedded configuration do not change the base version.
+    schreiben(ordner / "q" / "bootsmodell.json", lesen(ordner / "q" / "bootsmodell.json") + "\n");
+    pruefe(katalogmodell(katalog, "quader", fassung).fassung == fassung,
+        "Formatierung aendert Modellfassung");
+    auto changed = nlohmann::json::parse(lesen(ordner / "q" / "bootsmodell.json"));
+    changed["konfiguration"] = {{"schema_version", 1}, {"revision", 12}};
+    schreiben(ordner / "q" / "bootsmodell.json", changed.dump(2));
+    pruefe(katalogmodell(katalog, "quader", fassung).fassung == fassung,
+        "Konfiguration aendert Modellfassung");
+    changed["name"] = "Modellinhalt geaendert";
+    schreiben(ordner / "q" / "bootsmodell.json", changed.dump(2));
     pruefe(fehler_von([&] { katalogmodell(katalog, "quader", fassung); }).rfind("CORE-KAT-0004", 0) == 0,
         "Veraltete Fassung nicht erkannt");
     pruefe(fehler_von([&] { darstellungsgeometrie(katalog, "quader", fassung); }).rfind("CORE-KAT-0004", 0) == 0,
@@ -152,10 +161,10 @@ void details(const fs::path& quelle, const fs::path& tmp)
     pruefe(neu != fassung && katalogmodell(katalog, "quader", neu).fassung == neu, "Neue Fassung fehlt");
 
     // Without display mesh the volume mesh is delivered as substitute.
-    auto json = lesen(ordner / "q" / "modell.json");
+    auto json = lesen(ordner / "q" / "bootsmodell.json");
     const auto anfang = json.find("\"Darstellung\"");
     json.erase(anfang, json.find("},", anfang) + 2 - anfang);
-    schreiben(ordner / "q" / "modell.json", json);
+    schreiben(ordner / "q" / "bootsmodell.json", json);
     katalog = modellkatalog(ordner);
     const auto ersatz = darstellungsgeometrie(katalog, "quader", katalog.eintrag("quader")->modell_fassung);
     pruefe(ersatz.teile.size() == 1 && ersatz.teile[0].herkunft == "volumen_ersatz", "Volumenersatz fehlt");
@@ -166,7 +175,7 @@ void farben(const fs::path& quelle, const fs::path& tmp)
     const auto ordner = tmp / "farben";
     fs::create_directories(ordner);
     fs::copy(quelle / "quader", ordner / "q", fs::copy_options::recursive);
-    const auto datei = ordner / "q" / "modell.json";
+    const auto datei = ordner / "q" / "bootsmodell.json";
     // Vorlage ohne Darstellungsstil: farbe/oberflaeche der Beispieldatei entfernen.
     auto vorlage = nlohmann::json::parse(lesen(datei));
     auto& darstellung = vorlage["gruppen"]["rumpf"]["elemente"][0]["Darstellung"];
@@ -292,10 +301,10 @@ void fehlerfaelle(const fs::path& quelle, const fs::path& tmp)
     fs::copy(quelle / "quader", ordner / "c", fs::copy_options::recursive);
     fs::create_directories(ordner / "d_ohne_modell");
     fs::create_directories(ordner / "e_kaputt");
-    schreiben(ordner / "e_kaputt" / "modell.json", "{");
-    auto json = lesen(ordner / "c" / "modell.json");
+    schreiben(ordner / "e_kaputt" / "bootsmodell.json", "{");
+    auto json = lesen(ordner / "c" / "bootsmodell.json");
     json.replace(json.find("\"id\": \"quader\""), 14, "\"id\": \"quader_c\"");
-    schreiben(ordner / "c" / "modell.json", json);
+    schreiben(ordner / "c" / "bootsmodell.json", json);
     auto defekt = nlohmann::json::parse(json);
     defekt["schema_version"] = "0.1-entwurf";
     defekt.erase("geometrie");
@@ -306,10 +315,10 @@ void fehlerfaelle(const fs::path& quelle, const fs::path& tmp)
         (*block)["datei"] = "boot.obj";
     }
     element["Hydrostatik"]["masse"]["datei"] = "fehlende-masse.obj";
-    schreiben(ordner / "c" / "modell.json", defekt.dump(2));
+    schreiben(ordner / "c" / "bootsmodell.json", defekt.dump(2));
 
     const auto katalog = modellkatalog(ordner);
-    pruefe(katalog.eintraege().size() == 4, "Unterordner ohne modell.json mitgezaehlt");
+    pruefe(katalog.eintraege().size() == 4, "Unterordner ohne bootsmodell.json mitgezaehlt");
     for (std::size_t i : {0u, 1u}) {
         const auto& e = katalog.eintraege()[i];
         pruefe(e.status == "fehlerhaft" && e.fehleranzahl > 0, "ID-Duplikat nicht fehlerhaft");

@@ -182,7 +182,7 @@
       "id": "CORE-KAT-0002",
       "kurztext": "Modell-ID mehrfach im Ordner vergeben.",
       "pass_kriterium": "Jede Modell-ID kommt im Katalog genau einmal vor.",
-      "fail_kriterium": "Mehrere modell.json tragen dieselbe id; alle betroffenen Modelle sind fehlerhaft.",
+      "fail_kriterium": "Mehrere bootsmodell.json tragen dieselbe id; alle betroffenen Modelle sind fehlerhaft.",
       "handlungsanweisung": "IDs in den Modellbeschreibungen eindeutig vergeben.",
       "pruefstatus": "implementiert"
     },
@@ -248,6 +248,22 @@
       "pass_kriterium": "Alle aufbereiteten Eigenschaften und Geometrien entsprechen dem Snapshot und tragen ihren dokumentierten Status.",
       "fail_kriterium": "Eine lesbare Teilansicht enthaelt eine fehlgeschlagene oder ungueltige Wert-/Geometrieaufbereitung.",
       "handlungsanweisung": "Diagnose und Status beachten; teilweise aufbereitete Daten nicht als gueltige Physik behandeln.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-SEG-0031",
+      "kurztext": "OBJ-Montagereferenz veraltet oder ohne Quellenpruefung.",
+      "pass_kriterium": "Explizite Vertexreferenz stimmt mit gespeicherter SHA256-Pruefung ueberein oder eine semantische Konturbasis ist durch aktuelle OBJ und Legacy-Quelle belegt.",
+      "fail_kriterium": "Quellenpruefung weicht ab oder es fehlen reproduzierbare semantische Bezugspunkte; bei nutzbarem Legacy-Fallback ist der Quellenkonflikt ein Hinweis.",
+      "handlungsanweisung": "Diagnose beachten; nur belegte aktuelle Kontur verwenden und neue Quellenchecks ausschliesslich nach ausdruecklicher Bestaetigung speichern.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-SEG-0032",
+      "kurztext": "Bestehende Montagepose auf belegte Konturbasis umgerechnet.",
+      "pass_kriterium": "Starre Umrechnung erhaelt Halsposition und gerichtete Vorliekachse der gespeicherten Lage ohne Skalierung oder Ruecksetzung.",
+      "fail_kriterium": "Legacy-Referenz fehlt oder ist entartet; die Umrechnung darf dann nicht ausgefuehrt werden.",
+      "handlungsanweisung": "Read-only Umrechnung pruefen; erst nach ausdruecklicher Aktion aktuelle Quellenbindung bestaetigen. Physische Quellen unveraendert lassen.",
       "pruefstatus": "implementiert"
     }
   ]

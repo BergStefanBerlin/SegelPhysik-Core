@@ -157,9 +157,9 @@ struct Modell {
 // exact predicates; validation is not a proof against every geometric defect.
 // Face-pair testing uses an AABB sweep, worst-case quadratic when boxes overlap.
 // Throws std::runtime_error with CORE-MOD-0001..0008 and file/element context.
-// fassung is a non-cryptographic FNV-1a fingerprint of JSON and the actually
-// imported physics OBJ contents, including boundaries; not of legacy display
-// files. Versions 2 and 3 hash the entire consolidated OBJ.
+// fassung is the same non-cryptographic FNV-1a fingerprint as modell_fassung:
+// canonical JSON excluding top-level konfiguration and settings on named
+// elements, plus all explicit geometry/sail/lookup file references.
 Modell lade_modell(const std::filesystem::path& datei);
 
 // Tolerant description reader for catalogue and display purposes. It does not
@@ -194,11 +194,14 @@ struct ModellBeschreibung {
 };
 ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei);
 
-// Fingerprint over the JSON and all readable physics OBJ files in import
-// order. For an importable model it equals lade_modell(datei).fassung.
+// Hashes canonical nlohmann JSON without top-level konfiguration and settings
+// on gruppen.*.elemente[] with string IDs, then sorted unique datei,
+// quelle_datei and lookup_datei references with their bytes. Missing files
+// have an explicit marker; read
+// failures throw. For an importable model it equals lade_modell(datei).fassung.
 std::string modell_fassung(const std::filesystem::path& datei);
 
-// Creates a new directory containing modell.json and boot.obj. Never overwrites
+// Creates a new directory containing bootsmodell.json and boot.obj. Never overwrites
 // an existing destination; originals are read only. Uses the regular importer.
 // Schema-3 derivations become explicit source meshes in schema 2.
 void konvertiere_modell_v2(const std::filesystem::path& quelle,

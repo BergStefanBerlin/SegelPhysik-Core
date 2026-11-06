@@ -21,7 +21,7 @@
 namespace segelphysik {
 namespace {
 
-const char* const modelldateiname = "modell.json";
+const char* const modelldateiname = "bootsmodell.json";
 
 [[noreturn]] void kat_fehler(int nummer, const std::string& text)
 {
@@ -286,6 +286,17 @@ Darstellungsgeometrie darstellungsgeometrie_aus_beschreibung(
                     Mesh{std::move(teil.punkte_m), std::move(teil.dreiecke)}, *definition);
                 teil.punkte_m = std::move(netz.punkte);
                 teil.dreiecke = std::move(netz.dreiecke);
+            }
+            const auto* setting = element_setting(beschreibung.dokument, e.id);
+            bool sail = false;
+            for (const auto& gruppe : beschreibung.dokument["gruppen"])
+                for (const auto& element : gruppe["elemente"])
+                    if (element.value("id", std::string{}) == e.id)
+                        sail = element.contains("Segel");
+            if (setting && (!sail || modell_id != "420") &&
+                setting->at("konfiguriert").get<bool>()) {
+                const auto pose = setting_pose(*setting);
+                for (auto& point : teil.punkte_m) point = pose.modellpunkt_nach_welt(point);
             }
             result.teile.push_back(std::move(teil));
         } catch (const std::exception& fehler) {

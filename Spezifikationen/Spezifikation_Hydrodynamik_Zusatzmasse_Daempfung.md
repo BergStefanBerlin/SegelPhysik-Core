@@ -71,7 +71,7 @@ Die Modellbeschreibung erhält einen optionalen, rückwärtskompatiblen Block
 für Zusatzmassen und Dämpfung.
 
 - Je Zusatzmassenwert, je Dämpfungskoeffizient und je Dämpfungsverhältnis ist
-  ein Überschreiben in `modell.json` möglich; ohne Angabe gelten die
+  ein Überschreiben in `bootsmodell.json` möglich; ohne Angabe gelten die
   abgeleiteten Werte.
 - Einheiten, Wertebereiche (endlich, nicht negativ) und gültige
   Freiheitsgrade werden beim Import validiert. Ein ungültiger Block wird

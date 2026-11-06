@@ -150,7 +150,7 @@ noch durch als vollständig bezeichnete Gesamtergebnisse vorgetäuscht werden.
 
 Vor produktiver Physik werden die bestätigten Daten- und Ergebnisverträge
 technisch konkretisiert. Dauerhafte Hydrodynamik- und Profilangaben gehören
-in den bestehenden `modell.json`-Vertrag und werden in die vorhandene
+in den bestehenden `bootsmodell.json`-Vertrag und werden in die vorhandene
 Modellbeschreibungsspezifikation integriert. Geometriewerte, die sich
 zuverlässig aus physischen Meshes ableiten lassen, werden nicht redundant
 gespeichert. Die konkrete Zuordnung zu den aktuellen Elementen und die
@@ -193,7 +193,7 @@ Die Berechnung verwendet ausdrücklich dokumentierte, prüfbare Geometriewerte.
 LWL und benetzte Fläche dürfen aus einem physischen Mesh abgeleitet werden,
 wenn das Verfahren für das betreffende Modell nachweislich geeignet ist;
 andernfalls müssen sie als dauerhafte Modellangaben im bestehenden
-`modell.json`-Vertrag vorliegen. Eine Ableitung aus Darstellungsmeshes oder
+`bootsmodell.json`-Vertrag vorliegen. Eine Ableitung aus Darstellungsmeshes oder
 Dateinamen ist ausgeschlossen. Die Datenfelder werden in die bestehende
 Modellbeschreibungsspezifikation integriert.
 
@@ -219,7 +219,7 @@ keine Vorhersage und darf nicht als solche ausgegeben werden.
 
 Für den Kiel wird zunächst ein einfaches, nachvollziehbares Kennwertmodell
 mit Seitenkraft sowie Profil- und induziertem Widerstand umgesetzt. Als
-Alternative darf ein im `modell.json`-Vertrag angegebenes 2D-Profil
+Alternative darf ein im `bootsmodell.json`-Vertrag angegebenes 2D-Profil
 verwendet werden, das zunächst über die gesamte Spannweite beziehungsweise
 Höhe als gleichförmig angenommen wird. Dafür sind eine geeignete Polare und
 explizite Ablösegrenzen erforderlich; ein Profilname allein genügt nicht.
@@ -333,7 +333,7 @@ Die API-Erweiterung erfolgt additiv; bestehende Aufrufe ohne
 Hydrodynamikkonfiguration müssen weiter das bisherige Verhalten liefern. Die
 Implementierung verwendet intern einen typisierten Core-Kontext und erhält
 zunächst den bestehenden Simulationsstart. Dauerhafte Yacht- und
-Profilparameter gehören in `modell.json`, laufbezogene Fluiddaten werden
+Profilparameter gehören in `bootsmodell.json`, laufbezogene Fluiddaten werden
 explizit an den typisierten Kontext gebunden. Die konkrete öffentliche
 Funktionsform wird bei der technischen Vertragskonkretisierung festgelegt.
 
@@ -359,7 +359,7 @@ Modellmetadaten verwenden. Inhaltlich benötigt dieser Kontext mindestens:
 | Pose und Starrkörpergeschwindigkeit | bestehender `Zustand` | Translation im Weltframe; Rotation ist in der ersten Geschwindigkeitsnäherung kein lokaler Strömungsanteil |
 
 Bauteilrollen und dauerhaft zur Yacht gehörende hydrodynamische
-Profilangaben werden im bestehenden `modell.json`-Vertrag geführt; die
+Profilangaben werden im bestehenden `bootsmodell.json`-Vertrag geführt; die
 Modellbeschreibungsspezifikation ist dafür maßgeblich. Verlässlich aus
 physischen Meshes ableitbare Geometrie wird nicht dupliziert. Fluiddaten und
 die Laufbindung werden in einem typisierten Core-Kontext transportiert; der
@@ -687,7 +687,7 @@ keine GUI-Dateien oder spezielle Hydrodynamikdarstellungen sind erforderlich.
 ### A-C-00072: Modell- und Laufdatenvertrag
 
 Dauerhafte Bauteilrollen und physikalische Modellangaben werden im
-bestehenden `modell.json`-Vertrag geführt. Geometriewerte werden nicht
+bestehenden `bootsmodell.json`-Vertrag geführt. Geometriewerte werden nicht
 redundant gespeichert, wenn sie verlässlich aus physischen Meshes ableitbar
 sind. Fluidparameter und gleichförmige Fluidgeschwindigkeit werden in einem
 typisierten Core-Laufkontext transportiert. Ein dynamischer Lauf mit
@@ -865,7 +865,7 @@ den endlichen induzierten Anteil, sofern dieser nicht bereits als
 bleiben nach Kraftart und Modellelement identifizierbar.
 
 Objektabhängige, nicht zuverlässig aus Laufzustand und physischem Mesh
-ableitbare Parameter sind im bestehenden `modell.json` direkt am jeweiligen
+ableitbare Parameter sind im bestehenden `bootsmodell.json` direkt am jeweiligen
 Element unter `Hydrodynamik` zu speichern. Der Laufkontext bleibt zuständig
 für gemeinsame Fluidparameter wie Dichte, Viskosität und
 Fluidgeschwindigkeit. Geometriewerte, die der Core zuverlässig und

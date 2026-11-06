@@ -28,7 +28,7 @@ int main(int argc,char* argv[])
         const auto validierung=segelphysik::pruefung_json(argv[1],gueltig);
         if(!gueltig || validierung.find("\"fehler\":[]")==std::string::npos)
             throw std::runtime_error("Gueltiges Modellpruefergebnis fehlt");
-        const auto ungueltig=segelphysik::pruefung_json("nicht-vorhandenes-modell.json",gueltig);
+        const auto ungueltig=segelphysik::pruefung_json("nicht-vorhandenes-bootsmodell.json",gueltig);
         if(gueltig || ungueltig.find("CORE-MOD-0005")==std::string::npos)
             throw std::runtime_error("Strukturierter Modellfehler fehlt");
         const auto modell = segelphysik::lade_modell(argv[1]);
@@ -526,7 +526,7 @@ int main(int argc,char* argv[])
         r=segelphysik::simulieren(argv[1],output,o);
         if(r.status!="abgebrochen") throw std::runtime_error("Abbruchstatus fehlt");
         std::filesystem::remove(output);
-        r=segelphysik::simulieren("nicht-vorhandenes-modell.json",output,o);
+        r=segelphysik::simulieren("nicht-vorhandenes-bootsmodell.json",output,o);
         if(r.status!="fehlgeschlagen"||r.diagnose.empty()||r.gesamtlaufzeit_s<0.)
             throw std::runtime_error("Fehlerlauf nicht gemessen");
     } catch(const std::exception& e) {std::cerr<<e.what()<<'\n';status=1;}

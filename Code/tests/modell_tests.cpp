@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -51,8 +52,8 @@ struct Dateien {
     }
     segelphysik::Modell laden(const std::string& inhalt) const
     {
-        schreiben("modell.json", inhalt);
-        return segelphysik::lade_modell(ordner / "modell.json");
+        schreiben("bootsmodell.json", inhalt);
+        return segelphysik::lade_modell(ordner / "bootsmodell.json");
     }
 };
 
@@ -121,7 +122,7 @@ std::string anhaengen(const std::string& erstes, const std::string& zweites, std
 }
 
 template <typename Funktion>
-void fehler(Funktion funktion, const std::string& id, const std::string& kontext = "modell.json")
+void fehler(Funktion funktion, const std::string& id, const std::string& kontext = "bootsmodell.json")
 {
     try {
         funktion();
@@ -448,11 +449,43 @@ void fassung_tests(Dateien& d)
     d.schreiben("mesh.obj", tetra(false, 1.));
     const auto c = d.laden(json);
     pruefe(a.fassung != c.fassung, "Physikmesh nicht im Fingerprint");
-    pruefe(c.fassung != d.laden(json + "\n").fassung, "JSON nicht im Fingerprint");
+    pruefe(c.fassung == d.laden(json + "\n").fassung, "Formatierung aendert Modellfassung");
+    pruefe(c.fassung == segelphysik::modell_fassung(d.ordner / "bootsmodell.json"),
+           "Parser und Modellfassung stimmen nicht ueberein");
+    auto document = nlohmann::json::parse(json);
+    for (std::uint64_t revision : {0ULL, 12ULL, 99ULL}) {
+        document["konfiguration"] = {{"schema_version", 1}, {"revision", revision}};
+        const auto configured = d.laden(document.dump(2));
+        pruefe(configured.fassung == c.fassung &&
+               configured.fassung == segelphysik::modell_fassung(d.ordner / "bootsmodell.json"),
+               "Leere Konfiguration oder Revision aendert Modellfassung");
+    }
+    auto& setting = document["gruppen"]["testgruppe"]["elemente"][0]["setting"];
+    setting = {{"translation_m", {1., 2., 3.}},
+               {"rotation_xyzw", {0., 0., 1., 0.}}, {"konfiguriert", true},
+               {"erweiterung", UINT64_C(18446744073709551614)}};
+    pruefe(d.laden(document.dump()).fassung == c.fassung &&
+           segelphysik::modell_fassung(d.ordner / "bootsmodell.json") == c.fassung,
+           "Element-setting aendert Basisfassung oder Hashpfade unterscheiden sich");
+    setting["rotation_xyzw"] = {0., 0., 0., 0.};
+    fehler([&] { d.laden(document.dump()); }, "CORE-MOD-0002");
+    setting["rotation_xyzw"] = {0., 0., 1., 0.};
+    auto nested = document;
+    nested["anderer_inhalt"] = {{"setting", {{"rotation_xyzw", {0., 0., 0., 1.}}}}};
+    d.schreiben("bootsmodell.json", nested.dump());
+    const auto nested_fingerprint = segelphysik::modell_fassung(d.ordner / "bootsmodell.json");
+    nested["anderer_inhalt"]["setting"]["rotation_xyzw"] = {0., 0., 1., 0.};
+    d.schreiben("bootsmodell.json", nested.dump());
+    pruefe(segelphysik::modell_fassung(d.ordner / "bootsmodell.json") != nested_fingerprint,
+           "setting ausserhalb echter Elemente wird unzulaessig ausgeblendet");
+    document["unbekannt"] = {{"grosszahl", UINT64_C(18446744073709551614)}};
+    d.schreiben("bootsmodell.json", document.dump());
+    pruefe(segelphysik::modell_fassung(d.ordner / "bootsmodell.json") != c.fassung,
+           "Unbekannter Modellinhalt fehlt im Fingerprint");
     const auto darstellung = modell(R"({"id":"bild","Darstellung":{"datei":"bild.obj"}},)" + element(punkt()));
     const auto vorher = d.laden(darstellung);
     d.schreiben("bild.obj", "beliebiger Grafikinhalt");
-    pruefe(vorher.fassung == d.laden(darstellung).fassung, "Grafikinhalt veraendert Physikfassung");
+    pruefe(vorher.fassung != d.laden(darstellung).fassung, "Grafikinhalt fehlt im Modellfingerprint");
 }
 
 void volumen_ueberschneidung_tests(Dateien& d)
@@ -566,7 +599,7 @@ int main(int argc, char** argv)
         if (argc > 1) beispiel = std::filesystem::u8path(argv[1]);
         else {
             const auto root = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path();
-            const auto kandidat = root.parent_path() / "Modelle" / "quader" / "modell.json";
+            const auto kandidat = root.parent_path() / "Modelle" / "quader" / "bootsmodell.json";
             if (std::filesystem::exists(kandidat)) beispiel = kandidat;
         }
         beispiel_test(beispiel);

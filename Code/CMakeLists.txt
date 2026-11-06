@@ -48,7 +48,7 @@ configure_file(src/fehlerkatalog.hpp.in generated/fehlerkatalog.hpp @ONLY)
 
 add_library(segelphysik_core STATIC src/core.cpp src/pose.cpp src/modell.cpp
     src/hydrostatik.cpp src/hydrotraegheit.cpp src/messung.cpp src/simulation.cpp src/katalog.cpp
-    src/inspektion.cpp src/aufbereitung.cpp)
+    src/inspektion.cpp src/aufbereitung.cpp src/segelkonfigurator.cpp)
 target_include_directories(segelphysik_core PUBLIC include)
 target_include_directories(segelphysik_core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(segelphysik_core PUBLIC nlohmann_json::nlohmann_json)
@@ -69,8 +69,8 @@ if(BUILD_TESTING)
     target_link_libraries(aufbereitung_tests PRIVATE segelphysik_core)
     list(APPEND core_targets aufbereitung_tests)
     add_test(NAME modellaufbereitung COMMAND aufbereitung_tests
-        "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/folkeboot/modell.json")
+        "${SEGELPHYSIK_MODELLE_DIR}/420/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/folkeboot/bootsmodell.json")
     add_executable(aufbereitung_benchmark tests/aufbereitung_benchmark.cpp)
     target_link_libraries(aufbereitung_benchmark PRIVATE segelphysik_core)
     list(APPEND core_targets aufbereitung_benchmark)
@@ -104,17 +104,17 @@ if(BUILD_TESTING)
     list(APPEND core_targets hydrodynamik_tests)
     add_test(NAME hydrodynamik_referenzen COMMAND hydrodynamik_tests)
     add_test(NAME hydrodynamik_referenzmodelle COMMAND hydrodynamik_tests
-        "${SEGELPHYSIK_MODELLE_DIR}/optimist/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/folkeboot/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/bleistift/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/kegel/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/kugel/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/platte/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/pyramide/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/rolle/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/unregelmaessig/modell.json")
+        "${SEGELPHYSIK_MODELLE_DIR}/optimist/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/420/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/folkeboot/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/bleistift/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/kegel/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/kugel/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/platte/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/pyramide/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/rolle/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/unregelmaessig/bootsmodell.json")
     add_executable(lateraldruckpunkt_tests tests/lateraldruckpunkt_tests.cpp)
     target_link_libraries(lateraldruckpunkt_tests PRIVATE segelphysik_core)
     list(APPEND core_targets lateraldruckpunkt_tests)
@@ -123,11 +123,11 @@ if(BUILD_TESTING)
     target_link_libraries(traegheit_tests PRIVATE segelphysik_core)
     list(APPEND core_targets traegheit_tests)
     add_test(NAME hydrodynamik_traegheit COMMAND traegheit_tests
-        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/kugel/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/optimist/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/folkeboot/modell.json")
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/kugel/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/optimist/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/420/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/folkeboot/bootsmodell.json")
     add_executable(simulation_tests tests/simulation_tests.cpp)
     target_link_libraries(simulation_tests PRIVATE segelphysik_core)
     list(APPEND core_targets simulation_tests)
@@ -138,15 +138,15 @@ if(BUILD_TESTING)
     target_link_libraries(testantrieb_tests PRIVATE segelphysik_core)
     list(APPEND core_targets testantrieb_tests)
     add_test(NAME temporaerer_testantrieb COMMAND testantrieb_tests
-        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json")
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/420/bootsmodell.json")
     add_test(NAME simulation_gesamtlauf COMMAND simulation_tests
-        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json"
-        "${CMAKE_CURRENT_SOURCE_DIR}/tests/testdata/stationaere_referenz/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json")
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/bootsmodell.json"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/testdata/stationaere_referenz/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/420/bootsmodell.json")
     add_test(NAME stationaere_kurvenfahrt COMMAND stationaere_kurvenfahrt_tests
-        "${CMAKE_CURRENT_SOURCE_DIR}/tests/testdata/stationaere_kurvenreferenz/modell.json"
-        "${SEGELPHYSIK_MODELLE_DIR}/420/modell.json")
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/testdata/stationaere_kurvenreferenz/bootsmodell.json"
+        "${SEGELPHYSIK_MODELLE_DIR}/420/bootsmodell.json")
     add_executable(core_benchmark tests/benchmark.cpp)
     target_link_libraries(core_benchmark PRIVATE segelphysik_core)
     list(APPEND core_targets core_benchmark)
@@ -154,13 +154,13 @@ if(BUILD_TESTING)
     target_link_libraries(modell_tests PRIVATE segelphysik_core)
     list(APPEND core_targets modell_tests)
     add_test(NAME modell_import COMMAND modell_tests
-        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json")
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/bootsmodell.json")
     add_test(NAME core_build_configuration COMMAND core_tests)
     add_executable(bilanz_tests tests/bilanz_tests.cpp)
     target_link_libraries(bilanz_tests PRIVATE segelphysik_core)
     list(APPEND core_targets bilanz_tests)
     add_test(NAME kraft_momentenbilanz COMMAND bilanz_tests
-        "${SEGELPHYSIK_MODELLE_DIR}/quader/modell.json")
+        "${SEGELPHYSIK_MODELLE_DIR}/quader/bootsmodell.json")
     add_executable(katalog_tests tests/katalog_tests.cpp)
     target_link_libraries(katalog_tests PRIVATE segelphysik_core)
     list(APPEND core_targets katalog_tests)
@@ -175,6 +175,18 @@ if(BUILD_TESTING)
     target_link_libraries(modell_v2_tests PRIVATE segelphysik_core)
     list(APPEND core_targets modell_v2_tests)
     add_test(NAME modell_geometrie_v2 COMMAND modell_v2_tests
+        "${SEGELPHYSIK_MODELLE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}")
+    add_executable(segelkonfigurator_tests tests/segelkonfigurator_tests.cpp)
+    target_link_libraries(segelkonfigurator_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets segelkonfigurator_tests)
+    add_test(NAME segelkonfiguration_contract COMMAND segelkonfigurator_tests
+        "${SEGELPHYSIK_MODELLE_DIR}/420/bootsmodell.json")
+    add_test(NAME segel_mittschiffs_basis COMMAND segelkonfigurator_tests
+        --zero-base-contract "${SEGELPHYSIK_MODELLE_DIR}")
+    add_executable(montage_tests tests/montage_tests.cpp)
+    target_link_libraries(montage_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets montage_tests)
+    add_test(NAME montage_alle_objekte COMMAND montage_tests
         "${SEGELPHYSIK_MODELLE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}")
     foreach(scenario help build_info error_catalog no_arguments invalid_argument extra_argument)
         add_test(NAME cli_${scenario}

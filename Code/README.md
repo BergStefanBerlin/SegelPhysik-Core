@@ -91,7 +91,7 @@ Beispiele, vom Repository aus (Ausgabedateien dürfen noch nicht existieren):
 
 ```powershell
 $cli = ".\build\standard\Release\segelphysik_cli.exe"
-$modell = "..\Modelle\quader\modell.json"
+$modell = "..\Modelle\quader\bootsmodell.json"
 & $cli --pruefen $modell
 & $cli --statisch $modell ".\build\statik.json"
 & $cli --dynamisch $modell ".\build\dynamik.jsonl" 1 0.01
@@ -101,6 +101,19 @@ Die Beispielmodelle liegen außerhalb des Repositories im gemeinsamen
 Ordner `Segelphysik\Modelle` neben `CORE` und `GUI`. CMake-Variable
 `SEGELPHYSIK_MODELLE_DIR` (Standard `../../Modelle` relativ zu `Code`)
 legt den Ordner für Tests und GUI fest.
+
+Die Montageinspektion liest diesen Originalbestand nur. `getMesh` mit
+Typ `darstellung` liefert genau eine aktuelle Geometrie je bestehender
+Objekt-ID; physische Mesh-Typen bleiben getrennte Quellen.
+`InspectionMesh.montage` ist die gemeinsame Objekt-/Segelreferenz.
+Segelmontage liest semantische Kontur-/Montagemetadaten statt Boots-ID-
+Sonderfaellen. Veraltete ungepruefte OBJ-Indices werden nur mit belegter
+Legacy-Geometrie starr adaptiert und diagnostiziert; bestaetigte
+Quellenchecks werden strikt geprueft. Erst bestaetigte Aktionen speichern
+Metadaten unter `setting.montage_referenz`.
+`ctest -R '^montage_alle_objekte$'` prueft alle elf aktuellen Modelle und
+Auto/Translation/Rotation/Fockversatz/Persistenz aller drei Boote auf
+eigenen Kopien im Buildordner, ohne Originaldaten zu schreiben.
 
 `.jsonl` liefert vollständige Zustände pro Zeile, andere Endungen ein
 inkrementell geschriebenes JSON-Array. Laufstatus und Gesamtdauer

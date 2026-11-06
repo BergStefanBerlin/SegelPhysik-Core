@@ -1,5 +1,5 @@
 {
-  "modell": "modell.json",
+  "modell": "bootsmodell.json",
   "beschreibung": "Exakte, bereits geloeste Kreisreferenz ohne Widerstand oder Zusatzmasse; u*r ist nicht eindeutig. Vollstaendigen Startzustand verwenden, kein Konvergenztest aus Ruhe.",
   "start": {
     "position_m": [0, 0, 0],

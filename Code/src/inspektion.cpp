@@ -1,5 +1,6 @@
 #include "segelphysik/inspektion.hpp"
 #include "segelphysik/hydrostatik.hpp"
+#include "segelphysik/segelkonfigurator.hpp"
 #include "katalog_intern.hpp"
 #include "modell_intern.hpp"
 
@@ -103,10 +104,10 @@ std::string safe_text(const std::string& value)
 
 std::string logical_location(std::string value)
 {
-    const auto model_file = value.find("modell.json");
+    const auto model_file = value.find("bootsmodell.json");
     const bool model_diagnostic = model_file != std::string::npos;
     if (model_file != std::string::npos) {
-        value.erase(0, model_file + std::string("modell.json").size());
+        value.erase(0, model_file + std::string("bootsmodell.json").size());
         while (!value.empty() && (value.front() == ',' || value.front() == ':' ||
                value.front() == ' ' || value.front() == '\\' || value.front() == '/'))
             value.erase(value.begin());
@@ -630,13 +631,25 @@ Json property_json(const InspectionProperty& property)
 
 Json mesh_json(const InspectionMesh& mesh)
 {
-    return {{"id", mesh.id}, {"element_id", mesh.element_id}, {"group", mesh.group},
+    Json result{{"id", mesh.id}, {"element_id", mesh.element_id}, {"group", mesh.group},
         {"type", mesh.type}, {"origin", mesh.origin}, {"topology", mesh.topology},
         {"points_m", mesh.points_m}, {"triangles", mesh.triangles},
         {"color_rgb", mesh.color_rgb ? Json(*mesh.color_rgb) : Json(nullptr)},
         {"surface", mesh.surface ? Json(*mesh.surface) : Json(nullptr)},
         {"source_id", mesh.source_id}, {"provenance", mesh.provenance},
         {"derivation", mesh.derivation}, {"element_ids", mesh.element_ids}};
+    if (mesh.montage) {
+        const auto& mounting = *mesh.montage;
+        result["montage"] = {{"element_id", mounting.element_id},
+            {"bezugspunkt_lokal_m", mounting.bezugspunkt_lokal_m},
+            {"laengsrichtung_lokal", mounting.laengsrichtung_lokal},
+            {"querrichtung_lokal", mounting.querrichtung_lokal},
+            {"rotation_xyzw", mounting.rotation_xyzw},
+            {"translation_m", mounting.translation_m},
+            {"herkunft", mounting.herkunft},
+            {"quellen_fingerprint", mounting.quellen_fingerprint}};
+    }
+    return result;
 }
 
 Json movement_pose_json(const InspectionMovementPose& pose)
@@ -721,6 +734,11 @@ std::shared_ptr<const ModelInspection> readModelInspection(
             without_paths(error.what(), model_folder));
     }
     impl->description = std::move(imported.beschreibung);
+    Json mounting_document;
+    {
+        std::ifstream input(model_file);
+        input >> mounting_document;
+    }
     std::vector<std::pair<std::filesystem::path, std::string>> display_versions;
     for (const auto& entry : impl->description.elemente)
         if (entry.darstellung)
@@ -765,7 +783,6 @@ std::shared_ptr<const ModelInspection> readModelInspection(
         TreeData tree;
         build_tree(tree, view, type, element_ids);
         if (!impl->model) mark_unvalidated_physics(tree);
-        add_derived_properties(tree, impl->description, impl->model, impl->display, type);
         impl->trees.emplace(type, std::move(tree));
         impl->tree_types.push_back({type, name, element_ids});
     }
@@ -775,10 +792,32 @@ std::shared_ptr<const ModelInspection> readModelInspection(
         group_by_id[entry.id] = entry.gruppe;
         impl->element_ids.insert(entry.id);
     }
-    for (const auto& part : impl->display.teile)
+    for (const auto& group : mounting_document.at("gruppen"))
+        for (const auto& definition : group.at("elemente")) {
+            if (definition.contains("Darstellung") || !definition.contains("Hydrostatik") ||
+                !definition.at("Hydrostatik").contains("masse"))
+                continue;
+            const auto& mass = definition.at("Hydrostatik").at("masse");
+            if (mass.value("art", std::string{}) != "punktmasse") continue;
+            const auto id = definition.at("id").get<std::string>();
+            if (std::any_of(impl->display.teile.begin(), impl->display.teile.end(),
+                [&](const Darstellungsteil& part) { return part.element_id == id; }))
+                continue;
+            auto point = mass.at("position_m").get<Vektor3>();
+            if (const auto* setting = element_setting(mounting_document, id))
+                if (setting->at("konfiguriert").get<bool>())
+                    point = setting_pose(*setting).modellpunkt_nach_welt(point);
+            impl->display.teile.push_back({id, group_by_id.at(id), "punktmasse_referenz",
+                {point}, {}, std::nullopt, std::nullopt});
+        }
+    std::set<std::string> displayed_ids;
+    for (const auto& part : impl->display.teile) {
+        if (!displayed_ids.insert(part.element_id).second)
+            inspection_error("CORE-INSP-0004", "Mehrdeutige aktuelle Darstellungsreferenz: " + part.element_id);
         append_mesh(impl->meshes, "darstellung", part.element_id, part.gruppe,
-            part.herkunft, "dreiecke", part.punkte_m, part.dreiecke,
+            part.herkunft, part.dreiecke.empty() ? "punkte" : "dreiecke", part.punkte_m, part.dreiecke,
             part.farbe_rgb, part.oberflaeche);
+    }
     if (impl->model) for (const auto& element : impl->model->elemente) {
         const auto group = group_by_id.find(element.id);
         const std::string group_name = group == group_by_id.end() ? "" : group->second;
@@ -815,6 +854,63 @@ std::shared_ptr<const ModelInspection> readModelInspection(
             quelle = entry->volumen_mesh;
         else quelle = entry->masse_mesh;
         mesh.source_id = quelle.value_or("");
+        if (mesh.type == "darstellung") {
+            MontageReferenz mounting;
+            mounting.element_id = mesh.element_id;
+            mounting.herkunft = "Deklarierte Objektgeometrie im Modellbezug";
+            if (const auto* setting = element_setting(impl->description.dokument, mesh.element_id)) {
+                if (setting->at("konfiguriert").get<bool>()) {
+                    mounting.rotation_xyzw = setting->at("rotation_xyzw").get<QuaternionXyzw>();
+                    mounting.translation_m = setting->at("translation_m").get<Vektor3>();
+                }
+            }
+            mounting.quellen_fingerprint = impl->info.model_version;
+            for (const auto& group : mounting_document.at("gruppen"))
+                for (const auto& definition : group.at("elemente")) {
+                    if (definition.at("id") != mesh.element_id) continue;
+                    if (mesh.origin == "punktmasse_referenz") {
+                        mounting.bezugspunkt_lokal_m = definition.at("Hydrostatik").at("masse").at("position_m").get<Vektor3>();
+                        mounting.herkunft = "Explizite Punktmassenposition im Modellbezug";
+                    }
+                    if (!definition.contains("Montage")) continue;
+                    const auto& metadata = definition.at("Montage");
+                    if (!metadata.contains("anschlag_vertex_indices")) continue;
+                    if (!entry->darstellung)
+                        inspection_error("CORE-INSP-0004", "Montageindices ohne deklarierte OBJ-Quelle");
+                    const auto& path = *entry->darstellung;
+                    const auto raw = lade_quellmesh(path, std::nullopt, true);
+                    const auto reference_point = [&](const Json& indices) {
+                        if (!indices.is_array() || indices.empty())
+                            inspection_error("CORE-INSP-0004", "Leere OBJ-Montagereferenz");
+                        Vektor3 result{};
+                        for (const auto& index : indices) {
+                            if (!index.is_number_unsigned() || index.get<std::size_t>() == 0 ||
+                                index.get<std::size_t>() > raw.punkte.size())
+                                inspection_error("CORE-INSP-0004", "Veraltete OBJ-Montagereferenz: " +
+                                    mesh.element_id + "; " + index.dump() + "; Vertices=" +
+                                    std::to_string(raw.punkte.size()));
+                            const auto& point = raw.punkte[index.get<std::size_t>() - 1];
+                            for (std::size_t i = 0; i < 3; ++i) result[i] += point[i];
+                        }
+                        for (auto& value : result) value /= static_cast<double>(indices.size());
+                        return result;
+                    };
+                    mounting.bezugspunkt_lokal_m = reference_point(metadata.at("anschlag_vertex_indices"));
+                    if (metadata.contains("ende_vertex_indices")) {
+                        const auto end = reference_point(metadata.at("ende_vertex_indices"));
+                        double length_squared = 0.;
+                        for (std::size_t i = 0; i < 3; ++i) {
+                            mounting.laengsrichtung_lokal[i] = end[i] - mounting.bezugspunkt_lokal_m[i];
+                            length_squared += mounting.laengsrichtung_lokal[i] * mounting.laengsrichtung_lokal[i];
+                        }
+                        if (!(length_squared > 1e-24))
+                            inspection_error("CORE-INSP-0004", "Entartete OBJ-Montageachse");
+                    }
+                    mounting.herkunft = "Explizite Objekt-Montageindices in deklarierter OBJ-Quelle";
+                    mounting.quellen_fingerprint = path_fingerprint(path);
+                }
+            mesh.montage = std::move(mounting);
+        }
         mesh.provenance = mesh.type == "flutrand" || mesh.type == "massenpunkte" ?
             "abgeleitet" : "quelle";
         if (mesh.type == "flutrand") mesh.derivation = "Offene Schalenrandknoten aus Kanteninzidenz";
@@ -858,7 +954,8 @@ std::shared_ptr<const ModelInspection> readModelInspection(
     for (auto& [type, tree] : impl->trees) for (auto& node : tree.nodes) {
         if (node.kind != "element") continue;
         for (const auto& mesh : impl->meshes)
-            if (std::any_of(mesh.element_ids.begin(), mesh.element_ids.end(), [&](const std::string& id) {
+            if ((type != "objekte" || mesh.type == "darstellung") &&
+                std::any_of(mesh.element_ids.begin(), mesh.element_ids.end(), [&](const std::string& id) {
                 return std::find(node.element_ids.begin(), node.element_ids.end(), id) != node.element_ids.end();
             })) node.mesh_ids.push_back(mesh.id);
     }
@@ -884,7 +981,47 @@ std::shared_ptr<const ModelInspection> readModelInspection(
             inspection_error("CORE-INSP-0003", "Quelldaten waehrend Einlesen geaendert");
         throw;
     }
-    return std::shared_ptr<const ModelInspection>(new ModelInspection(std::move(impl)));
+    auto* current = impl.get();
+    auto inspection = std::shared_ptr<const ModelInspection>(new ModelInspection(std::move(impl)));
+    const auto sails = leseSegelKonfiguration(katalog, *inspection);
+    if (sails.status == SegelKonfigurationsStatus::Fehler) {
+        current->info.status = "nur_ansicht";
+        for (const auto& diag : sails.diagnosen)
+            current->info.diagnostics.push_back({diag.code, diag.nachricht, diag.element_id});
+    } else {
+        const auto geometry = leseKonfigurierteSegelgeometrie(sails);
+        if (geometry.status == SegelErgebnisStatus::Fehler) {
+            current->info.status = "nur_ansicht";
+            for (const auto& diag : geometry.diagnosen)
+                current->info.diagnostics.push_back({diag.code, diag.nachricht, diag.element_id});
+        }
+        for (const auto& replacement : geometry.meshes) {
+            const auto reference = std::find_if(sails.referenzen.begin(), sails.referenzen.end(),
+                [&](const SegelReferenz& ref) { return ref.element_id == replacement.element_id; });
+            const auto pose = std::find_if(sails.lagen.begin(), sails.lagen.end(),
+                [&](const SegelLage& lage) { return lage.element_id == replacement.element_id; });
+            for (auto& mesh : current->meshes) {
+                if (mesh.type != "darstellung" || mesh.element_id != replacement.element_id) continue;
+                mesh.points_m = replacement.points_m;
+                mesh.triangles = replacement.triangles;
+                if (reference != sails.referenzen.end() && pose != sails.lagen.end()) {
+                    mesh.montage = reference->montage;
+                    mesh.montage->rotation_xyzw = pose->rotation_xyzw;
+                    mesh.montage->translation_m = pose->translation_m;
+                }
+            }
+            for (auto& part : current->display.teile) {
+                if (part.element_id != replacement.element_id) continue;
+                part.punkte_m = replacement.points_m;
+                part.dreiecke = replacement.triangles;
+            }
+        }
+        for (const auto& diag : sails.diagnosen)
+            current->info.diagnostics.push_back({diag.code, diag.nachricht, diag.element_id});
+    }
+    for (auto& [type, tree] : current->trees)
+        add_derived_properties(tree, current->description, current->model, current->display, type);
+    return inspection;
 }
 
 std::vector<InspectionType> getAvailableObjectTreeTypes(const ModelInspection& inspection)
@@ -1028,9 +1165,9 @@ Modellstruktur modellstruktur(const ModelInspection& inspection)
             StrukturGruppe group{node.name, node.name, {}};
             for (const auto& child : tree)
                 if (child.parent_id == node.id && child.kind == "element") {
-                    const auto display = std::any_of(inspection.impl_->description.elemente.begin(),
-                        inspection.impl_->description.elemente.end(), [&](const ElementBeschreibung& e) {
-                            return e.id == child.name && e.darstellung.has_value();
+                    const auto display = std::any_of(inspection.impl_->meshes.begin(),
+                        inspection.impl_->meshes.end(), [&](const InspectionMesh& mesh) {
+                            return mesh.element_id == child.name && mesh.type == "darstellung";
                         });
                     const auto volume = inspection.impl_->model &&
                         std::any_of(inspection.impl_->model->elemente.begin(),

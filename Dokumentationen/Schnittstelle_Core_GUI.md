@@ -583,7 +583,7 @@ Zustand. Die GUI wählt und überwacht den Ordner; der Core liest ihn.
 
 | Funktion | Antwort |
 |---|---|
-| `modellkatalog(ordner)` | Katalog über `ordner/modell.json` und `ordner/*/modell.json`, sortiert nach Ordnername |
+| `modellkatalog(ordner)` | Katalog über `ordner/bootsmodell.json` und `ordner/*/bootsmodell.json`, sortiert nach Ordnername |
 | `katalog_json(kat)` | `katalogversion`, `modelle[]` mit `modell_id`, `name`, `beschreibung`, `modell_fassung`, `status` (`verwendbar`/`fehlerhaft`), `fehleranzahl` |
 | `modellstruktur(kat, id, fassung)` | Gruppen und Elemente (`darstellung`, `hydrostatik_volumen`, optional `bewegung`), `gesamtmasse_kg`, `huellquader_m{min,max}` |
 | `darstellungsgeometrie(kat, id, fassung[, element])` | `teile[]` mit `element_id`, `gruppe`, `herkunft` (`darstellung`/`volumen_ersatz`), `farbe_rgb`, `oberflaeche`, `punkte_m`, `dreiecke`; dazu `diagnosen` |
@@ -713,7 +713,7 @@ Starrkörperbewegung. Die erste Relativgeschwindigkeit nutzt die Translation
 am Gesamtschwerpunkt; lokale Rotationsanteile sind eine spätere Optimierung.
 Die bestehende hydrostatische Statik und der Testantrieb-Vertrag V3 bleiben
 davon getrennt. Dauerhafte Hydrodynamik- und Profilangaben liegen im
-bestehenden `modell.json`-Vertrag und werden in der vorhandenen
+bestehenden `bootsmodell.json`-Vertrag und werden in der vorhandenen
 Modellbeschreibungsspezifikation geführt. Laufbezogene Fluiddaten werden in
 einem typisierten Core-Kontext transportiert. Der bestehende Simulationsstart
 bleibt zunächst unverändert; die GUI benötigt dafür keine neuen
@@ -924,7 +924,7 @@ erwartungsgemäß; sie hasht das gesamte einzelne OBJ und das JSON.
 
 ```powershell
 .\build\standard\Release\segelphysik_konvertieren.exe `
-  "..\Modelle\420\modell.json" ".\build\standard\mein-420-v2"
+  "..\Modelle\420\bootsmodell.json" ".\build\standard\mein-420-v2"
 ```
 
 Alternativ CPPI-0065 `konvertiere_modell_v2(quelle, zielordner)`.
@@ -933,13 +933,263 @@ eigene OBJ-Quellnetze materialisiert; Schema 2 enthaelt keine
 `ableitung`-Felder. Physik und effektive Darstellungsgeometrie bleiben erhalten.
 Der Zielordner darf nicht existieren; sein Elternordner muss existieren.
 Originale werden nur gelesen, nie verändert. Ergebnis sind genau
-`modell.json` und `boot.obj`; der normale Katalog-/Inspektionsimport kann
+`bootsmodell.json` und `boot.obj`; der normale Katalog-/Inspektionsimport kann
 deren gemeinsamen Elternordner anschließend wie bei Altmodellen lesen.
 Schreibfehler melden gegebenenfalls einen unvollständigen neuen Ordner,
 der nicht stillschweigend entfernt wird.
 Der Regressionstest erzeugt zusätzliche demonstrierbare Referenzkopien
 unter `build\standard\v2-modelle-test`. Das sind Testprodukte, keine
 Änderungen an `..\Modelle` und keine automatische Migration beim Laden.
+
+## C-0.12: Persistente Segel-Einbaulage
+
+Maßgeblich sind [Spezifikation Segelkonfigurator, Abschnitte 1–9](../Spezifikationen/Spezifikation_Segelkonfigurator.md)
+und [CPPI-0120 bis CPPI-0136](Schnittstellenregister_Core.md). Die neue
+Schnittstelle liegt in `segelphysik/segelkonfigurator.hpp`; sie ist
+transport-, Qt- und VTK-unabhängig. `ModelInspection` bleibt ein
+unveränderlicher Ausgangssnapshot. Die Segel-API liefert neue Meshkopien,
+die die GUI anstelle der unveränderten Segelmeshes darstellen kann.
+
+`leseSegelKonfiguration(katalog, inspection)` gibt direkt einen
+`SegelKonfigurationSnapshot` zurück. Status `NichtKonfiguriert` bedeutet,
+dass der Block `konfiguration` in `bootsmodell.json` fehlt; die Standardlage ist dann die
+Identität. `Bereit` bezeichnet eine gültige geladene Fassung. Bei
+beschädigter, fremder oder quellenveralteter Datei ist der Status `Fehler`
+mit `diagnosen`; das Lesen wirft solche Formatfehler nicht nach außen.
+Der Snapshot enthält Modell-ID/-Fassung, Quellfingerprint, Revisionsstring,
+explizite Referenzen, Lagen und die unveränderten Ausgangsmeshes der
+konfigurierbaren Segel. Fehlende Original-Buglage in einem älteren Eintrag
+wird als `Unbekannt` geladen, ohne seine Einbaulage zu ändern.
+
+Für den 420er ist das Elementmapping ausdrücklich
+seit der Ordnerumstellung vom 06.11.2026 unter `modells/` abgelegt.
+Der bisherige Datenordner `meshes/` wurde in allen elf Referenzmodellen
+umbenannt; die Dateipfade in `bootsmodell.json` wurden entsprechend angepasst.
+Die API-Felder `meshes` behalten dagegen ihren Namen und ihre Bedeutung.
+Geometrie- und Lookup-Dateien bleiben byteidentisch. Da Modellfassung und
+Segelquellen-Fingerprints auch Pfade berücksichtigen, wurden die
+Fingerprints der vorhandenen 420er-Konfiguration kontrolliert migriert;
+Revision, Einbaulagen und Original-Buglagen bleiben erhalten.
+
+Das Elementmapping lautet
+`Großsegel` → `420_grosssegel` / `modells/gui/grosssegel.obj` /
+Lookup `420_grosssegel` und `Fock` → `420_fock` /
+`modells/gui/fock.obj` / Lookup `420_fock`. Hals, Schothorn und
+Kopfecken kommen aus den IDs der jeweiligen intrinsischen `grundkontur`,
+nicht aus Punktreihenfolge. Die Riggreferenzen werden in
+`Code/src/segelkonfigurator.cpp` aus den `Darstellung.datei`-Referenzen der
+Modellelemente `Mast`, `Großbaum`, `Vorstag` aufgeloest und gegen die
+expliziten 420-Dateipfade geprueft: Mast-/Baumanschlag ist die
+Mast-Mittellinie auf Hoehe der Baum-Endkappen, die Grossbaumachse zwischen
+deren Zentren, der Fockdeckanschlag das erste Vorstagquerschnittszentrum
+und die Vorstagachse aus den ersten zwei Querschnittszentren. Die reproduzierbaren
+420er-Geometriewerte sind Mast-/Baumanschlag `[0.85070675, 0, 1.35] m`,
+Baumvektor zum Schothorn `[-2.338488, 0.539883, 0] m`, Fockdeck
+`[2.00570675, 0, 0.616428] m` und Vorstagrichtung
+`[-0.1475, 0, 0.510447] m`. Diese Werte stammen aus den OBJ-Vertices
+(`modells/gui/mast.obj`, `grossbaum.obj`, `vorstag.obj`), deren Kommentare
+Meter und +X Bug, +Y Backbord, +Z oben festlegen. Der Core-Kopietest
+berechnet dieselben Anschlaege/Achsen unabhaengig aus den Quelldateien und
+prueft den Winkel zur automatisch platzierten Segelkontur mit <= 1e-6 rad.
+Es gibt keine AABB-/Vertex-Reihenfolge-Heuristik zur Wahl der
+Segelkonturecken. Die Rigg-Querschnittsstruktur ist fuer diesen
+rekonstruierten 420er explizit: `mast.obj` enthaelt 24-Vertex-Ringe
+(erste zwei Ringe: Vertices 1–24 und 25–48); die Mastachse wird zwischen
+den Ringzentren auf die z-Hoehe der Baum-Endkappen interpoliert.
+`grossbaum.obj` enthaelt zwei 24-Vertex-Ringe (1–24, 25–48) und die
+Endkappenzentren als Vertices 49/50; die Kappenzentren muessen innerhalb
+1e-6 m mit den jeweiligen Ringzentren uebereinstimmen. `vorstag.obj`
+enthaelt den Deckquerschnitt in Vertices 1–8 und den folgenden
+Querschnitt in Vertices 9–16; ihre Differenz definiert die lokale
+Vorstagachse. Der unabhaengige CTest liest diese OBJ-Vertices selbst und
+prueft Anschlaege und resultierende Liekachsen gegen sie.
+Die Geometriewerte beschreiben den nicht simulationsfreigegebenen
+420er-Entwurf, keine Messgenauigkeit.
+
+**Autorisierte neutrale Basis fuer alle drei Boote:** Automatik folgt
+nicht mehr einem ausgeschwenkten Rohbaum, sondern stellt die
+Mittschiffsbasis her. 420, Folkeboot und Optimist speichern und zeigen
+Großsegel/Fock/Großbaum in 0-Grad-Oeffnung; Mast-/Vorliekneigung bleibt
+erhalten, Quaternionen sind deshalb nicht generell Identitaet.
+Opti-Spriet folgt konsistent der starren Segelpose. Keine neue UI.
+Folk/Opti verwenden explizite `Montage`-OBJ-Vertex-/Ringreferenzen
+direkt am bestehenden Element; genaue Indices, Semantik und gemessene
+Quellenkonflikte stehen in
+[Core-Spezifikation Abschnitt 2a](../Spezifikationen/Spezifikation_Segelkonfigurator.md).
+Ihre intrinsische Quelle steht einmalig unter `Segel.quelle_datei`,
+ein nicht vorhandener Lookup wird weder erfunden noch als notwendig
+fuer reine OBJ-Montage ausgegeben. `CORE-SEG-0030` im nutzbaren
+Snapshot kennzeichnet unvereinbare intrinsische Masse/OBJ und fehlende
+Physikfreigabe. Die API raet keine unbekannten Modellzuordnungen.
+
+**Aktueller datengetriebener Vertrag (06.11.2026):** Die obigen
+Folk-/Opti-Indices sind historische Referenzen. Neu rekonstruierte
+GUI-OBJs werden anhand ihrer Quelldeklaration und semantischen Kontur
+aufgeloest; ungepruefte alte Vertexindices werden nicht auf neue
+Meshes angewandt. `CORE-SEG-0031` benennt die veraltete Referenz und
+den belegten read-only Legacy-Fallback, `CORE-SEG-0032` die starre
+Umrechnung einer bestehenden Pose ohne Ruecksetzung. Quellenchecks
+bereits bestaetigter Referenzen werden strikt validiert.
+Die Referenzbildung verwendet keine Boots-ID-Sonderzweige.
+
+`getMesh(inspection, "darstellung")` liefert genau eine aktuelle
+Geometrie je vorhandener Objekt-ID, einschliesslich bestaetigter oder
+belegt adaptierter Segellage. Andere Mesh-Typen bleiben physische Quellen;
+`getObjectTree(..., "objekte")` referenziert nur die aktuelle Darstellung.
+Mehrdeutige Darstellung wird diagnostiziert, nicht durch Auswahl des
+ersten Meshes kaschiert. Das optionale Feld `InspectionMesh.montage`
+traegt `MontageReferenz` (CPPI-0139) fuer alle dargestellten Objekte.
+`inspectionMeshJson` exportiert denselben Block unter `montage`;
+bestehende JSON-/C++-Geometriefelder bleiben kompatibel.
+Segellose Modelle liefern einen gueltigen leeren Konfigurationssnapshot.
+Die erste explizite Bestaetigung speichert Quellenchecks ausschliesslich
+in `setting.montage_referenz`; Basisfassung und immutable Snapshot
+bleiben stabil. Originalmodelle werden in diesem Auftrag nur gelesen.
+
+Eine Aktionsvorschau wird mit `pruefeSegelAktion(snapshot, request)`
+berechnet und schreibt nichts. Der Request benennt mit `element_id`
+exakt `Großsegel` oder `Fock` und eine Aktion:
+
+- `Automatisch` stellt die neutrale Mittschiffsbasis wieder her:
+  420 an Mast/neutralem Baum bzw. Vorstag, Folk/Opti anhand expliziter
+  belegter OBJ-Referenzen. Automatik ersetzt vorherige manuelle Lage,
+  aber keine Original-Buglage.
+- `Translation` interpretiert `ebene` als XY/XZ/YZ in Modellachsen.
+  `translation_m` darf nur in den beiden Ebenenachsen Anteile haben;
+  die Normal-Komponente muss null sein.
+- `Rotation` interpretiert `winkel_grad` mathematisch um die positive
+  Normale der genannten Modellebene. `bewegte_ecke` benennt den Griff:
+  jede Ecke außer `Hals` rotiert um den Hals; beim Griff `Hals` rotiert
+  um `KopfVorliek`. Es wird kein freier Weltpivot angenommen.
+- `FockVersatzCm` ist ein absoluter vorzeichenbehafteter Zentimeterwert.
+  Die feste Referenz ist der Deckanschlag und die normierte Richtung zeigt
+  vom Deck zum Mast. Wiederholte Eingabe addiert nichts. Die resultierende
+  `lage.translation_m`/Geometrie enthaelt den cm-Versatz bereits; die GUI
+  darf ihn nach Uebernahme der Core-Lage nicht nochmals addieren.
+- `OriginalBuglage` erfordert `original_buglage` (`Unbekannt`,
+  `Backbord` oder `Steuerbord`) und wird wie die Lage transaktional
+  gespeichert.
+
+Vorschau- und Speicherergebnis haben Status `Vorschau`, `Gespeichert`
+oder `Fehler`; sie tragen den Revisionsstring, optional die vollständige
+resultierende Lage des betroffenen Segels, Meshkopien und strukturierte
+Diagnosen. Normale Aktionen geben nur alle Meshes des betroffenen Segels
+zurück. `leseKonfigurierteSegelgeometrie(snapshot)` liefert read-only
+alle konfigurierten Segelmeshes für den initialen Modellwechsel; übrige
+Modellgeometrie bezieht die GUI weiter aus `ModelInspection`. Damit wird
+ein bestätigter Zustand dargestellt, ohne den Inspektionssnapshot zu
+mutieren.
+
+`bestaetigeSegelAktion(...)` verlangt die Revision der Vorschau. Unter
+einer prozessübergreifenden Betriebssystemsperre werden Fassung,
+Quellfingerprint und aktuelle Revision erneut geprüft; konkurrierende
+oder veraltete Anforderungen scheitern mit Diagnose. `bootsmodell.lock`
+schuetzt das gezielte Aktualisieren von `setting` direkt am bestehenden
+Element in `bootsmodell.json` und der gemeinsamen `konfiguration`-Metadaten.
+Keine zentrale Elementmap und keine neuen IDs. Andere Eintraege, unbekannte
+Felder und sonstiger Modellinhalt bleiben erhalten. Eine temporäre Datei
+im selben Modellordner wird erst nach
+vollständigem Schreiben atomar ersetzt. Vorherige bestätigte Daten bleiben
+bei Fehlern erhalten. Die Datei enthält Modell-/Quellidentitäten,
+Revision, Quaternion `rotation_xyzw`, Translation in Metern,
+Original-Buglage und Quellfingerprint je Segel. Der Fockversatz wird aus
+Pose und Vorstagreferenz abgeleitet, nicht gespeichert. Intrinsische
+Segel-JSON, Darstellungs-OBJ, Riggmeshes und Lookup-Dateien werden nie
+geschrieben.
+
+Persistenzschema (Montagepose, kein Betriebstrimm):
+
+```json
+{
+  "konfiguration": {
+    "schema_version": 1,
+    "revision": 12,
+    "modell_id": "420",
+    "modell_fassung": "fnv1a64:...",
+    "quellen_fingerprint": "..."
+  },
+  "gruppen": {
+    "rigg": {
+      "elemente": [{
+        "id": "Fock",
+        "Darstellung": {"datei": "modells/gui/fock.obj"},
+        "Segel": {
+          "quelle_datei": "modells/aerodynamik/fock/fock.json",
+          "lookup_datei": "modells/aerodynamik/fock/LookUp/lookup.json"
+        },
+        "setting": {
+          "translation_m": [0.0, 0.0, 0.0],
+          "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+          "konfiguriert": true,
+          "original_buglage": "unbekannt",
+          "quellen_fingerprint": "..."
+        }
+      }]
+    }
+  }
+}
+```
+
+Die Zahlen sind nur Schemaillustration, keine validierte Focklage.
+Teilkonfigurationen sind erlaubt; fehlende Segel bleiben initial.
+Der initiale leere Block darf ausschliesslich `schema_version:1`,
+`revision:0` ohne Modell-/Quellenidentitaet enthalten;
+der erste bestaetigte Speichervorgang ergaenzt diese Identitaet.
+Alle vorhandenen Elemente verwenden dieselben gemeinsamen Posefelder in
+`setting`; Nicht-Segel haben keine Buglage oder Segel-Quellfingerprints.
+Bestaetigte Nicht-Segel-Montageposen werden genau einmal bei
+Darstellungsaufbereitung angewendet. Die lokale 420-Segelquelle wird
+nur von der Segel-API montiert. Folk-/Opti-OBJ-Segel erscheinen bereits
+neutral in der generischen Inspektion; ihre Segel-API liest eigene
+unveraenderte Rohmeshkopien und montiert genau einmal.
+Physische Netze, Massenschwerpunkt und Traegheit bleiben unveraendert;
+Montagedarstellung ist in dieser Stufe keine physikalische Verstellung.
+Ein Legacy-Sidecar oder die alte zentrale Elementmap wird explizit abgelehnt.
+Bei Migration Revision, Pose, bestaetigten Zustand und Original-Buglage
+unveraendert uebernehmen; anhand bestehender IDs die vorhandenen Elemente
+finden und ihre `setting`-Felder gezielt ergaenzen. Keine IDs hinzufuegen.
+Redundante IDs und cm-Werte entfallen. Intrinsische Quelle/Lookup einmalig
+am jeweiligen Element referenzieren.
+Modellfassung nach Umbenennung neu ermitteln, SHA-256-Quellfingerprints
+nur bei veraenderten Pfaden/Bytes neu ermitteln.
+
+Modellfingerprint: FNV-1a64 mit Offset `14695981039346656037` und Faktor
+`1099511628211`, modulo 2^64. Jede Teilzeichenfolge wird mit ihrer
+UTF-8-Byte-Laenge als 8 little-endian Bytes vorangestellt gehasht:
+zuerst das mit nlohmann geparste Modelldokument ohne Top-Level-`konfiguration`
+und ohne `setting` direkt an `gruppen.*.elemente[]` mit String-ID
+kanonisch per `dump()` serialisieren.
+Dann alle rekursiv gefundenen Stringfelder `datei`, `quelle_datei`,
+`lookup_datei`,
+eindeutig und lexikographisch sortiert, jeweils relativer Pfad und
+Dateiinhalt. Keine rekursive Inventarisierung aller Lookup-Produkte.
+Alle anderen Modellinhalte inklusive gleichnamiger `setting`-Felder
+ausserhalb der Elementobjekte sowie referenzierte Quellen bleiben erfasst.
+Eine fehlende
+referenzierte Datei liefert den expliziten Marker `[fehlende Quelldatei]`;
+Lese-/JSON-Fehler werden nicht verschluckt. Ausgabe `fnv1a64:` plus 16
+kleine Hexziffern. `lade_modell` und `modell_fassung` verwenden dieselbe
+Berechnung; Konfigurationsspeicherung aendert die Modellfassung nicht.
+Der native Test bietet `segelkonfigurator_tests --fingerprint <bootsmodell.json>`
+zur exakten migrationsseitigen Berechnung ohne eigene JSON-Kanonisierung.
+
+Der Winkelvertrag ist von Einbaulage getrennt. `stelleSegelStellwinkelVorschauDar`
+wendet Grad-Winkel um die gerichtete Kopf-zum-Hals-Achse durch den
+semantischen Hals vor der Einbaulage an (lokale 420-Quelle `(0,0,-1)`,
+Folk/Opti explizite OBJ-Vorlieksachse). Positiv bedeutet Backbord,
+negativ Steuerbord.
+Bei bekannter, abweichender Original-Buglage spiegelt der Core lokal mit
+`diag(1,-1,1)` und kehrt Dreiecksorientierungen um; bei gleicher Seite
+bleibt die Form ungespiegelt. Bei `delta=0` bleibt die Originalform in
+der gespeicherten neutralen Basis erhalten, nicht in der historisch
+ausgeschwenkten Rohstellung. Nichtnullwinkel mit unbekannter Originalseite liefern Diagnose,
+statt eine Seite aus dem Wölbungsvorzeichen abzuleiten. Der Winkel ist
+in C-0.12 eine transiente Darstellungsvorschau, keine gespeicherte
+Stellereignisfolge oder Physikauswertung.
+
+Die native Vertragstest-Suite kopiert das 420er-Modell in das Core-Build-
+Verzeichnis; die Originalmodelle und Lookup-Produkte sind keine
+Testschreibziele.
 
 ## C-0.9: Dynamische modellfeste Fremdkraft – Core-Mindestvertrag
 

@@ -67,7 +67,7 @@ nur die dokumentierten Felder enthalten.
 **Version:** C-0.2 · **Status:** umgesetzt · **Herkunft:** IDEE-C-00020, -00021, -00022, -00025
 
 Aufruf `modellkatalog(ordner)` mit dem von der GUI gewählten Ordner. Ein
-Hauptobjekt ist ein Modell, also eine `modell.json` direkt im Ordner oder in
+Hauptobjekt ist ein Modell, also eine `bootsmodell.json` direkt im Ordner oder in
 einem unmittelbaren Unterordner. Das Ergebnis ist ein Katalogobjekt, das die
 GUI hält; der Core führt keinen globalen Zustand. Je Hauptobjekt:
 
