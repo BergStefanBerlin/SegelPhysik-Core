@@ -182,7 +182,7 @@
       "id": "CORE-KAT-0002",
       "kurztext": "Modell-ID mehrfach im Ordner vergeben.",
       "pass_kriterium": "Jede Modell-ID kommt im Katalog genau einmal vor.",
-      "fail_kriterium": "Mehrere bootsmodell.json tragen dieselbe id; alle betroffenen Modelle sind fehlerhaft.",
+      "fail_kriterium": "Mehrere modells_information.json tragen dieselbe id; alle betroffenen Modelle sind fehlerhaft.",
       "handlungsanweisung": "IDs in den Modellbeschreibungen eindeutig vergeben.",
       "pruefstatus": "implementiert"
     },

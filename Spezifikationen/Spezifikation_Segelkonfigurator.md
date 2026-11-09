@@ -140,7 +140,7 @@ belegen den Konturbezug. Alte ungepruefte Segelindices werden **nicht**
 auf das neue Mesh angewandt. Sind ihre nichtentarteten semantischen
 Ecken in der deklarierten Massenquelle erhalten, wird daraus eine starre
 Quellbasis abgeleitet. Bei fehlender expliziter Massenreferenz darf das
-vorhandene standardisierte Schwesterobjekt `masse/<OBJ-Dateiname>` im
+vorhandene standardisierte Schwesterobjekt `mass/<OBJ-Dateiname>` im
 gleichen `modells`-Teilbaum als Legacy-Beleg dienen; ohne diesen Beleg
 wird die Automatik diagnostisch abgewiesen. Keine Skalierung:
 abweichende historische Segelabmessungen werden nicht kuenstlich angepasst.
@@ -201,7 +201,7 @@ Die intrinsischen JSONs bleiben unveraendert, es gibt dort keine
 vorhandenen kompatiblen Lookups. `CORE-SEG-0030` im gueltigen
 Montagesnapshot weist die inkompatible intrinsische Kopplung und fehlende
 Physikfreigabe sichtbar aus. Der verschachtelte Alt-Sidecar unter
-`optimist/modells/aerodynamik/segelkonfiguration.json` enthaelt kopierte
+`optimist/modells/aerodynamics/segelkonfiguration.json` enthaelt kopierte
 420-Werte (inklusive nicht existierender Opti-Fock); er ist kein
 freigegebener Montagevertrag und wird weder gelesen noch umgeschrieben.
 
@@ -276,7 +276,7 @@ vorhandener unlesbarer/ungueltiger Block erzeugt dagegen Diagnose.
 Beim Speichern bleiben sonstiger Modellinhalt, nicht betroffene Eintraege
 und unbekannte Felder einschliesslich segelspezifischer Erweiterungen erhalten.
 
-`bootsmodell.lock` schuetzt Revisions-/Quellenpruefung und atomare Ersetzung
+`modells_information.lock` schuetzt Revisions-/Quellenpruefung und atomare Ersetzung
 der gesamten Modelldatei. Der Modellfingerprint schliesst ausschliesslich
 den obersten `konfiguration`-Block und `setting` unmittelbar an benannten
 Elementobjekten unter `gruppen.*.elemente[]` aus und verwendet die kanonische

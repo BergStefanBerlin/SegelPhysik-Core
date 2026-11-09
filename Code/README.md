@@ -91,7 +91,7 @@ Beispiele, vom Repository aus (Ausgabedateien dürfen noch nicht existieren):
 
 ```powershell
 $cli = ".\build\standard\Release\segelphysik_cli.exe"
-$modell = "..\Modelle\quader\bootsmodell.json"
+$modell = "..\Modelle\quader\modells_information.json"
 & $cli --pruefen $modell
 & $cli --statisch $modell ".\build\statik.json"
 & $cli --dynamisch $modell ".\build\dynamik.jsonl" 1 0.01

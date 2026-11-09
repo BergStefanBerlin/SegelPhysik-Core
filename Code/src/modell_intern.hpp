@@ -16,9 +16,12 @@ const nlohmann::json* geometrieableitung(const ModellBeschreibung& beschreibung,
 Mesh abgeleitetes_mesh(const Mesh& quelle, const nlohmann::json& definition);
 const nlohmann::json* element_setting(const nlohmann::json& dokument,
                                      const std::string& element_id);
+nlohmann::json normalisiere_modell_information(const nlohmann::json& dokument);
+nlohmann::json aktualisiere_modell_information(const nlohmann::json& information,
+                                               const nlohmann::json& core_dokument);
 Pose setting_pose(const nlohmann::json& setting);
 void validiere_element_settings(const nlohmann::json& dokument,
-                                const std::string& kontext = "bootsmodell.json");
+                                const std::string& kontext = "modells_information.json");
 
 struct ModellInspektionsImport {
     ModellBeschreibung beschreibung;

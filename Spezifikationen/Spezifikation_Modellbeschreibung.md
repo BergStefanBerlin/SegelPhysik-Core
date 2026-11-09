@@ -3,7 +3,7 @@
 ## Status und Geltungsbereich
 
 **Autorisierte Montage-Ablageaenderung 06.11.2026:** Aktive Dateien heissen
-`bootsmodell.json`. Jedes vorhandene Element darf ein `setting` direkt
+`modells_information.json`. Jedes vorhandene Element darf ein `setting` direkt
 neben `id` und `Darstellung` tragen: `translation_m`, `rotation_xyzw`,
 `konfiguriert`. Default ist Identitaet/false; endliche Translation und
 normiertes Quaternion werden fuer alle Elemente validiert. Unbekannte
@@ -393,9 +393,9 @@ Abfragen mit alter Katalogfassung.
 ### A-C-00109: Explizite, geschützte Migration
 
 `konvertiere_modell_v2(quelle, zielordner)` sowie das Kommando
-`segelphysik_konvertieren <bootsmodell.json> <neuer Zielordner>` lesen über die
+`segelphysik_konvertieren <modells_information.json> <neuer Zielordner>` lesen über die
 gemeinsamen Importer und erzeugen ausschließlich einen neuen Zielordner
-mit `bootsmodell.json` und `boot.obj`. Ein existierender Zielordner wird
+mit `modells_information.json` und `boot.obj`. Ein existierender Zielordner wird
 abgelehnt, auch bei identischem Inhalt. Originaldateien bleiben
 unverändert. Der Konverter übernimmt vorhandene Geometrievarianten,
 Material-/Farbmetadaten, Bewegungen und explizite physikalische Daten.

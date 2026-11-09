@@ -116,12 +116,12 @@ void reference_models(const fs::path& source, const fs::path& output)
     const auto old_catalogue = modellkatalog(source);
     for (const auto* name : {"optimist", "420", "folkeboot", "bleistift", "kegel", "kugel",
         "platte", "pyramide", "quader", "rolle", "unregelmaessig"}) {
-        const auto old_file = source / name / "bootsmodell.json";
+        const auto old_file = source / name / "modells_information.json";
         const auto target = output / name;
         const auto original = read(old_file);
         konvertiere_modell_v2(old_file, target);
         require(read(old_file) == original, "Original JSON changed");
-        const auto new_file = target / "bootsmodell.json";
+        const auto new_file = target / "modells_information.json";
         same_model(lade_modell(old_file), lade_modell(new_file));
         require(modell_fassung(new_file) == lade_modell(new_file).fassung, "Fingerprint inconsistent");
         const auto catalogue = modellkatalog(output);
@@ -130,9 +130,17 @@ void reference_models(const fs::path& source, const fs::path& output)
         require(old_entry && entry && old_entry->status == entry->status, "Catalogue status changed");
         const auto old_snapshot = readModelInspection(old_catalogue, name, old_entry->modell_fassung);
         const auto snapshot = readModelInspection(catalogue, name, entry->modell_fassung);
-        require(old_snapshot->info().status == snapshot->info().status &&
-            old_snapshot->info().diagnostics.size() == snapshot->info().diagnostics.size(),
-            "Inspection diagnostics changed");
+        if (old_snapshot->info().status != snapshot->info().status ||
+            old_snapshot->info().diagnostics.size() != snapshot->info().diagnostics.size()) {
+            std::string details;
+            for (const auto& diagnostic : old_snapshot->info().diagnostics)
+                details += " old:" + diagnostic.fehler_id + ":" + diagnostic.text;
+            for (const auto& diagnostic : snapshot->info().diagnostics)
+                details += " new:" + diagnostic.fehler_id + ":" + diagnostic.text;
+            throw std::runtime_error("Inspection diagnostics changed for " + std::string(name) +
+                " (" + std::to_string(old_snapshot->info().diagnostics.size()) + " -> " +
+                std::to_string(snapshot->info().diagnostics.size()) + ")" + details);
+        }
         compare_display(darstellungsgeometrie(*old_snapshot), darstellungsgeometrie(*snapshot));
         const auto old_tree = modellstruktur(*old_snapshot);
         const auto new_tree = modellstruktur(*snapshot);
@@ -219,7 +227,7 @@ void schema_v3_migration(const fs::path& output)
     fs::create_directory(v3_output);
     for (const auto* name : {"bleistift", "kegel", "kugel", "platte", "pyramide",
         "quader", "rolle", "unregelmaessig", "420", "folkeboot", "optimist"}) {
-        const auto old_file = output / name / "bootsmodell.json";
+        const auto old_file = output / name / "modells_information.json";
         const auto target = v3_output / name;
         const auto original = read(old_file);
         if (conflicted.count(name)) {
@@ -230,7 +238,7 @@ void schema_v3_migration(const fs::path& output)
         }
 
         konvertiere_modell_v3(old_file, target);
-        const auto new_file = target / "bootsmodell.json";
+        const auto new_file = target / "modells_information.json";
         require(read(old_file) == original, "Schema-3 migration changed source");
         same_model(lade_modell(old_file), lade_modell(new_file));
         const auto document = Json::parse(read(new_file));
@@ -262,10 +270,10 @@ void schema_v3_migration(const fs::path& output)
         }
     }
 
-    const auto v2_file = output / "quader" / "bootsmodell.json";
+    const auto v2_file = output / "quader" / "modells_information.json";
     const auto v2_target = v3_output / "quader-from-v2";
     konvertiere_modell_v3(v2_file, v2_target);
-    same_model(lade_modell(v2_file), lade_modell(v2_target / "bootsmodell.json"));
+    same_model(lade_modell(v2_file), lade_modell(v2_target / "modells_information.json"));
 }
 
 void derived_migration(const fs::path& output)
@@ -277,11 +285,11 @@ void derived_migration(const fs::path& output)
             field + ": " + std::to_string(a) + " vs " + std::to_string(b));
     };
     for (const auto* name : {"420", "folkeboot", "optimist"}) {
-        const auto old_file = output / name / "bootsmodell.json";
+        const auto old_file = output / name / "modells_information.json";
         const auto target = converted / name;
         const auto original = read(old_file);
         konvertiere_modell_v3(old_file, target, true);
-        const auto new_file = target / "bootsmodell.json";
+        const auto new_file = target / "modells_information.json";
         const auto before = lade_modell(old_file), after = lade_modell(new_file);
         require(read(old_file) == original, "Derived migration changed original");
         near(before.masse_kg, after.masse_kg, 1e-9*before.masse_kg, "Total mass");
@@ -371,7 +379,7 @@ void derived_migration(const fs::path& output)
 
     const auto negative = converted / "invalid";
     fs::create_directory(negative);
-    auto document = Json::parse(read(output / "schema-v3-modelle" / "quader" / "bootsmodell.json"));
+    auto document = Json::parse(read(output / "schema-v3-modelle" / "quader" / "modells_information.json"));
     write(negative / "boot.obj", read(output / "schema-v3-modelle" / "quader" / "boot.obj"));
     auto& volume = document["gruppen"].begin().value()["elemente"][0]["Hydrostatik"]["volumen"];
     for (const auto& definition : {Json{{"art","unknown"},{"z_m",0.}},
@@ -380,16 +388,16 @@ void derived_migration(const fs::path& output)
             Json{{"art","z_schnitt"},{"z_m",0.},{"steigung_x","invalid"}},
             Json{{"art","ohne_deckflaeche"},{"z_m",0.}}}) {
         volume["ableitung"] = definition;
-        write(negative / "bootsmodell.json", document.dump());
-        rejects([&] { lade_modell(negative / "bootsmodell.json"); }, "CORE-MOD-0009");
+        write(negative / "modells_information.json", document.dump());
+        rejects([&] { lade_modell(negative / "modells_information.json"); }, "CORE-MOD-0009");
     }
     volume.erase("ableitung");
     auto& shell = document["gruppen"].begin().value()["elemente"][0]["Hydrostatik"]["masse"];
     shell["art"] = "schale"; shell["wanddicke_m"] = .01;
     shell["ableitung"] = {{"art","ohne_deckflaeche"},{"z_m",1e6}};
-    write(negative / "bootsmodell.json", document.dump());
-    rejects([&] { lade_modell(negative / "bootsmodell.json"); }, "CORE-MOD-0009");
-    rejects([&] { konvertiere_modell_v3(negative / "bootsmodell.json", converted / "must-not-exist", true); },
+    write(negative / "modells_information.json", document.dump());
+    rejects([&] { lade_modell(negative / "modells_information.json"); }, "CORE-MOD-0009");
+    rejects([&] { konvertiere_modell_v3(negative / "modells_information.json", converted / "must-not-exist", true); },
         "CORE-MOD-0009");
     require(!fs::exists(converted / "must-not-exist"), "Invalid derivation created a target");
 }
@@ -397,10 +405,10 @@ void validation(const fs::path& output)
 {
     const auto target = output / "validation";
     fs::create_directory(target);
-    const auto template_file = output / "quader" / "bootsmodell.json";
+    const auto template_file = output / "quader" / "modells_information.json";
     auto root = Json::parse(read(template_file));
     const auto geometry = read(output / "quader" / "boot.obj");
-    const auto file = target / "bootsmodell.json";
+    const auto file = target / "modells_information.json";
     write(target / "boot.obj", geometry);
     auto test = [&](const Json& document, const std::string& code) {
         write(file, document.dump());

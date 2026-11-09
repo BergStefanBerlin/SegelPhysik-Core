@@ -49,7 +49,7 @@ private:
     std::vector<std::vector<KatalogDiagnose>> diagnosen_;
 };
 
-// Searches ordner/bootsmodell.json and ordner/*/bootsmodell.json, sorted by folder name.
+// Searches ordner/modells_information.json and ordner/*/modells_information.json, sorted by folder name.
 // CORE-KAT-0001 if the folder is not readable.
 Modellkatalog modellkatalog(const std::filesystem::path& ordner);
 

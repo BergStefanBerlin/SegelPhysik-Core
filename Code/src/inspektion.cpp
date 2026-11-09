@@ -104,10 +104,10 @@ std::string safe_text(const std::string& value)
 
 std::string logical_location(std::string value)
 {
-    const auto model_file = value.find("bootsmodell.json");
+    const auto model_file = value.find("modells_information.json");
     const bool model_diagnostic = model_file != std::string::npos;
     if (model_file != std::string::npos) {
-        value.erase(0, model_file + std::string("bootsmodell.json").size());
+        value.erase(0, model_file + std::string("modells_information.json").size());
         while (!value.empty() && (value.front() == ',' || value.front() == ':' ||
                value.front() == ' ' || value.front() == '\\' || value.front() == '/'))
             value.erase(value.begin());
@@ -739,6 +739,7 @@ std::shared_ptr<const ModelInspection> readModelInspection(
         std::ifstream input(model_file);
         input >> mounting_document;
     }
+    mounting_document = normalisiere_modell_information(mounting_document);
     std::vector<std::pair<std::filesystem::path, std::string>> display_versions;
     for (const auto& entry : impl->description.elemente)
         if (entry.darstellung)

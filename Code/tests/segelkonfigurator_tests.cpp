@@ -142,7 +142,7 @@ void strip_settings(nlohmann::json& model)
 
 bool has_temporary_configuration_file(const fs::path& root)
 {
-    const auto prefix = std::string("bootsmodell.json.tmp.");
+    const auto prefix = std::string("modells_information.json.tmp.");
     for (const auto& entry : fs::directory_iterator(root))
         if (entry.path().filename().u8string().find(prefix) == 0) return true;
     return false;
@@ -395,7 +395,7 @@ fs::path copy_model(const fs::path& source)
         const auto relative = fs::relative(entry.path(), source);
         const auto filename = entry.path().filename().u8string();
         if (filename == "segelkonfiguration.json" || filename == "segelkonfiguration.lock" ||
-            filename == "bootsmodell.lock")
+            filename == "modells_information.lock")
             continue;
         const auto relative_text = relative.generic_u8string();
         const bool lookup_product = relative_text.find("LookUp/") != std::string::npos ||
@@ -409,7 +409,7 @@ fs::path copy_model(const fs::path& source)
             fs::copy_file(entry.path(), target, fs::copy_options::overwrite_existing);
         }
     }
-    const auto model_path = destination / "bootsmodell.json";
+    const auto model_path = destination / "modells_information.json";
     auto model = nlohmann::json::parse(read_binary_file(model_path));
     strip_settings(model);
     std::ofstream output(model_path, std::ios::binary | std::ios::trunc);
@@ -478,10 +478,16 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
         const auto immutable_meshes = getMesh(
             *inspection, "darstellung", std::vector<std::string>{"Großsegel", "Fock"});
         auto snapshot = leseSegelKonfiguration(catalog, *inspection);
-        require(snapshot.status == SegelKonfigurationsStatus::NichtKonfiguriert,
-                "Missing config must be a non-error unconfigured state");
+        if (snapshot.status != SegelKonfigurationsStatus::NichtKonfiguriert) {
+            std::string details = "Missing config must be a non-error unconfigured state (status " +
+                std::to_string(static_cast<int>(snapshot.status)) + ")";
+            for (const auto& diagnostic : snapshot.diagnosen)
+                details += "\n" + diagnostic.code + ": " + diagnostic.nachricht +
+                    " [" + diagnostic.element_id + "]";
+            throw std::runtime_error(details);
+        }
         require(snapshot.revision == "0", "Initial revision must be zero");
-        auto initial_model = nlohmann::json::parse(read_binary_file(root / "bootsmodell.json"));
+        auto initial_model = nlohmann::json::parse(read_binary_file(root / "modells_information.json"));
         initial_model["konfiguration"] = {
             {"schema_version", 1}, {"revision", 0}};
         for (auto& group : initial_model["gruppen"])
@@ -491,7 +497,7 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
                     {"rotation_xyzw", {0., 0., 0., 1.}},
                     {"konfiguriert", false}};
         {
-            std::ofstream output(root / "bootsmodell.json", std::ios::binary | std::ios::trunc);
+            std::ofstream output(root / "modells_information.json", std::ios::binary | std::ios::trunc);
             output << initial_model.dump(2) << '\n';
         }
         snapshot = leseSegelKonfiguration(catalog, *inspection);
@@ -506,11 +512,11 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
         require(snapshot.grundmeshes.size() >= 2, "Original sail meshes must be available");
 
         const auto mast_vertices = read_obj_vertices_independently(
-            root / "modells/gui/mast.obj");
+            root / "modells/visualisation/mast.obj");
         const auto boom_vertices = read_obj_vertices_independently(
-            root / "modells/gui/grossbaum.obj");
+            root / "modells/visualisation/grossbaum.obj");
         const auto stay_vertices = read_obj_vertices_independently(
-            root / "modells/gui/vorstag.obj");
+            root / "modells/visualisation/vorstag.obj");
         const auto boom_cap_a = boom_vertices.at(boom_vertices.size() - 2);
         const auto boom_cap_b = boom_vertices.back();
         const auto boom_section_a = independent_section_center(boom_vertices, 0, 24);
@@ -560,7 +566,7 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
         const auto main_preview = pruefeSegelAktion(snapshot, main_auto);
         check_status(main_preview, SegelErgebnisStatus::Vorschau,
                      "Main automatic preview should succeed");
-        require(nlohmann::json::parse(read_binary_file(root / "bootsmodell.json"))["konfiguration"] ==
+        require(nlohmann::json::parse(read_binary_file(root / "modells_information.json"))["konfiguration"] ==
                     initial_model["konfiguration"],
                 "Preview must not persist configuration");
         require(main_preview.lage.has_value(), "Preview must include resulting pose");
@@ -586,7 +592,7 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
         check_status(main_committed, SegelErgebnisStatus::Gespeichert,
                      "Main automatic commit should persist atomically");
         require(main_committed.revision == "1", "First commit must increment revision");
-        auto partial_model = nlohmann::json::parse(read_binary_file(root / "bootsmodell.json"));
+        auto partial_model = nlohmann::json::parse(read_binary_file(root / "modells_information.json"));
         require(model_element(partial_model, "Großsegel")["setting"]["konfiguriert"] == true &&
                 model_element(partial_model, "Fock")["setting"]["konfiguriert"] == false &&
                 !partial_model["konfiguration"].contains("elemente"),
@@ -596,7 +602,7 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
                 lage(partial_reload, "Großsegel").konfiguriert &&
                 !lage(partial_reload, "Fock").konfiguriert,
                 "Partial configuration must preserve the confirmed sail and leave Fock initial");
-        require(modell_fassung(root / "bootsmodell.json") == entry->modell_fassung,
+        require(modell_fassung(root / "modells_information.json") == entry->modell_fassung,
                 "Saving configuration must preserve base model fingerprint");
         auto with_extension = partial_model;
         auto& mast_setting = model_element(with_extension, "Mast")["setting"];
@@ -608,7 +614,7 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
         main_setting["zukunft"] = "erhalten";
         with_extension["konfiguration"]["erweiterung"] = {{"version", 4}};
         {
-            std::ofstream output(root / "bootsmodell.json", std::ios::binary | std::ios::trunc);
+            std::ofstream output(root / "modells_information.json", std::ios::binary | std::ios::trunc);
             output << with_extension.dump(2) << '\n';
         }
         const auto extension_reload = leseSegelKonfiguration(catalog, *inspection);
@@ -623,7 +629,7 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
             catalog, *inspection, snapshot, fock_auto, snapshot.revision);
         check_status(fock_committed, SegelErgebnisStatus::Gespeichert,
                      "Fock automatic commit should persist");
-        auto after_extension = nlohmann::json::parse(read_binary_file(root / "bootsmodell.json"));
+        auto after_extension = nlohmann::json::parse(read_binary_file(root / "modells_information.json"));
         require(model_element(after_extension, "Mast")["setting"] == mast_setting &&
                 model_element(after_extension, "Großsegel")["setting"] == main_setting &&
                 after_extension["konfiguration"]["erweiterung"] ==
@@ -807,9 +813,9 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
                      "Original bug side must be saved transactionally");
         const auto before_conflict = leseSegelKonfiguration(catalog, *inspection);
 #ifdef _WIN32
-        const auto config_file_path = root / "bootsmodell.json";
+        const auto config_file_path = root / "modells_information.json";
         const auto bytes_before_write_fault = read_binary_file(config_file_path);
-        const auto blocked_temporary = root / "bootsmodell.json.tmp.0";
+        const auto blocked_temporary = root / "modells_information.json.tmp.0";
         fs::create_directory(blocked_temporary);
         auto prewrite_failure = launch_writer(
             executable, root, before_conflict.revision);
@@ -846,7 +852,7 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
                 "Separate writer processes must serialize and reject one stale revision");
         const auto lock_baseline = leseSegelKonfiguration(catalog, *inspection);
         const auto lock_handle = CreateFileW(
-            (root / "bootsmodell.lock").c_str(), GENERIC_READ | GENERIC_WRITE, 0,
+            (root / "modells_information.lock").c_str(), GENERIC_READ | GENERIC_WRITE, 0,
             nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         require(lock_handle != INVALID_HANDLE_VALUE,
                 "Test must be able to hold the model configuration lock");
@@ -926,7 +932,7 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
         check_status(zero_side, SegelErgebnisStatus::Vorschau,
                      "Zero setting must preserve unknown original geometry");
 
-        const auto config_path = root / "bootsmodell.json";
+        const auto config_path = root / "modells_information.json";
         const auto saved_model_bytes = read_binary_file(config_path);
         auto migrated_model = nlohmann::json::parse(saved_model_bytes);
         migrated_model["konfiguration"]["revision"] = 12;
@@ -975,9 +981,9 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
             output << saved_model_bytes;
         }
         for (const auto& source : {
-                "modells/aerodynamik/main/main.json",
-                "modells/aerodynamik/main/LookUp/lookup.json",
-                "modells/gui/mast.obj"}) {
+                "modells/aerodynamics/main/main.json",
+                "modells/aerodynamics/main/LookUp/lookup.json",
+                "modells/visualisation/mast.obj"}) {
             const auto source_path = root / fs::u8path(source);
             const auto source_bytes = read_binary_file(source_path);
             {
@@ -1043,7 +1049,7 @@ void test_configuration(const fs::path& source_model, const fs::path& executable
 
         {
             std::ofstream modified_geometry(
-                root / "modells/gui/grosssegel.obj",
+                root / "modells/visualisation/grosssegel.obj",
                 std::ios::binary | std::ios::app);
             modified_geometry << "\n# source revision conflict\n";
         }
@@ -1093,7 +1099,7 @@ void test_empty_model_configurations(const fs::path& source_model)
     std::size_t checked = 0;
     for (const auto& entry : fs::directory_iterator(source_model.parent_path().parent_path())) {
         if (!entry.is_directory() || entry.path() == source_model.parent_path() ||
-            !fs::exists(entry.path() / "bootsmodell.json")) continue;
+            !fs::exists(entry.path() / "modells_information.json")) continue;
         const auto root = copy_model(entry.path());
         struct Cleanup {
             fs::path root;
@@ -1102,7 +1108,7 @@ void test_empty_model_configurations(const fs::path& source_model)
                 fs::remove_all(root, error);
             }
         } cleanup{root};
-        const auto path = root / "bootsmodell.json";
+        const auto path = root / "modells_information.json";
         const auto fingerprint = modell_fassung(path);
         auto model = nlohmann::json::parse(read_binary_file(path));
         const auto id = model.at("id").get<std::string>();
@@ -1199,16 +1205,17 @@ Vektor3 indexed_center(const std::vector<Vektor3>& vertices,
 void normalize_boat_bases(const fs::path& models)
 {
     for (const auto& id : {"420", "folkeboot", "optimist"}) {
-        auto model = nlohmann::json::parse(read_binary_file(models / id / "bootsmodell.json"));
-        require(!model_element(model, "Großbaum").contains("Montage"),
+        auto model = nlohmann::json::parse(read_binary_file(models / id / "modells_information.json"));
+        require(!model_element(model, "Großbaum").contains("montage"),
                 "Neutral-base migration already applied; refusing duplicate revision updates");
     }
     for (const auto& id : {"420", "folkeboot", "optimist"}) {
         const auto root = models / id;
-        const auto path = root / "bootsmodell.json";
+        const auto path = root / "modells_information.json";
         auto model = nlohmann::json::parse(read_binary_file(path));
         auto& boom = model_element(model, "Großbaum");
-        auto vertices = read_obj_vertices_independently(root / boom["Darstellung"]["datei"].get<std::string>());
+        auto vertices = read_obj_vertices_independently(
+            root / boom["darstellung"]["geometrie"].get<std::string>());
         nlohmann::json near_indices, far_indices;
         if (std::string(id) == "420") {
             near_indices = {50};
@@ -1217,19 +1224,16 @@ void normalize_boat_bases(const fs::path& models)
             near_indices = {2, 3, 6, 7};
             far_indices = {1, 4, 5, 8};
             auto& main = model_element(model, "Großsegel");
-            main["Segel"] = {{"quelle_datei", "modells/aerodynamik/main.json"}};
-            main["Montage"] = obj_mounting({1, 5}, {2, 6}, {4, 8}, {3, 7});
+            main["montage"] = obj_mounting({1, 5}, {2, 6}, {4, 8}, {3, 7});
             auto& fock = model_element(model, "Fock");
-            fock["Segel"] = {{"quelle_datei", "modells/aerodynamik/fock.json"}};
-            fock["Montage"] = obj_mounting({2, 5}, {1, 4}, {3, 6});
+            fock["montage"] = obj_mounting({2, 5}, {1, 4}, {3, 6});
         } else {
             for (unsigned i = 1; i <= 64; i += 2) near_indices.push_back(i);
             for (unsigned i = 2; i <= 64; i += 2) far_indices.push_back(i);
             auto& main = model_element(model, "Großsegel");
-            main["Segel"] = {{"quelle_datei", "modells/aerodynamik/main.json"}};
-            main["Montage"] = obj_mounting({3, 21}, {1, 19}, {6, 24}, {2, 4, 20, 22});
+            main["montage"] = obj_mounting({3, 21}, {1, 19}, {6, 24}, {2, 4, 20, 22});
         }
-        boom["Montage"] = {
+        boom["montage"] = {
             {"schema_version", 1}, {"basis", "mittschiffs"}, {"bezug", "obj"},
             {"anschlag_vertex_indices", near_indices}, {"ende_vertex_indices", far_indices}};
         const auto near_point = indexed_center(vertices, near_indices);
@@ -1279,7 +1283,7 @@ void normalize_boat_bases(const fs::path& models)
             spriet["setting"]["rotation_xyzw"] = main_setting["rotation_xyzw"];
             spriet["setting"]["translation_m"] = main_setting["translation_m"];
             spriet["setting"]["konfiguriert"] = true;
-            spriet["Montage"] = {{"schema_version", 1}, {"basis", "mittschiffs"},
+            spriet["montage"] = {{"schema_version", 1}, {"basis", "mittschiffs"},
                                  {"bezug", "obj"}, {"mitbewegt_mit", "Großsegel"}};
             model["konfiguration"]["revision"] = snapshot.revision.empty() ? 1 :
                 std::stoull(snapshot.revision) + 1;
@@ -1315,15 +1319,15 @@ void test_zero_boat_bases(const fs::path& models)
             std::cout << id << ": CORE-SEG-0030 retained; mounting ready, no physics release\n";
         }
         const auto root = models / id;
-        auto model = nlohmann::json::parse(read_binary_file(root / "bootsmodell.json"));
+        auto model = nlohmann::json::parse(read_binary_file(root / "modells_information.json"));
         const auto& boom = model_element(model, "Großbaum");
         auto boom_points = read_obj_vertices_independently(
-            root / boom["Darstellung"]["datei"].get<std::string>());
+            root / boom["darstellung"]["geometrie"].get<std::string>());
         SegelLage boom_pose;
         boom_pose.rotation_xyzw = boom["setting"]["rotation_xyzw"].get<QuaternionXyzw>();
         boom_pose.translation_m = boom["setting"]["translation_m"].get<Vektor3>();
-        const auto before_near = indexed_center(boom_points, boom["Montage"]["anschlag_vertex_indices"]);
-        const auto before_far = indexed_center(boom_points, boom["Montage"]["ende_vertex_indices"]);
+        const auto before_near = indexed_center(boom_points, boom["montage"]["anschlag_vertex_indices"]);
+        const auto before_far = indexed_center(boom_points, boom["montage"]["ende_vertex_indices"]);
         const auto near_point = transform_point(boom_pose, before_near);
         const auto far_point = transform_point(boom_pose, before_far);
         require(std::abs(near_point[1]) < 1e-8 && std::abs(far_point[1] - near_point[1]) < 1e-8 &&
@@ -1344,9 +1348,14 @@ void test_zero_boat_bases(const fs::path& models)
             action.element_id = ref.element_id;
             const auto automatic = pruefeSegelAktion(snapshot, action);
             check_status(automatic, SegelErgebnisStatus::Vorschau, "Neutral automatic action");
-            require(point_distance(transform_point(*automatic.lage, ref.ecken.hals_m), tack) < 1e-7 &&
-                    point_distance(transform_point(*automatic.lage, ref.ecken.schothorn_m), clew) < 1e-7,
-                    "Automatik must reproduce neutral base, not opened raw boom");
+            const auto automatic_tack = point_distance(
+                transform_point(*automatic.lage, ref.ecken.hals_m), tack);
+            const auto automatic_clew = point_distance(
+                transform_point(*automatic.lage, ref.ecken.schothorn_m), clew);
+            require(automatic_tack < 1e-7 && automatic_clew < 1e-7,
+                    "Automatik must reproduce neutral base for " + ref.element_id +
+                    " (tack error " + std::to_string(automatic_tack) +
+                    " m, clew error " + std::to_string(automatic_clew) + " m)");
             auto sides = snapshot;
             for (auto& sail : sides.lagen) sail.original_buglage = SegelBuglage::Backbord;
             const auto zero = stelleSegelStellwinkelVorschauDar(sides, ref.element_id, 0.);
@@ -1400,7 +1409,7 @@ void test_zero_boat_bases(const fs::path& models)
                                 "Generic display and delta0 must apply mounting exactly once");
                 }
             }
-            require(entry.modell_fassung == modell_fassung(root / "bootsmodell.json"),
+            require(entry.modell_fassung == modell_fassung(root / "modells_information.json"),
                     "Neutral settings and delta must leave fingerprint stable");
             const auto foot = subtract(clew, tack);
             const auto opening = std::atan2(foot[1], -foot[0]) * 180. / 3.14159265358979323846;
@@ -1417,7 +1426,7 @@ void test_zero_boat_bases(const fs::path& models)
                     spriet["setting"]["translation_m"] == main["setting"]["translation_m"],
                     "Spriet must follow the same rigid neutralization as the sail");
             const auto points = read_obj_vertices_independently(
-                root / spriet["Darstellung"]["datei"].get<std::string>());
+                root / spriet["darstellung"]["geometrie"].get<std::string>());
             nlohmann::json far_ring = nlohmann::json::array();
             for (unsigned i = 2; i <= 64; i += 2) far_ring.push_back(i);
             const auto& main_reference = reference(snapshot, "Großsegel");
@@ -1470,7 +1479,7 @@ int main(int argc, char** argv)
         if (argc == 4 && std::string(argv[1]) == "--writer")
             return write_from_worker(fs::u8path(argv[2]), argv[3]);
         if (argc != 2) throw std::runtime_error(
-            "Usage: segelkonfigurator_tests <420-bootsmodell.json>");
+            "Usage: segelkonfigurator_tests <420-modells_information.json>");
         test_synthetic_operations();
         fs::path executable;
 #ifdef _WIN32

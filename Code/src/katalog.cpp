@@ -21,7 +21,7 @@
 namespace segelphysik {
 namespace {
 
-const char* const modelldateiname = "bootsmodell.json";
+const char* const modelldateiname = "modells_information.json";
 
 [[noreturn]] void kat_fehler(int nummer, const std::string& text)
 {

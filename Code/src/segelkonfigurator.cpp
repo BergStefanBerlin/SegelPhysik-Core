@@ -349,6 +349,11 @@ Json read_json(const std::filesystem::path& path)
     return value;
 }
 
+Json read_model_json(const std::filesystem::path& path)
+{
+    return normalisiere_modell_information(read_json(path));
+}
+
 std::vector<Vektor3> read_obj_vertices(const std::filesystem::path& path)
 {
     std::ifstream input(path);
@@ -715,7 +720,7 @@ SegelReferenz sail_reference(const std::filesystem::path& root, const Json& mode
                     element.at("Hydrostatik").at("masse").contains("datei") ?
                     json_string(element.at("Hydrostatik").at("masse"), "datei") :
                     (std::filesystem::u8path(display).parent_path().parent_path() /
-                        "masse" / std::filesystem::u8path(display).filename()).generic_u8string();
+                        "mass" / std::filesystem::u8path(display).filename()).generic_u8string();
                 if (!std::filesystem::is_regular_file(root / std::filesystem::u8path(mass_path)))
                     throw std::runtime_error("CORE-SEG-0031: Legacy-Montage ohne belegte Originalgeometrie: " + id);
                 const auto legacy = indexed_corners(
@@ -1140,7 +1145,7 @@ SegelKonfigurationSnapshot load_snapshot(const std::filesystem::path& root,
         result.lagen.push_back(lage);
     }
 
-    const auto model = read_json(root / "bootsmodell.json");
+    const auto model = read_model_json(root / "modells_information.json");
     validiere_element_settings(model);
     if (std::filesystem::exists(root / "segelkonfiguration.json"))
         throw std::runtime_error("Legacy-Segelkonfiguration vorhanden; explizite Migration erforderlich");
@@ -1355,7 +1360,7 @@ SegelKonfigurationErgebnis preview_from(SegelKonfigurationSnapshot snapshot,
 
 Json read_config_json(const std::filesystem::path& path)
 {
-    const auto model = read_json(path);
+    const auto model = read_model_json(path);
     return model.contains("konfiguration") ? model.at("konfiguration") : Json();
 }
 
@@ -1367,8 +1372,8 @@ SegelKonfigurationSnapshot leseSegelKonfiguration(
     try {
         const auto& info = inspection.info();
         const auto root = model_root(katalog, inspection);
-        const auto model = read_json(root / "bootsmodell.json");
-        if (modell_fassung(root / "bootsmodell.json") != info.model_version)
+        const auto model = read_model_json(root / "modells_information.json");
+        if (modell_fassung(root / "modells_information.json") != info.model_version)
             throw std::runtime_error("Modell-/Quellenstand passt nicht zum Inspektionssnapshot");
         std::vector<SegelReferenz> references;
         std::vector<SegelDiagnose> diagnostics;
@@ -1452,8 +1457,8 @@ SegelKonfigurationErgebnis bestaetigeSegelAktion(
     if (preview.status != SegelErgebnisStatus::Vorschau) return preview;
     try {
         const auto root = model_root(katalog, inspection);
-        const auto path = root / "bootsmodell.json";
-        ConfigurationLock lock(root / "bootsmodell.lock");
+        const auto path = root / "modells_information.json";
+        ConfigurationLock lock(root / "modells_information.lock");
         const auto current = read_config_json(path);
         const std::string current_revision = current.is_null() ? "0" :
             std::to_string(current.at("revision").get<std::uint64_t>());
@@ -1481,7 +1486,8 @@ SegelKonfigurationErgebnis bestaetigeSegelAktion(
         if (revision == std::numeric_limits<std::uint64_t>::max())
             throw std::runtime_error("Konfigurationsrevision erschoepft");
         const auto next_revision = revision + 1;
-        auto model = read_json(path);
+        const auto information = read_json(path);
+        auto model = normalisiere_modell_information(information);
         auto& element = const_cast<Json&>(find_model_element(model, anforderung.element_id));
         if (!element.contains("setting")) element["setting"] = Json::object();
         element["setting"].update(lage_json(*changed,
@@ -1493,7 +1499,7 @@ SegelKonfigurationErgebnis bestaetigeSegelAktion(
             {"obj_sha256", sha256(root / std::filesystem::u8path(display))},
             {"kontur_sha256", sha256(root / std::filesystem::u8path(source))}};
         model["konfiguration"] = config_json(updated, next_revision, current);
-        const auto content = model.dump(2) + "\n";
+        const auto content = aktualisiere_modell_information(information, model).dump(2) + "\n";
         atomic_write(path, content);
         auto result = latest_preview;
         result.status = SegelErgebnisStatus::Gespeichert;

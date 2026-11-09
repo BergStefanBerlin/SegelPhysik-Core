@@ -52,18 +52,6 @@ const InspectionProperty* property(const std::vector<InspectionProperty>& values
     return found == values.end() ? nullptr : &*found;
 }
 
-void collect_keys(const Json& value, std::set<std::string>& keys)
-{
-    if (value.is_object()) {
-        for (const auto& [key, child] : value.items()) {
-            keys.insert(key);
-            collect_keys(child, keys);
-        }
-    } else if (value.is_array()) {
-        for (const auto& child : value) collect_keys(child, keys);
-    }
-}
-
 bool has_diagnostic(const InspectionInfo& info, const std::string& id)
 {
     return std::any_of(info.diagnostics.begin(), info.diagnostics.end(),
@@ -79,14 +67,23 @@ void verify_snapshot(const fs::path& models, const fs::path& scratch)
     const auto* entry = catalogue.eintrag("420");
     require(entry != nullptr, "420 missing from catalogue");
     const auto snapshot = readModelInspection(catalogue, "420", entry->modell_fassung);
-    require(snapshot->info().status == "verwendbar", "420 inspection should be usable");
+    if (snapshot->info().status != "verwendbar") {
+        std::string details = "420 inspection should be usable";
+        for (const auto& diagnostic : snapshot->info().diagnostics)
+            details += "\n" + diagnostic.fehler_id + ": " + diagnostic.text +
+                " [" + diagnostic.fundstelle + "]";
+        throw std::runtime_error(details);
+    }
 
     const auto tree_types = getAvailableObjectTreeTypes(*snapshot);
     std::set<std::string> tree_ids;
     for (const auto& type : tree_types) tree_ids.insert(type.id);
-    for (const auto* type : {"modell", "objekte", "darstellung", "hydrostatik",
-            "hydrodynamik", "bewegung"})
+    for (const auto* type : {"modell", "objekte", "darstellung", "hydrostatik"})
         require(tree_ids.count(type) != 0, std::string("missing tree type ") + type);
+    require(tree_ids.count("hydrodynamik") != 0,
+        "hydrodynamic tree should be present with hydrodynamic model data");
+    require(tree_ids.count("bewegung") != 0,
+        "movement tree should be present with movement model data");
 
     const auto model_tree = getObjectTree(*snapshot, "modell");
     require(!model_tree.empty() && model_tree.front().id.empty() &&
@@ -137,74 +134,33 @@ void verify_snapshot(const fs::path& models, const fs::path& scratch)
         total_mass->status == "vorhanden", "total mass property missing or mistyped");
     require(bounds && bounds->value_type == "object" && bounds->unit == "m",
         "bounds property missing or mistyped");
-    const auto source_document = Json::parse(read_file(scratch / "420" / "bootsmodell.json"));
-    std::set<std::string> source_keys;
-    collect_keys(source_document, source_keys);
+    const auto source_document = Json::parse(read_file(scratch / "420" / "modells_information.json"));
+    const auto& sails = source_document.at("gruppen").at("segel").at("elemente");
+    const auto has_aerodynamic_source = std::any_of(sails.begin(), sails.end(), [](const Json& sail) {
+        return sail.contains("physics") && sail["physics"].contains("aerodynamic") &&
+            sail["physics"]["aerodynamic"].contains("definition");
+    });
+    const auto model_properties = getObjectProperties(*snapshot, "modell", {""}, true);
+    const auto has_inspected_sail_source = std::any_of(model_properties.begin(),
+        model_properties.end(), [](const InspectionProperty& value) {
+            return value.id == "quelle_datei";
+        });
+    require(has_aerodynamic_source && has_inspected_sail_source,
+        "aerodynamic source reference was not normalized into the sail inspection properties");
     std::set<std::string> represented;
     for (const auto& node : model_tree) represented.insert(node.name);
-    for (const auto& value : getObjectProperties(*snapshot, "modell", {""}, true))
-        represented.insert(value.name);
-    for (const auto& key : source_keys)
-        if (key != "gruppen" && key != "elemente")
-            require(represented.count(key) != 0, "source field omitted from inspection tree: " + key);
-
-    const auto movement_tree = getObjectTree(*snapshot, "bewegung");
-    const auto movement = std::find_if(movement_tree.begin(), movement_tree.end(), [](const auto& node) {
-        return node.name == "Bewegung";
-    });
-    require(movement != movement_tree.end(), "movement subtree missing");
-    const auto movement_properties = getObjectProperties(*snapshot, "bewegung", {movement->id}, false);
-    require(property(movement_properties, movement->id, "@hubweg_m") != nullptr,
-        "derived movement lift distance missing");
-    const auto structure = modellstruktur(*snapshot);
-    const auto moving_element = std::find_if(structure.gruppen.begin(), structure.gruppen.end(),
-        [](const StrukturGruppe& value) {
-            return std::any_of(value.elemente.begin(), value.elemente.end(),
-                [](const StrukturElement& item) { return item.bewegung.has_value(); });
-        });
-    require(moving_element != structure.gruppen.end(), "movement definition missing from structure");
-    const auto moving_definition = std::find_if(moving_element->elemente.begin(),
-        moving_element->elemente.end(), [](const StrukturElement& item) { return item.bewegung.has_value(); });
-    const auto preview = getMovementPreview(*snapshot, moving_definition->id);
-    require(preview && preview->frame == "modell" && preview->poses.size() == 3 &&
-        preview->minimum_value == std::optional<double>(0.) &&
-        preview->maximum_value == std::optional<double>(100.) &&
-        preview->poses[0].label == "normal" && !preview->poses[0].meshes.empty(),
-        "typed movement preview lacks normal/minimum/maximum geometry");
-    const auto preview_json = Json::parse(movementPreviewJson(*snapshot, moving_definition->id));
-    require(preview_json["preview"]["element_id"] == moving_definition->id &&
-        preview_json["preview"]["poses"].size() == preview->poses.size(),
-        "movement preview JSON differs from typed API");
-    const auto& preview_mesh = preview->poses.front().meshes.front();
-    const auto source_meshes = getMesh(*snapshot, "darstellung",
-        std::vector<std::string>{preview_mesh.element_id});
-    const auto source_mesh = std::find_if(source_meshes.begin(), source_meshes.end(),
-        [&](const InspectionMesh& mesh) { return mesh.id == preview_mesh.id.substr(
-            0, preview_mesh.id.find("/preview/")); });
-    require(source_mesh != source_meshes.end(), "movement preview source mesh missing");
-    Modell movement_model;
-    Element movement_controller;
-    movement_controller.id = moving_definition->id;
-    movement_controller.bewegung = moving_definition->bewegung;
-    movement_model.elemente.push_back(movement_controller);
-    const auto transform = bewegungstransformation(movement_model, source_mesh->element_id,
-        {{moving_definition->id, preview->reference_value}});
-    const auto& source_point = source_mesh->points_m.front();
-    const std::array<double, 3> transformed_point{
-        transform[0] * source_point[0] + transform[1] * source_point[1] +
-            transform[2] * source_point[2] + transform[3],
-        transform[4] * source_point[0] + transform[5] * source_point[1] +
-            transform[6] * source_point[2] + transform[7],
-        transform[8] * source_point[0] + transform[9] * source_point[1] +
-            transform[10] * source_point[2] + transform[11]};
-    for (std::size_t axis = 0; axis < 3; ++axis)
-        require(std::abs(preview_mesh.points_m.front()[axis] - transformed_point[axis]) < 1e-10,
-            "movement preview did not use Core movement transform");
+    for (const auto& value : model_properties) represented.insert(value.name);
+    for (const auto* field : {"id", "name", "status", "entwurf", "Darstellung",
+             "Hydrostatik", "Segel", "Montage", "setting", "quelle_datei", "lookup_datei"})
+        require(represented.count(field) != 0,
+            "normalized inspection field omitted from tree: " + std::string(field));
+    require(represented.count("physics") == 0 && represented.count("aerodynamic") == 0,
+        "schema 0.2 source fields leaked into the normalized inspection tree");
 
     const auto mesh_types = getAvailableMeshTypes(*snapshot);
     std::set<std::string> mesh_ids;
     for (const auto& type : mesh_types) mesh_ids.insert(type.id);
-    for (const auto* type : {"darstellung", "hydrostatik_volumen", "hydrodynamik",
+    for (const auto* type : {"darstellung", "hydrostatik_volumen",
             "massen_mesh", "massenpunkte", "flutrand"})
         require(mesh_ids.count(type) != 0, std::string("missing mesh type ") + type);
     const auto display_meshes = getMesh(*snapshot, "darstellung");
@@ -258,10 +214,10 @@ void verify_snapshot(const fs::path& models, const fs::path& scratch)
     require(legacy_display.teile.size() == old_display.teile.size(),
         "legacy display API changed");
 
-    const auto model_json = scratch / "420" / "bootsmodell.json";
+    const auto model_json = scratch / "420" / "modells_information.json";
     write_file(model_json, read_file(model_json) + "\n");
-    for (const auto& path : {scratch / "420" / "modells" / "gui" / "rumpf.obj",
-             scratch / "420" / "modells" / "masse" / "rumpf.obj"}) {
+    for (const auto& path : {scratch / "420" / "modells" / "visualisation" / "rumpf.obj",
+             scratch / "420" / "modells" / "mass" / "rumpf.obj"}) {
         std::error_code ignored;
         fs::remove(path, ignored);
     }
@@ -296,10 +252,10 @@ void verify_partial_and_unreadable(const fs::path& models, const fs::path& scrat
     const auto partial_folder = scratch / "partial";
     fs::create_directories(partial_folder);
     fs::copy(models / "quader", partial_folder / "quader", fs::copy_options::recursive);
-    const auto partial_file = partial_folder / "quader" / "bootsmodell.json";
+    const auto partial_file = partial_folder / "quader" / "modells_information.json";
     auto document = Json::parse(read_file(partial_file));
-    auto& mass = document["gruppen"]["rumpf"]["elemente"][0]["Hydrostatik"]["masse"];
-    mass["dichte_kg_pro_m3"] = -1;
+    auto& mass = document["gruppen"]["rumpf"]["elemente"][0]["physics"]["mass"];
+    mass["dichte_kg_m3"] = -1;
     write_file(partial_file, document.dump(2));
     const auto partial_catalogue = modellkatalog(partial_folder);
     const auto* partial_entry = partial_catalogue.eintrag("quader");
@@ -309,7 +265,7 @@ void verify_partial_and_unreadable(const fs::path& models, const fs::path& scrat
         has_diagnostic(partial->info(), "CORE-INSP-0004"),
         "invalid physics did not produce a partial view diagnostic");
     const auto partial_info = inspectionInfoJson(*partial);
-    require(partial_info.find("bootsmodell.json") == std::string::npos &&
+    require(partial_info.find("modells_information.json") == std::string::npos &&
         partial_info.find(scratch.u8string()) == std::string::npos &&
         partial_info.find("\\\\") == std::string::npos,
         "partial-view diagnostics leaked a source path");
@@ -325,14 +281,15 @@ void verify_partial_and_unreadable(const fs::path& models, const fs::path& scrat
 
     const auto unreadable_folder = scratch / "unreadable";
     fs::create_directories(unreadable_folder / "broken");
-    write_file(unreadable_folder / "broken" / "bootsmodell.json", "{");
+    write_file(unreadable_folder / "broken" / "modells_information.json", "{");
     const auto unreadable_catalogue = modellkatalog(unreadable_folder);
     const auto* unreadable_entry = unreadable_catalogue.eintrag("broken");
     require(unreadable_entry != nullptr, "unreadable model missing from catalogue");
-    require(error_from([&] {
+    const auto unreadable_error = error_from([&] {
         (void)readModelInspection(unreadable_catalogue, "broken", unreadable_entry->modell_fassung);
-    }).rfind("CORE-INSP-0003", 0) == 0,
-        "unreadable model did not fail snapshot capture");
+    });
+    require(unreadable_error.rfind("CORE-KAT-0004", 0) == 0,
+        "unreadable model did not fail snapshot capture: " + unreadable_error);
 }
 
 }

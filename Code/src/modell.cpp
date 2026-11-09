@@ -1696,14 +1696,161 @@ void validiere_element_settings(const nlohmann::json& dokument, const std::strin
     }
 }
 
+nlohmann::json normalisiere_modell_information(const nlohmann::json& dokument)
+{
+    if (!dokument.is_object() || dokument.value("schema_version", std::string{}) != "0.2")
+        return dokument;
+    if (!dokument.contains("id") || !dokument["id"].is_string() ||
+        !dokument.contains("modell") || !dokument["modell"].is_object() ||
+        !dokument.contains("gruppen") || !dokument["gruppen"].is_object())
+        throw std::runtime_error("CORE-MOD-0002: Ungueltige modells_information.json");
+
+    const auto& meta = dokument["modell"];
+    if (!meta.contains("name") || !meta["name"].is_string() ||
+        !meta.contains("status") || !meta["status"].is_string())
+        throw std::runtime_error("CORE-MOD-0002: Modellname und -status erforderlich");
+
+    nlohmann::json result{
+        {"schema_version", "0.1-entwurf"},
+        {"id", dokument["id"]},
+        {"name", meta["name"]},
+        {"status", meta["status"]},
+        {"gruppen", nlohmann::json::object()}
+    };
+    if (meta.contains("herkunft") && meta["herkunft"].is_object()) {
+        auto& origin = result["entwurf"] = nlohmann::json::object();
+        for (const auto* key : {"quelle", "hinweis"})
+            if (meta["herkunft"].contains(key)) origin[key] = meta["herkunft"][key];
+    }
+    if (meta.contains("simulationsfreigabe"))
+        result["entwurf"]["simulationsfreigabe"] = meta["simulationsfreigabe"];
+    if (dokument.contains("konfiguration")) result["konfiguration"] = dokument["konfiguration"];
+
+    for (const auto& [group_name, group] : dokument["gruppen"].items()) {
+        if (!group.is_object() || !group.contains("elemente") || !group["elemente"].is_array())
+            throw std::runtime_error("CORE-MOD-0002: Ungueltige Gruppe " + group_name);
+        auto& elements = result["gruppen"][group_name]["elemente"] =
+            nlohmann::json::array();
+        for (const auto& source : group["elemente"]) {
+            if (!source.is_object() || !source.contains("id") || !source["id"].is_string())
+                throw std::runtime_error("CORE-MOD-0002: Ungueltiges Modellelement in " + group_name);
+            nlohmann::json element{{"id", source["id"]}};
+            if (source.contains("darstellung")) {
+                if (!source["darstellung"].is_object())
+                    throw std::runtime_error("CORE-MOD-0002: Ungueltige darstellung");
+                auto display = source["darstellung"];
+                if (display.contains("geometrie")) {
+                    if (display.contains("datei"))
+                        throw std::runtime_error("CORE-MOD-0002: Mehrdeutige Darstellungsgeometrie");
+                    display["datei"] = display["geometrie"];
+                    display.erase("geometrie");
+                }
+                element["Darstellung"] = std::move(display);
+            }
+            if (source.contains("physics")) {
+                const auto& physics = source["physics"];
+                if (!physics.is_object())
+                    throw std::runtime_error("CORE-MOD-0002: physics muss ein Objekt sein");
+                for (auto it = physics.begin(); it != physics.end(); ++it)
+                    if (it.key() != "mass" && it.key() != "hydrostatic" &&
+                        it.key() != "hydrodynamic" && it.key() != "aerodynamic")
+                        throw std::runtime_error("CORE-MOD-0002: Unbekannter Physikbereich " + it.key());
+                if (physics.contains("mass")) {
+                    if (!physics["mass"].is_object() || !physics["mass"].contains("art"))
+                        throw std::runtime_error("CORE-MOD-0002: Massenart erforderlich");
+                    auto mass = physics["mass"];
+                    const auto kind = mass["art"].get<std::string>();
+                    if (kind == "Punktmasse") mass["art"] = "punktmasse";
+                    else if (kind == "Vollkörper" || kind == "Vollkoerper")
+                        mass["art"] = "vollkoerper";
+                    else if (kind == "Schale") mass["art"] = "schale";
+                    else throw std::runtime_error("CORE-MOD-0002: Unbekannte Massenart " + kind);
+                    if (mass.contains("dichte_kg_m3")) {
+                        mass["dichte_kg_pro_m3"] = mass["dichte_kg_m3"];
+                        mass.erase("dichte_kg_m3");
+                    }
+                    if (mass.contains("geometrie")) {
+                        if (mass.contains("datei"))
+                            throw std::runtime_error("CORE-MOD-0002: Mehrdeutige Massengeometrie");
+                        mass["datei"] = mass["geometrie"];
+                        mass.erase("geometrie");
+                    }
+                    element["Hydrostatik"]["masse"] = std::move(mass);
+                }
+                if (physics.contains("hydrostatic")) {
+                    const auto& hydrostatic = physics["hydrostatic"];
+                    if (!hydrostatic.is_object() || !hydrostatic.contains("geometrie"))
+                        throw std::runtime_error("CORE-MOD-0002: Hydrostatikgeometrie erforderlich");
+                    element["Hydrostatik"]["volumen"] = {
+                        {"datei", hydrostatic["geometrie"]}
+                    };
+                }
+                if (physics.contains("hydrodynamic"))
+                    element["Hydrodynamik"] = physics["hydrodynamic"];
+                if (physics.contains("aerodynamic")) {
+                    const auto& aero = physics["aerodynamic"];
+                    if (!aero.is_object() || !aero.contains("definition"))
+                        throw std::runtime_error("CORE-MOD-0002: Aerodynamische Definition erforderlich");
+                    auto& sail = element["Segel"];
+                    sail["quelle_datei"] = aero["definition"];
+                    if (aero.contains("lookup")) sail["lookup_datei"] = aero["lookup"];
+                }
+            }
+            if (source.contains("bewegung")) element["Bewegung"] = source["bewegung"];
+            if (source.contains("montage")) element["Montage"] = source["montage"];
+            if (source.contains("setting")) element["setting"] = source["setting"];
+            elements.push_back(std::move(element));
+        }
+    }
+    return result;
+}
+
+nlohmann::json aktualisiere_modell_information(const nlohmann::json& information,
+                                               const nlohmann::json& core_dokument)
+{
+    if (!information.is_object() || information.value("schema_version", std::string{}) != "0.2")
+        throw std::runtime_error("CORE-MOD-0002: modells_information.json erwartet");
+    nlohmann::json result = information;
+    if (core_dokument.contains("konfiguration"))
+        result["konfiguration"] = core_dokument["konfiguration"];
+    else
+        result.erase("konfiguration");
+
+    std::map<std::string, const nlohmann::json*> updated_elements;
+    if (core_dokument.contains("gruppen") && core_dokument["gruppen"].is_object())
+        for (const auto& group : core_dokument["gruppen"])
+            if (group.is_object() && group.contains("elemente") && group["elemente"].is_array())
+                for (const auto& element : group["elemente"])
+                    if (element.is_object() && element.contains("id") && element["id"].is_string())
+                        updated_elements.emplace(element["id"].get<std::string>(), &element);
+
+    for (auto& group : result["gruppen"])
+        for (auto& element : group["elemente"]) {
+            const auto id = element.at("id").get<std::string>();
+            const auto found = updated_elements.find(id);
+            if (found == updated_elements.end())
+                throw std::runtime_error("CORE-MOD-0002: Modellelement beim Speichern fehlt: " + id);
+            if (found->second->contains("setting"))
+                element["setting"] = found->second->at("setting");
+            else
+                element.erase("setting");
+        }
+    return result;
+}
+
 Modell lade_modell(const std::filesystem::path& datei)
 {
     const std::string ort = datei.u8string();
     const auto inhalt = lesen(datei, ort);
     Fingerabdruck fassung;
     fassung.datei(inhalt);
-    const auto root = Parser(inhalt, ort).lesen();
-    validiere_element_settings(nlohmann::json::parse(inhalt), ort);
+    const auto source_root = Parser(inhalt, ort).lesen();
+    const auto source_document = nlohmann::json::parse(inhalt);
+    const auto dokument = normalisiere_modell_information(source_document);
+    const auto root = source_document.is_object() &&
+        source_document.value("schema_version", std::string{}) == "0.2" ?
+        Parser(dokument.dump(), ort).lesen() : source_root;
+    validiere_element_settings(dokument, ort);
     auto modell = lade_modell_aus_json(datei, root, std::move(fassung));
     modell.fassung = modell_fassung(datei);
     return modell;
@@ -1859,8 +2006,13 @@ ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei)
 {
     const std::string ort = datei.u8string();
     const auto inhalt = lesen(datei, ort);
-    const auto root = Parser(inhalt, ort).lesen();
-    validiere_element_settings(nlohmann::json::parse(inhalt), ort);
+    const auto source_root = Parser(inhalt, ort).lesen();
+    const auto source_document = nlohmann::json::parse(inhalt);
+    const auto dokument = normalisiere_modell_information(source_document);
+    const auto root = source_document.is_object() &&
+        source_document.value("schema_version", std::string{}) == "0.2" ?
+        Parser(dokument.dump(), ort).lesen() : source_root;
+    validiere_element_settings(dokument, ort);
     return beschreibung_aus_json(datei, root);
 }
 
@@ -1868,8 +2020,13 @@ ModellInspektionsImport lade_inspektionsimport(const std::filesystem::path& date
 {
     const std::string ort = datei.u8string();
     const auto inhalt = lesen(datei, ort);
-    auto root = Parser(inhalt, ort).lesen();
-    validiere_element_settings(nlohmann::json::parse(inhalt), ort);
+    const auto source_root = Parser(inhalt, ort).lesen();
+    const auto source_document = nlohmann::json::parse(inhalt);
+    const auto dokument = normalisiere_modell_information(source_document);
+    auto root = source_document.is_object() &&
+        source_document.value("schema_version", std::string{}) == "0.2" ?
+        Parser(dokument.dump(), ort).lesen() : source_root;
+    validiere_element_settings(dokument, ort);
     ModellInspektionsImport result;
     result.beschreibung = beschreibung_aus_json(datei, root);
     Fingerabdruck fassung;
@@ -1890,6 +2047,9 @@ std::string modell_fassung(const std::filesystem::path& datei)
     auto root = nlohmann::json::parse(inhalt);
     if (!root.is_object()) fehler(2, ort, "Modell muss ein JSON-Objekt sein");
     root.erase("konfiguration");
+    if (root.value("schema_version", std::string{}) == "0.2" &&
+        root.contains("modell") && root["modell"].is_object())
+        root["modell"].erase("fingerprints");
     if (root.contains("gruppen") && root["gruppen"].is_object())
         for (auto& gruppe : root["gruppen"])
             if (gruppe.is_object() && gruppe.contains("elemente") && gruppe["elemente"].is_array())
@@ -1903,7 +2063,9 @@ std::string modell_fassung(const std::filesystem::path& datei)
         if (wert.is_object()) {
             for (auto it = wert.begin(); it != wert.end(); ++it) {
                 if ((it.key() == "datei" || it.key() == "quelle_datei" ||
-                     it.key() == "lookup_datei") && it.value().is_string())
+                     it.key() == "lookup_datei" || it.key() == "geometrie" ||
+                     it.key() == "definition" || it.key() == "lookup") &&
+                    it.value().is_string())
                     quellen.insert(it.value().get<std::string>());
                 else self(self, it.value());
             }
@@ -1931,7 +2093,8 @@ void konvertiere_modell_v2(const std::filesystem::path& quelle,
     if (std::filesystem::exists(zielordner))
         throw std::runtime_error("CORE-MOD-0005: Zielordner existiert bereits");
     const auto inhalt = lesen(quelle, quelle.u8string());
-    auto dokument = json_wert(Parser(inhalt, quelle.u8string()).lesen(), false);
+    const auto normalized = normalisiere_modell_information(nlohmann::json::parse(inhalt));
+    auto dokument = normalized;
     std::ostringstream obj;
     obj.imbue(std::locale::classic());
     obj << std::setprecision(std::numeric_limits<double>::max_digits10);
@@ -2000,8 +2163,8 @@ void konvertiere_modell_v2(const std::filesystem::path& quelle,
         if (!out) throw std::runtime_error("CORE-MOD-0005: Konvertiertes Modell nicht schreibbar");
     };
     schreiben("boot.obj", obj.str());
-    schreiben("bootsmodell.json", json);
-    lade_modell(zielordner / "bootsmodell.json");
+    schreiben("modells_information.json", json);
+    lade_modell(zielordner / "modells_information.json");
 }
 
 namespace {
@@ -2214,7 +2377,7 @@ void konvertiere_modell_v3(const std::filesystem::path& quelle,
     const auto json = document.dump(2) + "\n";
     std::map<std::string, Mesh> prepared;
     for (const auto& [id, mesh] : canonical_meshes) prepared.emplace(id, mesh);
-    lade_modell_aus_json(zielordner / "bootsmodell.json",
+    lade_modell_aus_json(zielordner / "modells_information.json",
         Parser(json, zielordner.u8string()).lesen(), Fingerabdruck{}, &prepared);
     if (!std::filesystem::create_directory(zielordner))
         throw std::runtime_error("CORE-MOD-0005: Neuer Zielordner kann nicht erstellt werden");
@@ -2225,8 +2388,8 @@ void konvertiere_modell_v3(const std::filesystem::path& quelle,
         if (!output) throw std::runtime_error("CORE-MOD-0005: Konvertiertes Modell nicht schreibbar");
     };
     write_file("boot.obj", obj.str());
-    write_file("bootsmodell.json", json);
-    lade_modell(zielordner / "bootsmodell.json");
+    write_file("modells_information.json", json);
+    lade_modell(zielordner / "modells_information.json");
 }
 
 }

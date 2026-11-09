@@ -122,11 +122,11 @@ void boats(const fs::path& source, const fs::path& work)
         const auto original_snapshot = leseSegelKonfiguration(original_catalog, *original_inspection);
         require_ready(original_snapshot);
         if (original_snapshot.referenzen.empty()) continue;
-        const auto original_model = source / fs::u8path(item.modell_id) / "bootsmodell.json";
+        const auto original_model = source / fs::u8path(item.modell_id) / "modells_information.json";
         const auto original_bytes = bytes(original_model);
         const auto root = work / fs::u8path(item.modell_id);
         fs::copy(original_model.parent_path(), root, fs::copy_options::recursive);
-        const auto path = root / "bootsmodell.json";
+        const auto path = root / "modells_information.json";
         const auto base = modell_fassung(path);
         const auto catalog = modellkatalog(root);
         const auto inspection = readModelInspection(catalog, item.modell_id, base);

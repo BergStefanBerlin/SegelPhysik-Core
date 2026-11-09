@@ -1083,7 +1083,7 @@ mutieren.
 `bestaetigeSegelAktion(...)` verlangt die Revision der Vorschau. Unter
 einer prozessübergreifenden Betriebssystemsperre werden Fassung,
 Quellfingerprint und aktuelle Revision erneut geprüft; konkurrierende
-oder veraltete Anforderungen scheitern mit Diagnose. `bootsmodell.lock`
+oder veraltete Anforderungen scheitern mit Diagnose. `modells_information.lock`
 schuetzt das gezielte Aktualisieren von `setting` direkt am bestehenden
 Element in `bootsmodell.json` und der gemeinsamen `konfiguration`-Metadaten.
 Keine zentrale Elementmap und keine neuen IDs. Andere Eintraege, unbekannte

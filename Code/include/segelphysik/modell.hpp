@@ -201,7 +201,7 @@ ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei);
 // failures throw. For an importable model it equals lade_modell(datei).fassung.
 std::string modell_fassung(const std::filesystem::path& datei);
 
-// Creates a new directory containing bootsmodell.json and boot.obj. Never overwrites
+// Creates a new directory containing modells_information.json and boot.obj. Never overwrites
 // an existing destination; originals are read only. Uses the regular importer.
 // Schema-3 derivations become explicit source meshes in schema 2.
 void konvertiere_modell_v2(const std::filesystem::path& quelle,

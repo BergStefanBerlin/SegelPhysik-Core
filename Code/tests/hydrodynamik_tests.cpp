@@ -565,16 +565,44 @@ void referenzboot(const std::filesystem::path& path)
             [](const Element& element) { return element.id == "Schwert"; });
         if (sword == model.elemente.end() || !sword->bewegung ||
             sword->bewegung->art != Bewegungsart::heben ||
+            sword->bewegung->richtung_modell != Vektor3{0., 0., 1.} ||
             std::abs(sword->bewegung->hubweg_m - .523) > .02)
             throw std::runtime_error("Optimist-Schwert-Hubweg weicht von der Meshreferenz ab");
+        const auto rudder = std::find_if(model.elemente.begin(), model.elemente.end(),
+            [](const Element& element) { return element.id == "Ruder"; });
+        if (rudder == model.elemente.end() || !rudder->bewegung ||
+            !rudder->bewegung->ruderwinkel ||
+            rudder->bewegung->achse_modell != Vektor3{0., 0., 1.} ||
+            rudder->bewegung->drehpunkt_modell_m != Vektor3{-1.189895, 0., 0.182972} ||
+            rudder->bewegung->mitbewegte_elemente !=
+                std::vector<std::string>{"Pinne", "Pinnenausleger", "Gummigelenk"})
+            throw std::runtime_error("Optimist-Ruderbewegung fehlt oder ist unvollstaendig");
     }
     if (model.id == "420") {
         const auto sword = std::find_if(model.elemente.begin(), model.elemente.end(),
             [](const Element& element) { return element.id == "Schwert"; });
         if (sword == model.elemente.end() || !sword->bewegung ||
             sword->bewegung->art != Bewegungsart::drehen ||
-            sword->bewegung->achse_modell != Vektor3{0., 1., 0.})
+            sword->bewegung->achse_modell != Vektor3{0., 1., 0.} ||
+            sword->bewegung->drehpunkt_modell_m != Vektor3{-0.359293, 0., 0.56})
             throw std::runtime_error("420er-Drehschwertdefinition fehlt");
+        const auto rudder = std::find_if(model.elemente.begin(), model.elemente.end(),
+            [](const Element& element) { return element.id == "Ruder"; });
+        if (rudder == model.elemente.end() || !rudder->bewegung ||
+            !rudder->bewegung->ruderwinkel ||
+            rudder->bewegung->achse_modell != Vektor3{0., 0., 1.} ||
+            rudder->bewegung->drehpunkt_modell_m != Vektor3{-2.279293, 0., 0.410047} ||
+            rudder->bewegung->mitbewegte_elemente != std::vector<std::string>{"Ruderkopf"})
+            throw std::runtime_error("420er-Ruderbewegung fehlt oder ist unvollstaendig");
+    }
+    if (model.id == "folkeboot") {
+        const auto rudder = std::find_if(model.elemente.begin(), model.elemente.end(),
+            [](const Element& element) { return element.id == "Ruder"; });
+        if (rudder == model.elemente.end() || !rudder->bewegung ||
+            !rudder->bewegung->ruderwinkel ||
+            rudder->bewegung->achse_modell != Vektor3{0., 0., 1.} ||
+            rudder->bewegung->drehpunkt_modell_m != Vektor3{-3.36, 0., -0.47})
+            throw std::runtime_error("Folkeboot-Ruderbewegung fehlt oder ist unvollstaendig");
     }
     const auto hull = std::find_if(model.elemente.begin(), model.elemente.end(),
         [](const Element& element) {
