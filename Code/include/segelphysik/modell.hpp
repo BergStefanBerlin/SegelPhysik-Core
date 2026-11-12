@@ -196,6 +196,7 @@ struct ModellBeschreibung {
     std::vector<ElementBeschreibung> elemente;
     nlohmann::json dokument;
     std::vector<QuellMesh> quellmeshes;
+    std::map<std::string, Bewegungsdefinition> gruppenbewegungen;
 };
 ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei);
 

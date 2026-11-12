@@ -2107,6 +2107,42 @@ ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei)
     return beschreibung_aus_json(datei, root, true);
 }
 
+namespace {
+
+void uebernehme_gruppenbewegungen(ModellBeschreibung& beschreibung,
+                                  const nlohmann::json& daten,
+                                  const std::string& ort)
+{
+    for (const auto& [gruppen_id, gruppe] : daten.at("groups").items()) {
+        if (!gruppe.contains("movement")) continue;
+        auto& normalisierte_gruppe = beschreibung.dokument.at("gruppen").at(gruppen_id);
+        auto& elemente = normalisierte_gruppe.at("elemente");
+        auto controller = std::find_if(elemente.begin(), elemente.end(),
+            [](const nlohmann::json& element) { return element.contains("Bewegung"); });
+        if (controller == elemente.end())
+            fehler(2, ort, "Gruppenbewegung ohne interne Bewegungszuordnung: " + gruppen_id);
+        const auto definition = Parser(controller->at("Bewegung").dump(), ort).lesen();
+        auto bewegung = bewegung_lesen(definition, ort + ", Gruppe " + gruppen_id);
+        bewegung.ruderwinkel = controller->contains("Hydrodynamik") &&
+            controller->at("Hydrodynamik").value("rolle", std::string{}) == "ruder";
+        bewegung.mitbewegte_elemente.clear();
+        for (const auto& element : elemente)
+            bewegung.mitbewegte_elemente.push_back(element.at("id").get<std::string>());
+        normalisierte_gruppe["Bewegung"] = controller->at("Bewegung");
+        normalisierte_gruppe["Bewegung"]["mitbewegte_elemente"] =
+            bewegung.mitbewegte_elemente;
+        if (gruppe.at("movement").contains("control"))
+            normalisierte_gruppe["Bewegung"]["control"] =
+                gruppe.at("movement").at("control");
+        controller->erase("Bewegung");
+        beschreibung.gruppenbewegungen.emplace(gruppen_id, std::move(bewegung));
+        for (auto& element : beschreibung.elemente)
+            if (element.gruppe == gruppen_id) element.bewegung.reset();
+    }
+}
+
+}
+
 ModellBeschreibung lies_beschreibung_modellformat03(
     const std::filesystem::path& datei, const nlohmann::json& daten,
     bool lade_quellmeshes)
@@ -2117,6 +2153,7 @@ ModellBeschreibung lies_beschreibung_modellformat03(
     const auto root = Parser(dokument.dump(), ort).lesen();
     validiere_element_settings(dokument, ort);
     auto result = beschreibung_aus_json(datei, root, lade_quellmeshes);
+    uebernehme_gruppenbewegungen(result, daten, ort);
     for (const auto& group : daten.at("groups"))
         for (const auto& element : group.at("elements")) {
             const auto id = element.at("id").get<std::string>();
@@ -2142,6 +2179,7 @@ ModellInspektionsImport lade_inspektionsimport(const std::filesystem::path& date
     const std::string ort = datei.u8string();
     const auto inhalt = lesen(datei, ort);
     nlohmann::json dokument;
+    nlohmann::json format03_daten;
     Json root;
     std::string checked_fassung;
     std::string fingerprint_fehler;
@@ -2158,6 +2196,7 @@ ModellInspektionsImport lade_inspektionsimport(const std::filesystem::path& date
             fingerprint_fehler = "CORE-FPR-0001 [" + ort +
                 "]: Fingerprint-Pruefung fehlgeschlagen; Physikimport ist gesperrt";
         dokument = detail::normalisiere_modellformat03(pruefung.daten, modeldir);
+        format03_daten = pruefung.daten;
         root = Parser(dokument.dump(), ort).lesen();
     } else {
         const auto source_root = Parser(inhalt, ort).lesen();
@@ -2170,6 +2209,8 @@ ModellInspektionsImport lade_inspektionsimport(const std::filesystem::path& date
     validiere_element_settings(dokument, ort);
     ModellInspektionsImport result;
     result.beschreibung = beschreibung_aus_json(datei, root, true);
+    if (!format03_daten.is_null())
+        uebernehme_gruppenbewegungen(result.beschreibung, format03_daten, ort);
     result.modelldokument = std::move(dokument);
     if (!fingerprint_fehler.empty()) {
         result.import_fehler = fingerprint_fehler;

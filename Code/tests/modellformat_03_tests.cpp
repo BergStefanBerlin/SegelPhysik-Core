@@ -3,6 +3,7 @@
 #include "segelphysik/katalog.hpp"
 #include "segelphysik/inspektion.hpp"
 #include "segelphysik/core.hpp"
+#include "../src/modell_intern.hpp"
 #include "../src/modellformat_03_intern.hpp"
 
 #include <chrono>
@@ -41,11 +42,47 @@ void schreiben(const std::filesystem::path& path, const std::string& value)
 
 void pruefe_420_bewegungsvorschau(const segelphysik::ModelInspection& inspection)
 {
-    const auto mainsail = segelphysik::getMovementPreview(inspection, "Mainsail");
-    const auto jib = segelphysik::getMovementPreview(inspection, "Jib");
+    const auto structure = segelphysik::modellstruktur(inspection);
+    const auto group = [&](const std::string& id) -> const segelphysik::StrukturGruppe& {
+        const auto found = std::find_if(structure.gruppen.begin(), structure.gruppen.end(),
+            [&](const auto& value) { return value.id == id; });
+        pruefung(found != structure.gruppen.end(), "Gruppe fehlt: " + id);
+        return *found;
+    };
+    for (const auto& id : {"mainsail", "jib"}) {
+        const auto& value = group(id);
+        pruefung(value.bewegung.has_value(), std::string(id) + ": Gruppenbewegung fehlt");
+        pruefung(std::all_of(value.elemente.begin(), value.elemente.end(),
+            [](const auto& element) { return !element.bewegung; }),
+            std::string(id) + ": Gruppenbewegung erscheint als Elementbewegung");
+        std::set<std::string> members;
+        for (const auto& element : value.elemente) members.insert(element.id);
+        pruefung(std::set<std::string>(value.bewegung->mitbewegte_elemente.begin(),
+            value.bewegung->mitbewegte_elemente.end()) == members,
+            std::string(id) + ": Gruppenmitglieder nicht vollstaendig");
+    }
+    pruefung(!group("rig").bewegung, "Statische Gruppe hat unerwartete Bewegung");
+    const auto properties = segelphysik::getObjectProperties(
+        inspection, "objekte", {"/gruppen/mainsail"}, false);
+    pruefung(std::any_of(properties.begin(), properties.end(), [](const auto& property) {
+        return property.area == "Bewegung" && property.id == "Bewegung/art";
+    }), "Gruppenbewegung fehlt in den Gruppeneigenschaften");
+    const auto encoded = nlohmann::json::parse(segelphysik::modellstruktur_json(structure));
+    const auto encoded_group = std::find_if(encoded.at("gruppen").begin(),
+        encoded.at("gruppen").end(), [](const auto& value) {
+            return value.at("id") == "mainsail";
+        });
+    pruefung(encoded_group != encoded.at("gruppen").end() &&
+        encoded_group->at("bewegung").at("art") == "drehen",
+        "Gruppenbewegung fehlt in der JSON-Struktur");
+
+    const auto mainsail = segelphysik::getGroupMovementPreview(inspection, "mainsail");
+    const auto jib = segelphysik::getGroupMovementPreview(inspection, "jib");
     pruefung(mainsail && jib, "420-Segelgruppen liefern unabhaengige Bewegungsvorschauen");
-    pruefung(!segelphysik::getMovementPreview(inspection, "Boom"),
-        "Mitbewegter Grossbaum wird kein eigener Bewegungscontroller");
+    pruefung(!segelphysik::getMovementPreview(inspection, "Mainsail") &&
+        !segelphysik::getMovementPreview(inspection, "Boom") &&
+        !segelphysik::getGroupMovementPreview(inspection, "rig"),
+        "Gruppenbewegung wird nicht als Elementbewegung oder statische Gruppe ausgegeben");
     pruefung(mainsail->kind == "drehen" && mainsail->axis_point_m
             && std::abs((*mainsail->axis_point_m)[0] - 0.85070675) < 1e-8
             && std::abs(mainsail->axis_direction[2] - 1.0) < 1e-8,
@@ -57,45 +94,47 @@ void pruefe_420_bewegungsvorschau(const segelphysik::ModelInspection& inspection
             && std::abs(jib->axis_direction[2] - 0.9606952729) < 1e-8,
         "Fockgruppe behaelt Vorstagachse und Drehpunkt");
 
-    const auto verify_group = [](const segelphysik::InspectionMovementPreview& preview,
-                                  const std::set<std::string>& expected,
-                                  const std::string& label) {
-        const auto minimum = std::find_if(preview.poses.begin(), preview.poses.end(),
-            [](const auto& pose) { return pose.label == "minimum"; });
-        const auto maximum = std::find_if(preview.poses.begin(), preview.poses.end(),
-            [](const auto& pose) { return pose.label == "maximum"; });
-        pruefung(minimum != preview.poses.end() && maximum != preview.poses.end(),
-            label + ": Minimum-/Maximum-Vorschau fehlt");
-        const auto meshes_by_element = [](const auto& pose) {
-            std::map<std::string, const segelphysik::InspectionMesh*> result;
-            for (const auto& mesh : pose.meshes) result.emplace(mesh.element_id, &mesh);
-            return result;
-        };
-        const auto minimum_meshes = meshes_by_element(*minimum);
-        const auto maximum_meshes = meshes_by_element(*maximum);
-        std::set<std::string> actual;
-        for (const auto& [id, mesh] : minimum_meshes) {
-            actual.insert(id);
-            pruefung(!mesh->points_m.empty(), label + ": Vorschau-Mesh ist leer: " + id);
+    for (const auto& preview : {*mainsail, *jib}) {
+        pruefung(!preview.minimum_value && !preview.maximum_value,
+            "Nicht definierte Segelgrenzen wurden erfunden");
+        pruefung(!preview.poses.empty() && preview.poses.front().label == "normal",
+            "Neutralpose fehlt");
+        const auto expected = preview.group_id == "mainsail" ?
+            std::set<std::string>{"Boom", "Mainsail"} : std::set<std::string>{"Jib"};
+        for (const auto& pose : preview.poses) {
+            std::set<std::string> actual;
+            for (const auto& mesh : pose.meshes) actual.insert(mesh.element_id);
+            pruefung(actual == expected, "Pose enthaelt nicht alle Gruppenmitglieder");
         }
-        pruefung(actual == expected && maximum_meshes.size() == expected.size(),
-            label + ": Vorschau enthaelt nicht exakt die Gruppenmitglieder");
-        for (const auto& id : expected) {
-            const auto before = minimum_meshes.at(id)->points_m;
-            const auto after = maximum_meshes.at(id)->points_m;
-            pruefung(before.size() == after.size(),
-                label + ": Geometriepunktzahl aendert sich fuer " + id);
-            const bool moved = std::equal(before.begin(), before.end(), after.begin(),
-                [](const auto& a, const auto& b) {
-                    return std::abs(a[0] - b[0]) < 1e-8
-                        && std::abs(a[1] - b[1]) < 1e-8
-                        && std::abs(a[2] - b[2]) < 1e-8;
-                });
-            pruefung(!moved, label + ": Bewegung erreicht Gruppenmitglied " + id + " nicht");
+        const auto encoded_preview = nlohmann::json::parse(
+            segelphysik::groupMovementPreviewJson(inspection, preview.group_id));
+        pruefung(encoded_preview.at("preview").at("group_id") == preview.group_id &&
+            encoded_preview.at("preview").at("poses").size() == preview.poses.size(),
+            "Gruppenvorschau weicht von JSON ab");
+        for (std::size_t i = 0; i < preview.poses.size(); ++i) {
+            const auto& encoded_pose = encoded_preview.at("preview").at("poses")[i];
+            const auto& pose = preview.poses[i];
+            pruefung(encoded_pose.at("label") == pose.label &&
+                encoded_pose.at("value") == pose.value && encoded_pose.at("unit") == pose.unit &&
+                encoded_pose.at("meshes").size() == pose.meshes.size(),
+                "Gruppenpose weicht von JSON ab");
+            for (std::size_t j = 0; j < pose.meshes.size(); ++j)
+                pruefung(encoded_pose.at("meshes")[j].at("points_m") == pose.meshes[j].points_m &&
+                    encoded_pose.at("meshes")[j].at("triangles") == pose.meshes[j].triangles &&
+                    encoded_pose.at("meshes")[j].at("element_id") == pose.meshes[j].element_id,
+                    "Gruppenmesh weicht von JSON ab");
         }
-    };
-    verify_group(*mainsail, {"Boom", "Mainsail"}, "Grosssegelgruppe");
-    verify_group(*jib, {"Jib"}, "Fockgruppe");
+    }
+    const auto keel = segelphysik::getGroupMovementPreview(inspection, "keel");
+    const auto rudder = segelphysik::getGroupMovementPreview(inspection, "rudder");
+    pruefung(keel && keel->minimum_value == 0. && keel->maximum_value == 90. &&
+        keel->poses.size() == 3 && rudder && rudder->minimum_value == -90. &&
+        rudder->maximum_value == 90. && rudder->poses.size() == 3,
+        "Explizite Schwert- oder Rudergrenzen fehlen");
+    bool unknown_group_rejected = false;
+    try { (void)segelphysik::getGroupMovementPreview(inspection, "unbekannt"); }
+    catch (const std::runtime_error&) { unknown_group_rejected = true; }
+    pruefung(unknown_group_rejected, "Unbekannte Gruppe wurde nicht zurueckgewiesen");
 }
 
 class Umgebung {
@@ -129,6 +168,190 @@ private:
     std::string name_;
     std::optional<std::string> previous_;
 };
+
+void pruefe_gruppenvorschau_ohne_aerodynamik(const std::filesystem::path& source_root,
+                                              const std::filesystem::path& temp_root)
+{
+    const auto source = source_root / "420";
+    const auto target = temp_root / "420";
+    std::filesystem::create_directories(target / "modells");
+    for (const auto& file : {"modells_data.json", "modells_validation.json"})
+        std::filesystem::copy_file(source / file, target / file);
+    for (const auto& folder : {"visualisation", "mass", "hydrostatics"})
+        std::filesystem::copy(source / "modells" / folder, target / "modells" / folder,
+            std::filesystem::copy_options::recursive);
+    auto data = nlohmann::json::parse(lesen(target / "modells_data.json"));
+    for (auto& group : data.at("groups"))
+        for (auto& element : group.at("elements"))
+            if (element.contains("physics")) {
+                element["physics"].erase("aerodynamic");
+                if (element["physics"].empty()) element.erase("physics");
+            }
+    data["groups"]["mainsail"]["elements"][0]["placement"]["originalTack"] = "port";
+    schreiben(target / "modells_data.json", data.dump());
+    segelphysik::aktualisiere_modell_fingerprints(target,
+        {segelphysik::ModellFingerprintBereich::modelData,
+         segelphysik::ModellFingerprintBereich::visualisation,
+         segelphysik::ModellFingerprintBereich::mass,
+         segelphysik::ModellFingerprintBereich::hydrostatics});
+    const auto catalog = segelphysik::modellkatalog(temp_root);
+    const auto* entry = catalog.eintrag("420");
+    pruefung(entry && entry->schema_valide, "Isoliertes 420-Modell nicht schema-valide");
+    const auto inspection = segelphysik::readModelInspection(catalog, "420", entry->modell_fassung);
+    pruefe_420_bewegungsvorschau(*inspection);
+    for (const auto& id : {"mainsail", "jib"}) {
+        const auto preview = segelphysik::getGroupMovementPreview(*inspection, id);
+        pruefung(preview && preview->poses.size() == 3 && preview->diagnostics.empty(),
+            std::string(id) + ": beide Segelvarianten fehlen oder haben eine Diagnose");
+        pruefung(preview->poses[1].label == "backbord" && preview->poses[1].value == 90. &&
+            preview->poses[2].label == "steuerbord" && preview->poses[2].value == -90.,
+            std::string(id) + ": Segelvarianten haben falsche Vorzeichen");
+    }
+    const auto main = segelphysik::getGroupMovementPreview(*inspection, "mainsail");
+    const auto mesh_for = [](const segelphysik::InspectionMovementPose& pose,
+                             const std::string& id) -> const segelphysik::InspectionMesh& {
+        const auto mesh = std::find_if(pose.meshes.begin(), pose.meshes.end(),
+            [&](const auto& value) { return value.element_id == id; });
+        if (mesh == pose.meshes.end()) throw std::runtime_error("Mesh fehlt: " + id);
+        return *mesh;
+    };
+    const auto& neutral_sail = mesh_for(main->poses[0], "Mainsail");
+    const auto& port_sail = mesh_for(main->poses[1], "Mainsail");
+    const auto& starboard_sail = mesh_for(main->poses[2], "Mainsail");
+    const auto& neutral_boom = mesh_for(main->poses[0], "Boom");
+    const auto& starboard_boom = mesh_for(main->poses[2], "Boom");
+    const auto pivot = *main->axis_point_m;
+    bool camber_seen = false;
+    for (std::size_t i = 0; i < neutral_sail.points_m.size(); ++i) {
+        const auto& n = neutral_sail.points_m[i];
+        const auto& p = port_sail.points_m[i];
+        const auto& s = starboard_sail.points_m[i];
+        pruefung(std::abs((p[1] - pivot[1]) + (n[0] - pivot[0])) < 1e-6 &&
+            std::abs((p[0] - pivot[0]) - (n[1] - pivot[1])) < 1e-6,
+            "Backbordpose dreht das Segel nicht um die Gruppenachse");
+        pruefung(std::abs((s[1] - pivot[1]) - (n[0] - pivot[0])) < 1e-6 &&
+            std::abs((s[0] - pivot[0]) - (n[1] - pivot[1])) < 1e-6,
+            "Steuerbordpose spiegelt den Segelbauch nicht korrekt");
+        camber_seen = camber_seen || std::abs(n[1] - pivot[1]) > 1e-5;
+    }
+    pruefung(camber_seen, "Testsegel besitzt keinen pruefbaren Bauch");
+    for (std::size_t i = 0; i < neutral_boom.points_m.size(); ++i) {
+        const auto& n = neutral_boom.points_m[i];
+        const auto& s = starboard_boom.points_m[i];
+        pruefung(std::abs((s[0] - pivot[0]) + (n[1] - pivot[1])) < 1e-6 &&
+            std::abs((s[1] - pivot[1]) - (n[0] - pivot[0])) < 1e-6,
+            "Grossbaum wurde gespiegelt statt nur gedreht");
+    }
+    const auto jib = segelphysik::getGroupMovementPreview(*inspection, "jib");
+    const auto& neutral_jib = mesh_for(jib->poses[0], "Jib");
+    const auto& port_jib = mesh_for(jib->poses[1], "Jib");
+    const auto jib_pivot = *jib->axis_point_m;
+    auto jib_axis = jib->axis_direction;
+    const auto axis_length = std::sqrt(jib_axis[0] * jib_axis[0] +
+        jib_axis[1] * jib_axis[1] + jib_axis[2] * jib_axis[2]);
+    for (auto& component : jib_axis) component /= axis_length;
+    for (std::size_t i = 0; i < neutral_jib.points_m.size(); ++i) {
+        const auto& point = neutral_jib.points_m[i];
+        const segelphysik::Vektor3 relative{point[0] - jib_pivot[0],
+            point[1] - jib_pivot[1], point[2] - jib_pivot[2]};
+        const segelphysik::Vektor3 cross{
+            jib_axis[1] * relative[2] - jib_axis[2] * relative[1],
+            jib_axis[2] * relative[0] - jib_axis[0] * relative[2],
+            jib_axis[0] * relative[1] - jib_axis[1] * relative[0]};
+        const auto projection = jib_axis[0] * relative[0] +
+            jib_axis[1] * relative[1] + jib_axis[2] * relative[2];
+        for (std::size_t component = 0; component < 3; ++component)
+            pruefung(std::abs(port_jib.points_m[i][component] -
+                (jib_pivot[component] - cross[component] +
+                    jib_axis[component] * projection)) < 1e-6,
+                "Fockpose dreht nicht korrekt um die geneigte Gruppenachse");
+    }
+    const auto before = segelphysik::groupMovementPreviewJson(*inspection, "mainsail");
+    data["groups"]["mainsail"]["elements"][0]["placement"]["originalTack"] = "unknown";
+    schreiben(target / "modells_data.json", data.dump());
+    pruefung(segelphysik::groupMovementPreviewJson(*inspection, "mainsail") == before,
+        "Quelldateiaenderung veraendert den bestehenden Snapshot");
+    segelphysik::aktualisiere_modell_fingerprints(target,
+        {segelphysik::ModellFingerprintBereich::modelData});
+    const auto changed_catalog = segelphysik::modellkatalog(temp_root);
+    const auto* changed_entry = changed_catalog.eintrag("420");
+    pruefung(changed_entry != nullptr, "Geaendertes Testmodell fehlt");
+    const auto changed = segelphysik::readModelInspection(
+        changed_catalog, "420", changed_entry->modell_fassung);
+    const auto unknown = segelphysik::getGroupMovementPreview(*changed, "mainsail");
+    pruefung(unknown && unknown->poses.size() == 1 && !unknown->diagnostics.empty(),
+        "Unbekannte Originalbuglage muss Seitenposen unterdruecken und diagnostizieren");
+    pruefung(segelphysik::getGroupMovementPreview(*changed, "jib")->poses.size() == 3,
+        "Unbekannte Buglage blockiert eine andere Segelgruppe");
+    data["groups"]["mainsail"]["elements"][0]["placement"]["originalTack"] = "starboard";
+    schreiben(target / "modells_data.json", data.dump());
+    segelphysik::aktualisiere_modell_fingerprints(target,
+        {segelphysik::ModellFingerprintBereich::modelData});
+    const auto opposite_catalog = segelphysik::modellkatalog(temp_root);
+    const auto* opposite_entry = opposite_catalog.eintrag("420");
+    pruefung(opposite_entry != nullptr, "Testmodell mit Steuerbord-Buglage fehlt");
+    const auto opposite = segelphysik::readModelInspection(
+        opposite_catalog, "420", opposite_entry->modell_fassung);
+    const auto reverse = segelphysik::getGroupMovementPreview(*opposite, "mainsail");
+    pruefung(reverse && reverse->poses.size() == 3, "Steuerbord-Buglage hat keine Seitenposen");
+    const auto& reverse_port = mesh_for(reverse->poses[1], "Mainsail");
+    const auto& reverse_starboard = mesh_for(reverse->poses[2], "Mainsail");
+    pruefung(reverse_port.triangles.front()[1] == neutral_sail.triangles.front()[2] &&
+        reverse_port.triangles.front()[2] == neutral_sail.triangles.front()[1] &&
+        reverse_starboard.triangles == neutral_sail.triangles,
+        "Spiegelung folgt nicht der jeweiligen Originalbuglage");
+    data["groups"]["mainsail"]["elements"][0]["placement"].erase("originalTack");
+    schreiben(target / "modells_data.json", data.dump());
+    segelphysik::aktualisiere_modell_fingerprints(target,
+        {segelphysik::ModellFingerprintBereich::modelData});
+    const auto absent_catalog = segelphysik::modellkatalog(temp_root);
+    const auto* absent_entry = absent_catalog.eintrag("420");
+    pruefung(absent_entry != nullptr, "Testmodell ohne Originalbuglage fehlt");
+    const auto absent = segelphysik::readModelInspection(
+        absent_catalog, "420", absent_entry->modell_fassung);
+    const auto no_tack = segelphysik::getGroupMovementPreview(*absent, "mainsail");
+    pruefung(no_tack && no_tack->poses.size() == 1 && !no_tack->diagnostics.empty(),
+        "Fehlende Originalbuglage wurde nicht diagnostiziert");
+    data["groups"]["mainsail"]["elements"][0]["placement"]["originalTack"] = "port";
+    schreiben(target / "modells_data.json", data.dump());
+    const auto sail_file = target / data.at("groups").at("mainsail").at("elements")[0]
+        .at("display").at("geometry").get<std::string>();
+    schreiben(sail_file,
+        "v 0 0 0\nv -1 0 0\nv -2 0 2\nv 0 0 2\nv -0.75 0.2 1\n"
+        "f 1 2 5\nf 2 3 5\nf 3 4 5\nf 4 1 5\n");
+    segelphysik::aktualisiere_modell_fingerprints(target,
+        {segelphysik::ModellFingerprintBereich::modelData,
+         segelphysik::ModellFingerprintBereich::visualisation});
+    const auto quad_catalog = segelphysik::modellkatalog(temp_root);
+    const auto* quad_entry = quad_catalog.eintrag("420");
+    pruefung(quad_entry != nullptr, "Viereckiges Testsegel fehlt");
+    const auto quad_inspection = segelphysik::readModelInspection(
+        quad_catalog, "420", quad_entry->modell_fassung);
+    const auto quad = segelphysik::getGroupMovementPreview(*quad_inspection, "mainsail");
+    pruefung(quad && quad->poses.size() == 3 && quad->diagnostics.empty(),
+        "Viereckiges Segel liefert keine beiden Seitenposen");
+    const auto& quad_neutral = mesh_for(quad->poses[0], "Mainsail");
+    const auto& quad_opposite = mesh_for(quad->poses[2], "Mainsail");
+    pruefung(std::abs((quad_opposite.points_m[4][0] - (*quad->axis_point_m)[0]) -
+        (quad_neutral.points_m[4][1] - (*quad->axis_point_m)[1])) < 1e-6,
+        "Bauch des viereckigen Segels wurde nicht an der ermittelten Ebene gespiegelt");
+    data["groups"]["mainsail"]["elements"][1]["display"]["hidden"] = true;
+    data["groups"]["mainsail"]["elements"][1]["physics"]["mass"] = {
+        {"type", "pointMass"}, {"mass_kg", 1.0}, {"position_m", {0.0, 0.0, 0.0}}};
+    schreiben(target / "modells_data.json", data.dump());
+    segelphysik::aktualisiere_modell_fingerprints(target,
+        {segelphysik::ModellFingerprintBereich::modelData});
+    const auto hidden_catalog = segelphysik::modellkatalog(temp_root);
+    const auto* hidden_entry = hidden_catalog.eintrag("420");
+    pruefung(hidden_entry != nullptr, "Testmodell mit verborgenem Mitglied fehlt");
+    const auto hidden_inspection = segelphysik::readModelInspection(
+        hidden_catalog, "420", hidden_entry->modell_fassung);
+    const auto hidden_preview = segelphysik::getGroupMovementPreview(*hidden_inspection, "mainsail");
+    pruefung(hidden_preview && hidden_preview->poses.empty() &&
+        std::any_of(hidden_preview->diagnostics.begin(), hidden_preview->diagnostics.end(),
+            [](const auto& diagnostic) { return diagnostic.fundstelle == "Boom"; }),
+        "Fehlendes Gruppenmesh muss diagnostiziert und unvollstaendige Posen unterdrueckt werden");
+}
 
 template<class Aktion>
 void muss_fehlschlagen(Aktion aktion)
@@ -701,6 +924,13 @@ int main(int argc, char** argv)
                     {{"id", "Centerboard"}, {"display", {{"hidden", false}}},
                      {"physics", {{"hydrostatic", {{"geometry", "schwert.obj"}}}}}}}}}}
         };
+        movement_data["groups"]["rig"]["elements"] =
+            nlohmann::json::array({make_element("Mast", {0, 0, 0})});
+        movement_data["groups"]["mainsail"]["elements"][0]["placement"]["originalTack"] = "port";
+        movement_data["groups"]["jib"]["elements"][0]["placement"]["originalTack"] = "unknown";
+        movement_data["groups"]["keel"]["movement"]["control"] = {
+            {"unit", "degree"}, {"minimum", 0}, {"maximum", 90},
+            {"minimumPosition", "down"}, {"maximumPosition", "up"}};
         const auto movement_normalized =
             segelphysik::detail::normalisiere_modellformat03(movement_data, model);
         const auto& mainsail_elements =
@@ -723,6 +953,38 @@ int main(int argc, char** argv)
         pruefung(!keel_elements[0].contains("Bewegung") &&
             keel_elements[1]["Bewegung"]["art"] == "drehen",
             "Vorhandener hydrostatischer Bewegungscontroller wurde veraendert");
+
+        const auto description = segelphysik::lies_beschreibung_modellformat03(
+            model / "modells_data.json", movement_data, false);
+        const auto& group_movement = description.gruppenbewegungen.at("mainsail");
+        pruefung(group_movement.art == segelphysik::Bewegungsart::drehen &&
+            group_movement.mitbewegte_elemente ==
+                std::vector<std::string>({"Mainsail", "Boom"}),
+            "Gruppenbewegung oder Gruppenmitglieder fehlen in der Beschreibung");
+        const auto& described_group = description.dokument.at("gruppen").at("mainsail");
+        pruefung(described_group.contains("Bewegung") &&
+            !described_group.at("elemente")[0].contains("Bewegung") &&
+            !described_group.at("elemente")[1].contains("Bewegung"),
+            "Bewegung gehoert nicht ausschliesslich zur Gruppe");
+        pruefung(described_group.at("Bewegung").at("mitbewegte_elemente") ==
+            nlohmann::json::array({"Mainsail", "Boom"}),
+            "Die oeffentliche Gruppenbewegung muss alle Gruppenmitglieder enthalten");
+        pruefung(description.dokument.at("gruppen").at("keel").at("Bewegung").at("control") ==
+            movement_data.at("groups").at("keel").at("movement").at("control"),
+            "Explizite Bewegungsgrenzen gehen im Gruppenimport verloren");
+        pruefung(described_group.at("elemente")[1].at("placement").at("translation_m") ==
+            nlohmann::json({0.02, -0.19, 0}),
+            "Individuelle Platzierung wurde veraendert");
+        pruefung(std::all_of(description.elemente.begin(), description.elemente.end(),
+            [](const auto& element) { return !element.bewegung; }),
+            "Gruppenbewegung erscheint als elementeigene Bewegung");
+        pruefung(!description.gruppenbewegungen.count("rig"),
+            "Statische Gruppe hat unerwartete Bewegung");
+        pruefung(described_group.at("elemente")[0].at("setting").at("original_buglage") == "backbord" &&
+            !described_group.at("elemente")[1].at("setting").contains("original_buglage") &&
+            description.dokument.at("gruppen").at("jib").at("elemente")[0]
+                .at("setting").at("original_buglage") == "unbekannt",
+            "Originalbuglage fehlt am Segel oder wird auf andere Gruppenmitglieder uebertragen");
 
         const auto metadata_model = temp_root / "tack-metadata";
         std::filesystem::create_directories(metadata_model);
@@ -756,6 +1018,7 @@ int main(int argc, char** argv)
         pruefung(segelphysik::darstellungsgeometrie(catalog, "bleistift",
             hidden_entry->modell_fassung).teile.empty(),
             "Ausgeblendetes Element liefert Geometrie oder Volumenersatz");
+        pruefe_gruppenvorschau_ohne_aerodynamik(source_root, temp_root);
     } catch (const std::exception& error) {
         std::filesystem::remove_all(temp_root);
         std::cerr << error.what() << '\n';

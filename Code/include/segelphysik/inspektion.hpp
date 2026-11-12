@@ -102,6 +102,21 @@ struct InspectionMovementPreview {
     std::vector<InspectionMovementPose> poses;
 };
 
+struct InspectionGroupMovementPreview {
+    std::string group_id;
+    std::string kind;
+    std::string frame = "modell";
+    std::optional<Vektor3> axis_point_m;
+    Vektor3 axis_direction{};
+    std::string reference_label;
+    double reference_value{};
+    std::string value_unit;
+    std::optional<double> minimum_value;
+    std::optional<double> maximum_value;
+    std::vector<InspectionMovementPose> poses;
+    std::vector<KatalogDiagnose> diagnostics;
+};
+
 struct InspectionInfo {
     std::string model_id;
     std::string model_version;
@@ -136,6 +151,8 @@ private:
         const ModelInspection&, const std::string&, const std::vector<std::string>&, bool);
     friend std::optional<InspectionMovementPreview> getMovementPreview(
         const ModelInspection&, const std::string&);
+    friend std::optional<InspectionGroupMovementPreview> getGroupMovementPreview(
+        const ModelInspection&, const std::string&);
     friend std::vector<InspectionType> getAvailableMeshTypes(const ModelInspection&);
     friend std::vector<InspectionMesh> getMesh(
         const ModelInspection&, const std::string&,
@@ -164,6 +181,8 @@ std::vector<InspectionProperty> getObjectProperties(
     const std::vector<std::string>& node_ids, bool includeChildren = true);
 std::optional<InspectionMovementPreview> getMovementPreview(
     const ModelInspection& inspection, const std::string& element_id);
+std::optional<InspectionGroupMovementPreview> getGroupMovementPreview(
+    const ModelInspection& inspection, const std::string& group_id);
 std::vector<InspectionType> getAvailableMeshTypes(const ModelInspection& inspection);
 std::vector<InspectionMesh> getMesh(
     const ModelInspection& inspection, const std::string& mesh_type,
@@ -177,6 +196,8 @@ std::string inspectionPropertiesJson(
     const std::vector<std::string>& node_ids, bool includeChildren = true);
 std::string movementPreviewJson(
     const ModelInspection& inspection, const std::string& element_id);
+std::string groupMovementPreviewJson(
+    const ModelInspection& inspection, const std::string& group_id);
 std::string inspectionMeshTypesJson(const ModelInspection& inspection);
 std::string inspectionMeshJson(
     const ModelInspection& inspection, const std::string& mesh_type,

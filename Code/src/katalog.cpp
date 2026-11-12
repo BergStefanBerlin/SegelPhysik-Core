@@ -394,7 +394,13 @@ Modellstruktur modellstruktur_aus_dateien(const Modellkatalog& katalog, const st
                 detail::pruefe_modellformat03(datei.parent_path(),
                     schemaordner_fuer_modellordner(datei.parent_path()), false).daten, false)
             : lies_beschreibung(datei);
-        for (const auto& gruppe : beschreibung.gruppen) result.gruppen.push_back({gruppe, gruppe, {}});
+        for (const auto& gruppe : beschreibung.gruppen) {
+            StrukturGruppe struktur{gruppe, gruppe, {}};
+            const auto bewegung = beschreibung.gruppenbewegungen.find(gruppe);
+            if (bewegung != beschreibung.gruppenbewegungen.end())
+                struktur.bewegung = bewegung->second;
+            result.gruppen.push_back(std::move(struktur));
+        }
         for (const auto& e : beschreibung.elemente) {
             auto gruppe = std::find_if(result.gruppen.begin(), result.gruppen.end(),
                 [&](const StrukturGruppe& g) { return g.id == e.gruppe; });
@@ -478,6 +484,35 @@ std::string katalog_json(const Modellkatalog& katalog)
     return out.str();
 }
 
+namespace {
+
+void bewegung_json(std::ostream& out, const std::optional<Bewegungsdefinition>& bewegung)
+{
+    if (!bewegung) {
+        out << "null";
+        return;
+    }
+    const auto& b = *bewegung;
+    out << "{\"art\":" << json_text(b.art == Bewegungsart::drehen ? "drehen" : "heben")
+        << ",\"steuerung\":" << json_text(b.ruderwinkel ? "ruderwinkel" : "stellung_prozent");
+    if (b.art == Bewegungsart::drehen) {
+        out << ",\"achse_modell\":";
+        zahlen(out, b.achse_modell);
+        out << ",\"drehpunkt_modell_m\":";
+        zahlen(out, b.drehpunkt_modell_m);
+    } else {
+        out << ",\"richtung_modell\":";
+        zahlen(out, b.richtung_modell);
+        out << ",\"hubweg_m\":" << b.hubweg_m;
+    }
+    out << ",\"mitbewegte_elemente\":[";
+    for (std::size_t j = 0; j < b.mitbewegte_elemente.size(); ++j)
+        out << (j ? "," : "") << json_text(b.mitbewegte_elemente[j]);
+    out << "]}";
+}
+
+}
+
 std::string modellstruktur_json(const Modellstruktur& s)
 {
     auto out = json_strom();
@@ -486,7 +521,9 @@ std::string modellstruktur_json(const Modellstruktur& s)
     for (std::size_t g = 0; g < s.gruppen.size(); ++g) {
         const auto& gruppe = s.gruppen[g];
         out << (g ? "," : "") << "{\"id\":" << json_text(gruppe.id) << ",\"name\":" << json_text(gruppe.name)
-            << ",\"elemente\":[";
+            << ",\"bewegung\":";
+        bewegung_json(out, gruppe.bewegung);
+        out << ",\"elemente\":[";
         for (std::size_t i = 0; i < gruppe.elemente.size(); ++i) {
             const auto& e = gruppe.elemente[i];
             out << (i ? "," : "") << "{\"id\":" << json_text(e.id) << ",\"name\":" << json_text(e.name)
@@ -504,26 +541,7 @@ std::string modellstruktur_json(const Modellstruktur& s)
                 first_reference = false;
             }
             out << "],\"bewegung\":";
-            if (!e.bewegung) out << "null";
-            else {
-                const auto& b = *e.bewegung;
-                out << "{\"art\":" << json_text(b.art == Bewegungsart::drehen ? "drehen" : "heben")
-                    << ",\"steuerung\":" << json_text(b.ruderwinkel ? "ruderwinkel" : "stellung_prozent");
-                if (b.art == Bewegungsart::drehen) {
-                    out << ",\"achse_modell\":";
-                    zahlen(out, b.achse_modell);
-                    out << ",\"drehpunkt_modell_m\":";
-                    zahlen(out, b.drehpunkt_modell_m);
-                } else {
-                    out << ",\"richtung_modell\":";
-                    zahlen(out, b.richtung_modell);
-                    out << ",\"hubweg_m\":" << b.hubweg_m;
-                }
-                out << ",\"mitbewegte_elemente\":[";
-                for (std::size_t j = 0; j < b.mitbewegte_elemente.size(); ++j)
-                    out << (j ? "," : "") << json_text(b.mitbewegte_elemente[j]);
-                out << "]}";
-            }
+            bewegung_json(out, e.bewegung);
             out << '}';
         }
         out << "]}";

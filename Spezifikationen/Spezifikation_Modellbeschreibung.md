@@ -650,9 +650,9 @@ der [GUI-Spezifikation](../../GUI/Spezifikationen/Spezifikation_GUI_Bootsauswahl
 **Status:** Fachlich finalisiert am 10.11.2026; Zielversion C-0.21.
 Core-Umsetzung und technische Abnahme sind offen.
 **Anforderungen:** A-C-00148 bis A-C-00153.
-**Entwurfsquellen:** [Migrationslog](../../Modelle/Modelle-NEW/MIGRATIONSLOG.md),
-[Datenschema](../../Modelle/Modelle-NEW/schema_data.json) und
-[Validierungsschema](../../Modelle/Modelle-NEW/schema_validation.json).
+**Entwurfsquellen:** [Migrationslog](../../Modelle/MIGRATIONSLOG.md),
+[Datenschema](../../Modelle/schema_data.json) und
+[Validierungsschema](../../Modelle/schema_validation.json).
 Technische Restdetails und Abnahmeschritte stehen im
 [Umsetzungsplan C-0.21](../Umsetzungsplaene/Umsetzungsplan_C-0.21.md).
 Nicht normativ offene Implementierungsdetails stehen in der
@@ -814,3 +814,74 @@ Die GUI-Abnahme bleibt separat in ihrer Spezifikation und ihrem Plan.
 | A-C-00151 | U-C-000132, U-C-000133 |
 | A-C-00152 | U-C-000134, U-C-000136 |
 | A-C-00153 | U-C-000136, U-C-000137 |
+
+## C-0.22 Ergänzung: Gruppeneigentümerschaft und elementlokale Segelseite
+
+**Status:** Fachlich finalisiert am 12.11.2026; Umsetzung offen.
+Zielversion C-0.22.
+**Anforderungen:** A-C-00154 und A-C-00155.
+**Entwurfsquelle:** IDEE-C-00004 in der
+[Entwurfspunkteliste Modellformat](Entwurfspunkte/Modellformat.json).
+
+| ID | Kurztitel |
+|---|---|
+| A-C-00154 | Gruppenbewegung bleibt gruppeneigen |
+| A-C-00155 | Originalbuglage wirkt nur auf das jeweilige Segel |
+
+Maßgeblich für die zulässigen JSON-Felder bleibt das aktive
+[Datenschema](../../Modelle/schema_data.json); dieses Core-Vorhaben ändert
+weder Schema noch Modelldaten.
+Die Core-Vorschau-Schnittstelle ist in der
+[Modellkatalog-Spezifikation, Abschnitt 5](Spezifikation_Modellkatalog_Schnittstelle.md#5-c-022-gruppenbewegungs-vorschau-aus-dem-inspektionssnapshot)
+festgelegt.
+
+### A-C-00154: Gruppenbewegung bleibt gruppeneigen
+
+Im Modellformat 0.3 ist `groups.<gruppen-id>.movement` die Bewegungsdefinition
+der Gruppe. Der Core erhält diese Eigentümerschaft beim Import und stellt sie
+in der typisierten Modellstruktur an der Gruppe bereit, nicht als
+Elementbewegung eines stellvertretenden Controllers. Eine Gruppe ohne
+`movement` bleibt unbewegt. Eine definierte Bewegung transformiert alle und
+nur die Elemente aus `groups.<gruppen-id>.elements`; ihre individuellen
+`placement.translation_m`- und `placement.rotation_xyzw`-Werte bleiben
+erhalten. Andere Gruppen und Elemente werden nicht verändert.
+
+Das Schema 0.3 bleibt unverändert: Es erlaubt `movement` am Gruppenobjekt und
+nicht am Element. Bewegungswerte, Grenzen oder zusätzliche JSON-Felder werden
+durch diese Anforderung nicht ergänzt. Bestehende Legacy-Verträge für
+elementeigene Bewegungen bleiben erhalten.
+
+**Abnahme:** Import- und Modellstrukturtests bestätigen, dass `mainsail` und
+`jib` ihre Bewegungen jeweils an der Gruppe führen, kein Element als
+Bewegungsinhaber ausgegeben wird und alle sowie nur die jeweiligen
+Gruppenmitglieder transformiert werden. Eine Gruppe ohne Bewegung bleibt
+statisch; individuelle Platzierungen und alle Elemente außerhalb der Gruppe
+bleiben unverändert. Alle Referenzdaten bestehen weiterhin das aktive
+Schema.
+
+### A-C-00155: Originalbuglage wirkt nur auf das jeweilige Segel
+
+`groups.<gruppen-id>.elements[].placement.originalTack` ist ein
+elementlokaler Herkunftswert für das jeweilige Segel. Bei einer
+seitenabhängigen Darstellung darf der Core nur die Darstellungsgeometrie
+dieses Segels gemäß Original- und Zielbuglage spiegeln. Die Angabe wird weder
+auf andere Segel noch auf sonstige Elemente derselben Gruppe, insbesondere
+nicht auf den Großbaum, übertragen. Sie verändert weder Elementplatzierung
+noch physische Netze, Masse, Trägheit oder Modelldateien. Ein nicht
+bestimmbarer Spiegelbedarf wird diagnostiziert; der Core rät keine Buglage.
+
+**Abnahme:** Ein Gruppenfixture mit Segel und Nicht-Segel-Mitglied weist
+nach, dass die Seitenvariante nur die Segelkontur ändert und die gemeinsame
+Gruppenbewegung auf beide Elemente wirkt. `originalTack: "unknown"` erzeugt
+bei erforderlicher Spiegelung eine Diagnose statt einer geratenen
+Segelgeometrie. Das Feld bleibt ausschließlich an den vom Schema erlaubten
+Segel-Elementen.
+
+### C-0.22 Nachverfolgbarkeit
+
+| Anforderung | Umsetzungsschritte |
+|---|---|
+| A-C-00154 | U-C-000138, U-C-000139 |
+| A-C-00155 | U-C-000138, U-C-000139 |
+| A-C-00156 | U-C-000139, U-C-000140 |
+| A-C-00157 | U-C-000139, U-C-000140 |

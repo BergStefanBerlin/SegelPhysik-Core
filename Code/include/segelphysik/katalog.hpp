@@ -76,6 +76,7 @@ struct StrukturGruppe {
     std::string id;
     std::string name;
     std::vector<StrukturElement> elemente;
+    std::optional<Bewegungsdefinition> bewegung;
 };
 struct Modellstruktur {
     std::string modell_id;

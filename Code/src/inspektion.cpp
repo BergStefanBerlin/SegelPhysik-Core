@@ -3,6 +3,7 @@
 #include "segelphysik/segelkonfigurator.hpp"
 #include "katalog_intern.hpp"
 #include "modell_intern.hpp"
+#include "modellformat_03_intern.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -10,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -208,6 +210,9 @@ void add_property(std::vector<InspectionProperty>& properties, const std::string
         if (parts.size() >= 5 && parts[0] == "gruppen" && parts[2] == "elemente") {
             field_index = 4;
             field = parts[field_index];
+        } else if (parts.size() >= 3 && parts[0] == "gruppen") {
+            field_index = 2;
+            field = parts[field_index];
         } else if (!parts.empty()) {
             field = parts.front();
         }
@@ -320,7 +325,15 @@ Json filtered_document(const Json& source, const std::string& tree_type,
                 element_ids.push_back(element["id"].get<std::string>());
             }
         }
-        if (!selected_elements.empty())
+        if (tree_type == "bewegung" && group.contains("Bewegung")) {
+            selected_elements = Json::array();
+            for (const auto& element : group["elemente"]) {
+                element_ids.push_back(element.at("id").get<std::string>());
+                selected_elements.push_back({{"id", element.at("id")}});
+            }
+            selected_groups[group_name] = Json{
+                {"elemente", std::move(selected_elements)}, {"Bewegung", group["Bewegung"]}};
+        } else if (!selected_elements.empty())
             selected_groups[group_name] = Json{{"elemente", std::move(selected_elements)}};
     }
     result["gruppen"] = std::move(selected_groups);
@@ -442,6 +455,10 @@ void build_tree(TreeData& tree, const Json& source, const std::string& tree_type
                     group_ids.push_back(element["id"].get<std::string>());
             tree.node_index[group_id] = tree.nodes.size();
             tree.nodes.push_back({group_id, "", group_name, "gruppe", unique_ids(group_ids)});
+            for (const auto& [key, value] : group.items())
+                if (key != "elemente")
+                    append_flat_properties(tree, value, group_id, child_path(group_id, key), key,
+                        pointer_escape(key));
             for (const auto& element : group_members) {
                 const auto element_id = element["id"].get<std::string>();
                 const auto node_id = child_path(child_path(group_id, "elemente"), element_id);
@@ -477,6 +494,9 @@ void build_tree(TreeData& tree, const Json& source, const std::string& tree_type
                 group_ids.push_back(element["id"].get<std::string>());
         tree.node_index[group_id] = tree.nodes.size();
         tree.nodes.push_back({group_id, "", group_name, "gruppe", unique_ids(group_ids)});
+        for (const auto& [key, value] : group.items())
+            if (key != "elemente")
+                append_value(tree, value, group_id, child_path(group_id, key), key, "", "gruppe");
         const auto& elements = group["elemente"];
         for (const auto& element : elements) {
             const auto element_id = element["id"].get<std::string>();
@@ -552,7 +572,8 @@ void add_derived_properties(TreeData& tree, const ModellBeschreibung& descriptio
                 add_property(tree.properties, node_id, node_id, "@wanddicke_m", "Wanddicke",
                     "m", "vorhanden", *entry.wanddicke_m);
         }
-        if ((tree_type == "bewegung" || tree_type == "objekte") && entry.bewegung) {
+        if ((tree_type == "bewegung" || tree_type == "objekte") && entry.bewegung &&
+            !description.gruppenbewegungen.count(group->gruppe)) {
             const auto movement_id = child_path(node_id, "Bewegung");
             const auto property_node_id = tree_type == "objekte" ? node_id : movement_id;
             add_property(tree.properties, property_node_id, movement_id, "@hubweg_m", "Hubweg", "m",
@@ -982,6 +1003,7 @@ std::shared_ptr<const ModelInspection> readModelInspection(
     }
     auto* current = impl.get();
     auto inspection = std::shared_ptr<const ModelInspection>(new ModelInspection(std::move(impl)));
+    if (!detail::ist_modellformat03_datei(model_file)) {
     const auto sails = leseSegelKonfiguration(katalog, *inspection);
     if (sails.status == SegelKonfigurationsStatus::Fehler) {
         current->info.status = "nur_ansicht";
@@ -1017,6 +1039,7 @@ std::shared_ptr<const ModelInspection> readModelInspection(
         }
         for (const auto& diag : sails.diagnosen)
             current->info.diagnostics.push_back({diag.code, diag.nachricht, diag.element_id});
+    }
     }
     for (auto& [type, tree] : current->trees)
         add_derived_properties(tree, current->description, current->model, current->display, type);
@@ -1072,6 +1095,12 @@ std::optional<InspectionMovementPreview> getMovementPreview(
     const auto& impl = *inspection.impl_;
     if (!impl.element_ids.count(element_id))
         inspection_error("CORE-INSP-0002", "Unbekannte Element-ID");
+    const auto description = std::find_if(impl.description.elemente.begin(),
+        impl.description.elemente.end(),
+        [&](const ElementBeschreibung& element) { return element.id == element_id; });
+    if (description != impl.description.elemente.end() &&
+        impl.description.gruppenbewegungen.count(description->gruppe))
+        return std::nullopt;
     if (!impl.model)
         inspection_error("CORE-INSP-0004", "Bewegungsvorschau wegen ungueltiger Physik nicht verfuegbar");
     const auto controller = std::find_if(impl.model->elemente.begin(), impl.model->elemente.end(),
@@ -1124,6 +1153,193 @@ std::optional<InspectionMovementPreview> getMovementPreview(
     return preview;
 }
 
+std::optional<InspectionGroupMovementPreview> getGroupMovementPreview(
+    const ModelInspection& inspection, const std::string& group_id)
+{
+    const auto& impl = *inspection.impl_;
+    if (std::find(impl.description.gruppen.begin(), impl.description.gruppen.end(), group_id) ==
+        impl.description.gruppen.end())
+        inspection_error("CORE-INSP-0002", "Unbekannte Gruppen-ID");
+    const auto found = impl.description.gruppenbewegungen.find(group_id);
+    if (found == impl.description.gruppenbewegungen.end()) return std::nullopt;
+    const auto& movement = found->second;
+    const auto& group = impl.description.dokument.at("gruppen").at(group_id);
+    const auto& data = group.at("Bewegung");
+    const bool sail_group = group_id == "mainsail" || group_id == "jib";
+    InspectionGroupMovementPreview preview;
+    preview.group_id = group_id;
+    preview.kind = movement.art == Bewegungsart::drehen ? "drehen" : "heben";
+    if (movement.art == Bewegungsart::drehen) {
+        preview.axis_point_m = movement.drehpunkt_modell_m;
+        preview.axis_direction = movement.achse_modell;
+    } else {
+        preview.axis_direction = movement.richtung_modell;
+    }
+    preview.reference_label = "Normalstellung";
+    preview.value_unit = movement.art == Bewegungsart::drehen ? "deg" : "m";
+    if (data.contains("control")) {
+        const auto& control = data.at("control");
+        const auto scale = control.value("unit", std::string{}) == "cm" ? .01 : 1.;
+        preview.minimum_value = control.at("minimum").get<double>() * scale;
+        preview.maximum_value = control.at("maximum").get<double>() * scale;
+        preview.reference_value = control.value("neutral", control.at("minimum").get<double>()) * scale;
+    }
+
+    std::vector<const InspectionMesh*> meshes;
+    for (const auto& member : movement.mitbewegte_elemente) {
+        const auto description = std::find_if(impl.description.elemente.begin(),
+            impl.description.elemente.end(),
+            [&](const ElementBeschreibung& item) { return item.id == member; });
+        const auto mesh = std::find_if(impl.meshes.begin(), impl.meshes.end(),
+            [&](const InspectionMesh& item) {
+                return description != impl.description.elemente.end() && description->darstellung &&
+                    item.type == "darstellung" && item.element_id == member &&
+                    item.origin != "volumen_ersatz" && item.origin != "punktmasse_referenz";
+            });
+        if (mesh != impl.meshes.end()) meshes.push_back(&*mesh);
+        else preview.diagnostics.push_back({"CORE-INSP-0004",
+            "Visualisierungsmesh fuer Gruppenmitglied nicht verfuegbar", member});
+    }
+
+    const auto dot = [](const Vektor3& a, const Vektor3& b) {
+        return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+    };
+    const auto subtract = [](const Vektor3& a, const Vektor3& b) {
+        return Vektor3{a[0]-b[0], a[1]-b[1], a[2]-b[2]};
+    };
+    const auto cross = [](const Vektor3& a, const Vektor3& b) {
+        return Vektor3{a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2],
+            a[0]*b[1]-a[1]*b[0]};
+    };
+    const auto axis_length = std::sqrt(dot(preview.axis_direction, preview.axis_direction));
+    if (!(axis_length > 1e-12))
+        inspection_error("CORE-INSP-0004", "Ungueltige Gruppenbewegungsachse");
+    Vektor3 axis = preview.axis_direction;
+    for (auto& value : axis) value /= axis_length;
+    std::set<std::string> sail_elements;
+    if (sail_group) for (const auto& element : group.at("elemente")) {
+        const auto placement = element.find("placement");
+        const auto display = element.find("Darstellung");
+        if ((placement != element.end() && placement->contains("originalTack")) ||
+            (display != element.end() && display->value("oberflaeche", std::string{}) == "stoff"))
+            sail_elements.insert(element.at("id").get<std::string>());
+    }
+
+    const auto mirror_sail = [&](InspectionMesh& mesh) -> bool {
+        std::map<std::pair<std::size_t, std::size_t>, unsigned> edges;
+        for (const auto& triangle : mesh.triangles)
+            for (std::size_t i = 0; i < 3; ++i) {
+                auto a = triangle[i], b = triangle[(i + 1) % 3];
+                if (a >= mesh.points_m.size() || b >= mesh.points_m.size()) return false;
+                if (a > b) std::swap(a, b);
+                ++edges[{a, b}];
+            }
+        std::set<std::size_t> boundary;
+        for (const auto& edge : edges) if (edge.second == 1) {
+            boundary.insert(edge.first.first);
+            boundary.insert(edge.first.second);
+        }
+        if (boundary.size() < 3 || !preview.axis_point_m) return false;
+        double nearest = std::numeric_limits<double>::infinity(), farthest = -1.;
+        std::size_t outer = 0;
+        for (const auto index : boundary) {
+            const auto relative = subtract(mesh.points_m[index], *preview.axis_point_m);
+            const auto along = dot(relative, axis);
+            const double distance = std::max(0., dot(relative, relative) - along * along);
+            nearest = std::min(nearest, distance);
+            if (distance > farthest) { farthest = distance; outer = index; }
+        }
+        const double tolerance = std::max(1e-16, farthest * 1e-10);
+        std::optional<std::size_t> first, second;
+        double min_along = std::numeric_limits<double>::infinity();
+        double max_along = -std::numeric_limits<double>::infinity();
+        for (const auto index : boundary) {
+            const auto relative = subtract(mesh.points_m[index], *preview.axis_point_m);
+            const auto along = dot(relative, axis);
+            const double distance = std::max(0., dot(relative, relative) - along * along);
+            if (distance > nearest + tolerance) continue;
+            if (along < min_along) { min_along = along; first = index; }
+            if (along > max_along) { max_along = along; second = index; }
+        }
+        if (!first || !second || *first == *second) return false;
+        const auto normal = cross(subtract(mesh.points_m[*second], mesh.points_m[*first]),
+            subtract(mesh.points_m[outer], mesh.points_m[*first]));
+        const auto normal_squared = dot(normal, normal);
+        if (!(normal_squared > 1e-20)) return false;
+        const auto origin = mesh.points_m[*first];
+        for (auto& point : mesh.points_m) {
+            const auto distance = 2. * dot(subtract(point, origin), normal) /
+                normal_squared;
+            for (std::size_t i = 0; i < 3; ++i) point[i] -= distance * normal[i];
+        }
+        for (auto& triangle : mesh.triangles) std::swap(triangle[1], triangle[2]);
+        return true;
+    };
+
+    const auto append_pose = [&](const std::string& label, double value) {
+        InspectionMovementPose pose{label, value, preview.value_unit, {}};
+        if (sail_group && label != "normal" && sail_elements.empty()) {
+            preview.diagnostics.push_back({"CORE-INSP-0004",
+                "Segel innerhalb der Gruppe nicht eindeutig bestimmbar", group_id});
+            return;
+        }
+        for (const auto* original : meshes) {
+            auto mesh = *original;
+            if (sail_group && label != "normal" && sail_elements.count(mesh.element_id)) {
+                const auto element = std::find_if(group.at("elemente").begin(),
+                    group.at("elemente").end(), [&](const Json& entry) {
+                        return entry.at("id") == mesh.element_id;
+                    });
+                if (element != group.at("elemente").end()) {
+                    const auto tack = element->value("placement", Json::object())
+                        .value("originalTack", std::string("unknown"));
+                    if (tack == "unknown") {
+                        preview.diagnostics.push_back({"CORE-INSP-0004",
+                            "Originalbuglage des Segels ist unbekannt", mesh.element_id});
+                        return;
+                    }
+                    const bool mirror = (value > 0. && tack == "starboard") ||
+                        (value < 0. && tack == "port");
+                    if (mirror && !mirror_sail(mesh)) {
+                        preview.diagnostics.push_back({"CORE-INSP-0004",
+                            "Spiegelebene aus Visualisierungsmesh nicht bestimmbar", mesh.element_id});
+                        return;
+                    }
+                }
+            }
+            const auto delta = (value - preview.reference_value) * (sail_group ? -1. : 1.);
+            const auto radians = delta * 3.14159265358979323846 / 180.;
+            for (auto& point : mesh.points_m) {
+                if (movement.art == Bewegungsart::heben) {
+                    for (std::size_t i = 0; i < 3; ++i) point[i] += axis[i] * delta;
+                } else {
+                    const auto relative = subtract(point, *preview.axis_point_m);
+                    const auto rotated = cross(axis, relative);
+                    const auto projection = dot(axis, relative);
+                    for (std::size_t i = 0; i < 3; ++i)
+                        point[i] = (*preview.axis_point_m)[i] + relative[i] * std::cos(radians) +
+                            rotated[i] * std::sin(radians) +
+                            axis[i] * projection * (1. - std::cos(radians));
+                }
+            }
+            mesh.id += "/preview/" + pointer_escape(label);
+            mesh.provenance = "abgeleitet";
+            mesh.derivation = "Gruppenbewegung/" + label;
+            pose.meshes.push_back(std::move(mesh));
+        }
+        if (pose.meshes.size() == movement.mitbewegte_elemente.size())
+            preview.poses.push_back(std::move(pose));
+    };
+    append_pose("normal", preview.reference_value);
+    if (preview.minimum_value) append_pose("minimum", *preview.minimum_value);
+    if (preview.maximum_value) append_pose("maximum", *preview.maximum_value);
+    if (sail_group && movement.art == Bewegungsart::drehen) {
+        append_pose("backbord", 90.);
+        append_pose("steuerbord", -90.);
+    }
+    return preview;
+}
+
 std::vector<InspectionType> getAvailableMeshTypes(const ModelInspection& inspection)
 {
     return inspection.impl_->mesh_types;
@@ -1162,6 +1378,9 @@ Modellstruktur modellstruktur(const ModelInspection& inspection)
     for (const auto& node : tree) {
         if (node.kind == "gruppe") {
             StrukturGruppe group{node.name, node.name, {}};
+            const auto movement = inspection.impl_->description.gruppenbewegungen.find(node.name);
+            if (movement != inspection.impl_->description.gruppenbewegungen.end())
+                group.bewegung = movement->second;
             for (const auto& child : tree)
                 if (child.parent_id == node.id && child.kind == "element") {
                     const auto display = std::any_of(inspection.impl_->meshes.begin(),
@@ -1260,6 +1479,24 @@ std::string movementPreviewJson(const ModelInspection& inspection, const std::st
     const auto preview = getMovementPreview(inspection, element_id);
     return envelope(inspection.info(), "preview",
         preview ? movement_preview_json(*preview) : Json(nullptr)).dump();
+}
+
+std::string groupMovementPreviewJson(const ModelInspection& inspection, const std::string& group_id)
+{
+    const auto preview = getGroupMovementPreview(inspection, group_id);
+    if (!preview) return envelope(inspection.info(), "preview", Json(nullptr)).dump();
+    Json poses = Json::array();
+    for (const auto& pose : preview->poses) poses.push_back(movement_pose_json(pose));
+    Json result{{"group_id", preview->group_id}, {"kind", preview->kind},
+        {"frame", preview->frame},
+        {"axis_point_m", preview->axis_point_m ? Json(*preview->axis_point_m) : Json(nullptr)},
+        {"axis_direction", preview->axis_direction},
+        {"reference_label", preview->reference_label},
+        {"reference_value", preview->reference_value}, {"value_unit", preview->value_unit},
+        {"minimum_value", preview->minimum_value ? Json(*preview->minimum_value) : Json(nullptr)},
+        {"maximum_value", preview->maximum_value ? Json(*preview->maximum_value) : Json(nullptr)},
+        {"poses", std::move(poses)}, {"diagnostics", diagnostic_json(preview->diagnostics)}};
+    return envelope(inspection.info(), "preview", std::move(result)).dump();
 }
 
 std::string inspectionMeshTypesJson(const ModelInspection& inspection)

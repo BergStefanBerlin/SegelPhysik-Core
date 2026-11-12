@@ -63,16 +63,44 @@ const auto objectTree = getObjectTree(*inspection, "objekte");
 const auto properties = getObjectProperties(*inspection, "objekte", selectedIds, true);
 ```
 
-`modellstruktur(*inspection).gruppen[].elemente[].bewegung` bleibt die
-kompatible typisierte Bewegungsdefinition. Für eine Vorschau ruft die GUI
-`getMovementPreview(*inspection, controllerElementId)` auf. Der Rückgabewert
-enthält modellfeste Achs-/Bezugswerte, Referenzstellung und die
-Core-transformierten Meshes der Normal- sowie verfügbaren Grenzstellungen.
-Werte in Prozent verwenden die bestehenden 0–100-Steuerwerte; eine
-Winkeldrehung mit `ruderwinkel` besitzt mangels Modellgrenzen keine
-erfundenen Minimum-/Maximum-Posen. Fehlende Vorschaugeometrie wird als
-Fehler gemeldet, nicht durch eine zweite GUI-Bewegungsimplementierung
-ersetzt.
+Für bestehende elementeigene beziehungsweise Legacy-Bewegungen bleibt
+`modellstruktur(*inspection).gruppen[].elemente[].bewegung` die kompatible
+Quelle; die GUI verwendet dafür `getMovementPreview(*inspection,
+element_id)`. Der Rückgabewert enthält modellfeste Achs-/Bezugswerte,
+Referenzstellung und Core-transformierte Meshes der Normal- sowie
+verfügbaren Grenzstellungen. Werte in Prozent verwenden die bestehenden
+0–100-Steuerwerte; nicht definierte Winkelgrenzen werden nicht erfunden.
+Die aktive Format-0.3-Gruppenbewegung wird dagegen ausschließlich über die
+Gruppenstruktur und Gruppen-ID abgefragt; siehe C-0.22 unten. Fehlende
+Vorschaugeometrie wird als Fehler gemeldet, nicht durch eine zweite
+GUI-Bewegungsimplementierung ersetzt.
+
+## C-0.22: Gruppenbewegungs-Vorschau
+
+Format 0.3 speichert `movement` an `groups.<group-id>`. Der Core hält diese
+Eigentümerschaft in der Modellstruktur an der Gruppe und liefert die
+vollständige Vorschau über deren Gruppen-ID:
+
+```cpp
+const auto preview = getGroupMovementPreview(*inspection, "mainsail");
+const auto json = groupMovementPreviewJson(*inspection, "mainsail");
+```
+
+Jede Pose enthält Core-transformierte Darstellungsmeshes aller und nur der
+Gruppenmitglieder; die Meshes behalten ihre Element-IDs. Bei Segelgruppen
+liefert der Core für denselben Ausschlag die Backbord- und
+Steuerbordvariante mit positivem beziehungsweise negativem Vorzeichen.
+`placement.originalTack` wirkt nur auf das betreffende Segelmesh. Eine
+unbekannte Originalbuglage wird diagnostiziert; der Core rät keine
+Spiegelung. Die Abfrage ist read-only und ändert weder Quelldaten noch
+Simulation. C++- und JSON-Antwort enthalten dieselben Posen und Diagnosen.
+Ohne im Modell festgelegten Segelausschlag dienen ±90° als reine
+Vorschau-Referenz; der Betrag entspricht dem bisherigen Core-Stellbereich
+von 0–90°. Sie sind
+keine Modell- oder Simulationsgrenze; `minimum_value` und `maximum_value`
+bleiben in diesem Fall leer. Die Spiegelebene wird aus dem
+Visualisierungsmesh und der Gruppenachse bestimmt; Aerodynamikdateien sind
+dafür nicht erforderlich.
 
 ## C-0.5: Temporärer Testantrieb, Ergebnisversion 3
 

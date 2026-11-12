@@ -220,3 +220,8 @@ Die Schnittstellen ergänzen den unveränderlichen Inspektionssnapshot.
 | CPPI-0145 | `laufzeit_defaults_datei()` | implementiert, Abnahme offen | C-0.21 / A-C-00152; gemeinsame Konfigurationsdatei mit Test-/Umgebungsprioritaet |
 | CPPI-0146 | `modellordner_standard(const filesystem::path&)` | implementiert, gezielt getestet | C-0.21 / A-C-00152; explizite Auswahl vor Test-Override, Umgebung und Datei |
 | CPPI-0147 | `schemaordner_fuer_modellordner(const filesystem::path&, const filesystem::path&)` | implementiert, gezielt getestet | C-0.21 / A-C-00152; gemeinsame Schemawurzel ohne Quellpfad-Fallback; erster Parameter bleibt Modellkontext |
+| CPPI-0148 | `InspectionGroupMovementPreview` | implementiert, gezielt und regressiv getestet | C-0.22 / A-C-00156, A-C-00157; gruppeneigene Vorschau mit vollständigen Gruppenposen und Diagnosen |
+| CPPI-0149 | `getGroupMovementPreview(const ModelInspection&, const string&)` | implementiert, gezielt und regressiv getestet | C-0.22 / A-C-00156, A-C-00157; read-only Core-Vorschau über Gruppen-ID |
+| CPPI-0150 | `groupMovementPreviewJson(const ModelInspection&, const string&)` | implementiert, gezielt und regressiv getestet | C-0.22 / A-C-00156, A-C-00157; JSON-Projektion derselben gruppeneigenen Vorschau |
+| CPPI-0151 | `ModellBeschreibung::gruppenbewegungen` | implementiert, gezielt und regressiv getestet | C-0.22 / A-C-00154; gruppeneigene Bewegungsdefinitionen für Format 0.3 |
+| CPPI-0152 | `StrukturGruppe::bewegung` | implementiert, gezielt und regressiv getestet | C-0.22 / A-C-00154, A-C-00156; optionale gruppeneigene Bewegungsdefinition |

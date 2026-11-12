@@ -682,11 +682,12 @@ Quelldateien nach Aufnahme ändert Baum und Eigenschaften nicht.
 
 ### A-C-00113: Typisierte Bewegungs-Vorschau aus dem Snapshot
 
-`modellstruktur(snapshot).gruppen[].elemente[].bewegung` bleibt die
-kompatible Quelle der typisierten `Bewegungsdefinition`: Art, Achse,
-Drehpunkt, Hubrichtung, mitbewegte Elemente und vorhandener Hubweg. Die
-Achsen und Punkte sind modellfest in Metern. `getMovementPreview(snapshot,
-element_id)` liefert eine optionale `InspectionMovementPreview` mit
+Für bestehende elementeigene beziehungsweise Legacy-Bewegungen bleibt
+`modellstruktur(snapshot).gruppen[].elemente[].bewegung` die kompatible Quelle
+der typisierten `Bewegungsdefinition`: Art, Achse, Drehpunkt, Hubrichtung,
+mitbewegte Elemente und vorhandener Hubweg. Die Achsen und Punkte sind
+modellfest in Metern. `getMovementPreview(snapshot, element_id)` liefert
+eine optionale `InspectionMovementPreview` mit
 Referenzstellung, vorhandener Achse, optionalem Drehpunkt, tatsächlichen
 Steuerwertgrenzen und Snapshot-`InspectionMesh`-Geometrien für die
 Normalstellung sowie verfügbare Grenzstellungen. Die Geometrien werden mit
@@ -709,6 +710,98 @@ Core-Bewegungsdefinitionen geprüft. Bei nicht modellierten Grenzen bleibt
 der jeweilige Wert `null`/nicht vorhanden. JSON und C++ liefern dieselben
 Referenz-, Achs- und Pose-Daten.
 
+Für Format 0.3, dessen `movement` am Gruppenobjekt liegt, gilt ergänzend die
+Gruppen-ID-basierte Vorschau aus A-C-00156 und A-C-00157.
+
 Die Meterteilung des Darstellungsrasters bleibt eine GUI-Aufgabe auf Basis
 der bestehenden Meter-/Koordinatenkonvention. Sie ändert keine
 Core-Stützstellen oder Rechennetze und benötigt kein physikalisches Raster.
+
+## 5. C-0.22: Gruppenbewegungs-Vorschau aus dem Inspektionssnapshot
+
+**Status:** Fachlich finalisiert am 12.11.2026; Core-Implementierung und
+CTest am 12.11.2026 bestanden; GUI-Integration und Nutzerabnahme separat.
+Zielversion C-0.22.
+**Anforderungen:** A-C-00156 und A-C-00157.
+**Entwurfsquelle:** IDEE-C-00004 in der
+[Entwurfspunkteliste Modellformat](Entwurfspunkte/Modellformat.json).
+
+Die zugehörigen Formatsemantiken stehen in der
+[Modellbeschreibung, A-C-00154 und A-C-00155](Spezifikation_Modellbeschreibung.md#c-022-ergänzung-gruppeneigentümerschaft-und-elementlokale-segelseite).
+Der einzige maßgebliche Core-Plan ist
+[Umsetzungsplan C-0.22](../Umsetzungsplaene/Umsetzungsplan_C-0.22.md).
+
+| ID | Kurztitel |
+|---|---|
+| A-C-00156 | Vorschau über die Gruppen-ID |
+| A-C-00157 | Beidseitige Segelpose und lokale Spiegelung |
+
+### A-C-00156: Vorschau über die Gruppen-ID
+
+Der Core stellt `getGroupMovementPreview(snapshot, group_id)` als
+read-only-Inspektionsabfrage bereit. Das Ergebnis benennt die Gruppe als
+Bewegungsinhaber und liefert die Core-transformierten Darstellungsmeshes
+aller und nur der zugehörigen Elemente, jeweils mit stabiler Gruppen- und
+Elementzuordnung. `InspectionGroupMovementPreview` enthält `group_id`,
+Bewegungsart und Bezugssystem, optionale Achsen-/Drehpunktdaten, die
+Referenzstellung, vorhandene Grenzen, `InspectionMovementPose`-Posen und
+Diagnosen. Jede Pose enthält eine Beschriftung, ihren Core-Wert und ihre
+Einheit sowie die Meshes mit stabiler Gruppen- und Element-ID. Für eine
+Gruppe ohne Bewegungsdefinition ist das Ergebnis `std::nullopt`; das ist
+kein Fehler. Neutralstellung sowie vorhandene Minimal- und Maximalstellungen
+folgen den bestehenden Core-Bewegungswerten und -grenzen; nicht definierte
+Grenzen bleiben nicht verfügbar und werden nicht geschätzt. Die bisherige
+`getMovementPreview(snapshot, element_id)` bleibt für bestehende
+elementeigene beziehungsweise Legacy-Bewegungen erhalten.
+
+Die neue typisierte C++-Antwort und ihre JSON-Projektion enthalten dieselben
+Gruppen-, Bewegungs-, Posen-, Mesh- und Diagnoseinformationen. Die Vorschau
+verändert weder den Inspektionssnapshot noch Modelldateien oder
+Simulationszustand. Die GUI berechnet keine Gruppenbewegung selbst.
+
+**Abnahme:** Eine Anfrage mit `group_id` liefert Gruppenmetadaten und pro
+Pose die vollständigen Core-Meshes aller Gruppenmitglieder; unbekannte
+Gruppen werden als Fehler gemeldet. Tests prüfen Achse, Drehpunkt,
+Normalstellung, vorhandene Grenzen, Element-IDs, Platzierungserhalt,
+unveränderte andere Gruppen und byte-/wertgleiche C++-/JSON-Inhalte.
+
+### A-C-00157: Beidseitige Segelpose und lokale Spiegelung
+
+Für eine Segelgruppe enthält die Gruppenbewegungs-Vorschau Backbord- und
+Steuerbordschotvariante desselben definierten Ausschlags. Ein vorhandener
+Ausschlag von 0 bis 90 Grad beschränkt die Vorschau nicht auf eine Seite:
+der Core stellt den gleichen Betrag auch mit umgekehrtem Vorzeichen dar.
+Es gilt der bestehende Winkelvertrag: positiv ist Backbord, negativ
+Steuerbord. Diese zusätzliche Gegenpose ist ausschließlich eine
+Inspektionsdarstellung; Bewegungsdefinition, Modell und Simulation bleiben
+unverändert. Die Seitenposen sind mit `backbord` beziehungsweise
+`steuerbord` beschriftet und verwenden denselben Ausschlagbetrag in Grad,
+mit positivem beziehungsweise negativem Vorzeichen. Der Core erfindet keine
+zusätzliche Bewegungsgrenze. Enthält eine Format-0.3-Segelgruppe keinen
+definierten Ausschlag, dient der Betrag von 90° aus dem bisherigen
+Core-Stellbereich als reine Vorschau-Referenz für beide Seiten. Dieser
+Referenzwert ist weder eine Modell- noch eine Simulationsgrenze.
+
+Die Core-Segeldarstellung verwendet für jedes Segel dessen
+`placement.originalTack` und spiegelt ausschließlich dessen Kontur, wenn
+Original- und Zielbuglage voneinander abweichen. Bei unbekannter
+Originalbuglage und benötigter Spiegelung liefert der Core eine konkrete
+Diagnose und keine geratene oder als vollständig ausgegebene Seitenpose.
+Die betroffene Seitenpose wird nicht ausgegeben; die Diagnose verweist auf
+das Segel-Element, während die neutrale Pose und andere Gruppenposen
+verfügbar bleiben.
+Die übrigen Gruppenmitglieder werden regulär um die gemeinsame Gruppenachse
+bewegt und nicht gespiegelt.
+Die Spiegelebene wird gemäß Nutzerentscheidung aus dem Visualisierungsmesh
+und der Gruppenachse bestimmt: zwei unterschiedliche achsnahe Punkte und
+der Punkt mit dem größten Abstand zur Drehachse. Ist daraus keine
+nichtentartete Ebene bestimmbar, wird die Seitenpose diagnostiziert und
+nicht ausgegeben; Aerodynamikdateien sind dafür nicht erforderlich.
+
+**Abnahme:** Für denselben Ausschlag existieren eindeutig bezeichnete
+Backbord- und Steuerbordposen mit gleichem Betrag und entgegengesetztem
+Vorzeichen. Eine Fixture-Prüfung bestätigt die Bauchspiegelung nur am
+betreffenden Segelmesh; Boom und weitere Gruppenelemente erfahren nur die
+Gruppenbewegung. Unbekannte Originalbuglage verhindert die nicht
+bestimmbare Segel-Seitenpose mit Diagnose, ohne die neutrale Pose oder
+andere Gruppen zu verfälschen.
