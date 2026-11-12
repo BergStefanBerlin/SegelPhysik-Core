@@ -3,8 +3,20 @@ project(SegelPhysikCore LANGUAGES CXX)
 
 include(CTest)
 find_package(nlohmann_json CONFIG REQUIRED)
-set(SEGELPHYSIK_MODELLE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../Modelle"
-    CACHE PATH "Model folder (sibling of the CORE and GUI checkouts)")
+include(FetchContent)
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
+FetchContent_Declare(core_jsoncons
+    URL https://codeload.github.com/danielaparker/jsoncons/tar.gz/refs/tags/v1.10.0
+    URL_HASH SHA256=c829350a2eece662beb378143e2ab1c1cbb07d703687bf168626665a8a7d8bc1)
+FetchContent_Declare(core_picosha2
+    URL https://codeload.github.com/okdshin/PicoSHA2/tar.gz/refs/tags/v1.0.1
+    URL_HASH SHA256=9983136544234e573fe07cc1a22fdf978ad7979043e7be2e9082f6d4991ff8a8)
+set(JSONCONS_BUILD_TESTS OFF CACHE BOOL "Build dependency tests" FORCE)
+FetchContent_MakeAvailable(core_jsoncons core_picosha2)
+set(SEGELPHYSIK_MODELLE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../Modelle_alt"
+    CACHE PATH "Legacy model fixtures archived under the model repository")
 option(SEGELPHYSIK_TEST_INSTRUMENTATION "Prepare instrumentation for explicit test runs" OFF)
 if(SEGELPHYSIK_TEST_INSTRUMENTATION AND NOT BUILD_TESTING)
     message(FATAL_ERROR "Test instrumentation requires BUILD_TESTING=ON")
@@ -44,13 +56,19 @@ string(FIND "${FEHLERKATALOG_JSON}" ")CORE_ERRORS\"" delimiter_position)
 if(NOT delimiter_position EQUAL -1)
     message(FATAL_ERROR "Error catalog contains reserved source delimiter")
 endif()
+# MSVC limits individual string literals to 16 KiB; preserve bytes in adjacent lines.
+string(REPLACE "\n" "\n)CORE_ERRORS\"\nR\"CORE_ERRORS("
+    FEHLERKATALOG_JSON "${FEHLERKATALOG_JSON}")
 configure_file(src/fehlerkatalog.hpp.in generated/fehlerkatalog.hpp @ONLY)
 
 add_library(segelphysik_core STATIC src/core.cpp src/pose.cpp src/modell.cpp
-    src/hydrostatik.cpp src/hydrotraegheit.cpp src/messung.cpp src/simulation.cpp src/katalog.cpp
+    src/modellformat_03.cpp src/hydrostatik.cpp src/hydrotraegheit.cpp src/messung.cpp
+    src/simulation.cpp src/katalog.cpp
     src/inspektion.cpp src/aufbereitung.cpp src/segelkonfigurator.cpp)
 target_include_directories(segelphysik_core PUBLIC include)
 target_include_directories(segelphysik_core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_include_directories(segelphysik_core SYSTEM PRIVATE
+    "${core_jsoncons_SOURCE_DIR}/include" "${core_picosha2_SOURCE_DIR}")
 target_link_libraries(segelphysik_core PUBLIC nlohmann_json::nlohmann_json)
 target_compile_features(segelphysik_core PUBLIC cxx_std_17)
 set_target_properties(segelphysik_core PROPERTIES CXX_EXTENSIONS OFF)
@@ -65,6 +83,8 @@ target_link_libraries(segelphysik_konvertieren PRIVATE segelphysik_core)
 
 set(core_targets segelphysik_core segelphysik_cli segelphysik_konvertieren)
 if(BUILD_TESTING)
+    set(SEGELPHYSIK_MODELFORMAT03_TEST_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../Modelle"
+        CACHE PATH "Active model format 0.3 test data root")
     add_executable(aufbereitung_tests tests/aufbereitung_tests.cpp)
     target_link_libraries(aufbereitung_tests PRIVATE segelphysik_core)
     list(APPEND core_targets aufbereitung_tests)
@@ -164,6 +184,17 @@ if(BUILD_TESTING)
     add_executable(katalog_tests tests/katalog_tests.cpp)
     target_link_libraries(katalog_tests PRIVATE segelphysik_core)
     list(APPEND core_targets katalog_tests)
+    add_executable(modellformat_03_tests tests/modellformat_03_tests.cpp)
+    target_link_libraries(modellformat_03_tests PRIVATE segelphysik_core)
+    add_test(NAME modellformat_03_fingerprints COMMAND modellformat_03_tests
+        "${SEGELPHYSIK_MODELFORMAT03_TEST_ROOT}")
+    add_test(NAME modellformat_03_schemabestand COMMAND modellformat_03_tests
+        --source-schemas "${SEGELPHYSIK_MODELFORMAT03_TEST_ROOT}")
+    add_test(NAME modellformat_03_fehlermatrix COMMAND modellformat_03_tests
+        --schema-error-matrix "${SEGELPHYSIK_MODELFORMAT03_TEST_ROOT}")
+    add_test(NAME modellformat_03_source_integration COMMAND modellformat_03_tests
+        --source-integration "${SEGELPHYSIK_MODELFORMAT03_TEST_ROOT}")
+    list(APPEND core_targets modellformat_03_tests)
     add_test(NAME modellkatalog_schnittstelle COMMAND katalog_tests
         "${SEGELPHYSIK_MODELLE_DIR}")
     add_executable(inspektion_tests tests/inspektion_tests.cpp)
@@ -181,6 +212,12 @@ if(BUILD_TESTING)
     list(APPEND core_targets segelkonfigurator_tests)
     add_test(NAME segelkonfiguration_contract COMMAND segelkonfigurator_tests
         "${SEGELPHYSIK_MODELLE_DIR}/420/modells_information.json")
+    set_tests_properties(modell_import kraft_momentenbilanz modellkatalog_schnittstelle
+        modellinspektion_c08 modell_geometrie_v2 segelkonfiguration_contract
+        PROPERTIES LABELS "legacy-compatibility")
+    set_tests_properties(modellformat_03_fingerprints modellformat_03_schemabestand
+        modellformat_03_fehlermatrix modellformat_03_source_integration
+        PROPERTIES LABELS "model-format-0.3")
     add_test(NAME segel_mittschiffs_basis COMMAND segelkonfigurator_tests
         --zero-base-contract "${SEGELPHYSIK_MODELLE_DIR}")
     add_executable(montage_tests tests/montage_tests.cpp)

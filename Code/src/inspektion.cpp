@@ -720,6 +720,9 @@ std::shared_ptr<const ModelInspection> readModelInspection(
     impl->info.model_id = model_id;
     impl->info.model_version = expected_model_version;
     const auto* catalogue_entry = katalog.eintrag(model_id);
+    if (catalogue_entry &&
+        (!catalogue_entry->schema_valide || !catalogue_entry->visualisierung_hash_aktuell))
+        inspection_error("CORE-INSP-0003", "Schema- oder Visualisierungspruefung sperrt die Inspektion");
     impl->legacy_model_usable = catalogue_entry && catalogue_entry->status == "verwendbar";
     static std::atomic<std::uint64_t> next_snapshot{1};
     impl->info.snapshot_id = expected_model_version + ":" +
@@ -734,12 +737,7 @@ std::shared_ptr<const ModelInspection> readModelInspection(
             without_paths(error.what(), model_folder));
     }
     impl->description = std::move(imported.beschreibung);
-    Json mounting_document;
-    {
-        std::ifstream input(model_file);
-        input >> mounting_document;
-    }
-    mounting_document = normalisiere_modell_information(mounting_document);
+    const Json& mounting_document = imported.modelldokument;
     std::vector<std::pair<std::filesystem::path, std::string>> display_versions;
     for (const auto& entry : impl->description.elemente)
         if (entry.darstellung)
@@ -1181,7 +1179,15 @@ Modellstruktur modellstruktur(const ModelInspection& inspection)
                         });
                     group.elemente.push_back({child.name, child.name, display, volume,
                         description == inspection.impl_->description.elemente.end()
-                            ? std::nullopt : description->bewegung});
+                            ? std::nullopt : description->bewegung,
+                        description != inspection.impl_->description.elemente.end() &&
+                            description->referenz_visualisierung,
+                        description != inspection.impl_->description.elemente.end() &&
+                            description->referenz_hydrostatik,
+                        description != inspection.impl_->description.elemente.end() &&
+                            description->referenz_hydrodynamik,
+                        description != inspection.impl_->description.elemente.end() &&
+                            description->referenz_aerodynamik});
                 }
             result.gruppen.push_back(std::move(group));
         }

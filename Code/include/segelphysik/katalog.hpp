@@ -31,6 +31,9 @@ struct KatalogEintrag {
     std::string modell_fassung;
     std::string status;  // verwendbar or fehlerhaft
     std::size_t fehleranzahl{};
+    bool schema_valide = true;
+    bool visualisierung_hash_aktuell = true;
+    bool fingerprints_aktuell = true;
 };
 
 class Modellkatalog {
@@ -64,6 +67,10 @@ struct StrukturElement {
     bool darstellung = false;
     bool hydrostatik_volumen = false;
     std::optional<Bewegungsdefinition> bewegung;
+    bool referenz_visualisierung = false;
+    bool referenz_hydrostatik = false;
+    bool referenz_hydrodynamik = false;
+    bool referenz_aerodynamik = false;
 };
 struct StrukturGruppe {
     std::string id;

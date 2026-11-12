@@ -4,10 +4,16 @@
   "thema": "Einheitliche Modellbeschreibung",
   "beispiele": "../Beispiele_Modellformat/README.md",
   "spezifikation": "../Spezifikation_Modellbeschreibung.md",
-  "hinweis": "IDEE-C-00072 und IDEE-C-00073 am 02.11.2026 finalisiert. Anschließend wählt der Nutzer ausdrücklich ausreichend genaue Erhaltung der bisherigen Physik über eine Quelle und reproduzierbare Teilgeometrien; Schnitt-/Flächenauswahl im bestehenden Vertrag präzisiert. Alle elf Modelle migriert und technisch geprüft; keine allgemeine Netzreparatur oder Änderung bestehender Rechenalgorithmen.",
+  "hinweis": "IDEE-C-00072 und IDEE-C-00073 am 02.11.2026 finalisiert. Anschließend wählt der Nutzer ausdrücklich ausreichend genaue Erhaltung der bisherigen Physik über eine Quelle und reproduzierbare Teilgeometrien; Schnitt-/Flächenauswahl im bestehenden Vertrag präzisiert. Alle elf Modelle migriert und technisch geprüft; keine allgemeine Netzreparatur oder Änderung bestehender Rechenalgorithmen. IDEE-C-00099 bis IDEE-C-00104 wurden am 10.11.2026 für C-0.21 finalisiert.",
   "finalisierte_zuordnungen": [
     {"idee": "IDEE-C-00072", "anforderung": "A-C-00110"},
-    {"idee": "IDEE-C-00073", "anforderung": "A-C-00111"}
+    {"idee": "IDEE-C-00073", "anforderung": "A-C-00111"},
+    {"idee": "IDEE-C-00099", "anforderung": "A-C-00148"},
+    {"idee": "IDEE-C-00100", "anforderung": "A-C-00148"},
+    {"idee": "IDEE-C-00101", "anforderungen": ["A-C-00149", "A-C-00150"]},
+    {"idee": "IDEE-C-00102", "anforderungen": ["A-C-00150", "A-C-00151"]},
+    {"idee": "IDEE-C-00103", "anforderung": "A-C-00153"},
+    {"idee": "IDEE-C-00104", "anforderung": "A-C-00152"}
   ],
   "punkte": [
     {
@@ -79,7 +85,68 @@
           "teilaspekt": "Fester Konstruktionsursprung unabhängig von Gesamtschwerpunkt und Wasserlinie."
         }
       ],
-      "frage": "Offen bleiben die konkrete geometrische Ursprungswahl, geografische Ausrichtung der Weltachsen, Orientierungsdarstellung und lokale Elementbezüge sowie Gelenke, Achsen, Grenzen und Steuerzuordnungen fuer Ruder, Schwert und Rigg."
+      "frage": "Offen bleiben die konkrete geometrische Ursprungswahl, geografische Ausrichtung der Weltachsen, Orientierungsdarstellung und lokale Elementbezüge sowie Gelenke, Achsen, Grenzen und Steuerzuordnungen fuer Ruder, Schwert und Rigg. Fuer den nachfolgenden Bewegungsentwurf sind insbesondere Steuerwerte/Grenzen, die Abgrenzung von Vorschau und Simulation sowie das Verhalten bei ueberlappenden Gruppen fachlich zu klaeren.",
+      "entwurf_bewegung_auf_gruppenebene": {
+        "status": "Vorschlag, nicht freigegeben und nicht normativ",
+        "ziel": "Eine Bewegungsdefinition beschreibt die Bewegung einer Modellgruppe. Alle Elemente der Gruppe bewegen sich gemeinsam; ihre individuellen Platzierungen bleiben erhalten. Die GUI erhaelt die vollstaendige fachliche Struktur ausschliesslich ueber die Core-Schnittstelle.",
+        "umfang": [
+          {
+            "bereich": "Modell",
+            "ort": "modells_data.json: groups.<gruppen-id>.movement",
+            "vorschlag": "Nur das Vorhandensein von movement kennzeichnet eine bewegte Gruppe. Ohne movement ist die Gruppe statisch. Die GUI und der Core leiten Bewegung nicht aus Elementnamen, Geometrie, Hydrostatik oder einer vermuteten Bootsbedeutung ab."
+          },
+          {
+            "bereich": "Modell",
+            "ort": "modells_data.json: groups.<gruppen-id>.elements[].placement",
+            "vorschlag": "Jedes Element behaelt seine eigene translation_m und rotation_xyzw. Die individuelle Elementplatzierung bleibt einzeln lesbar und editierbar; ihr Bezugsrahmen zur Gruppe und zum Modell wird im Bewegungsvertrag ausdruecklich festgelegt."
+          },
+          {
+            "bereich": "Core-Import",
+            "ort": "Format-0.3-Import und internes Bewegungsmodell",
+            "vorschlag": "Die Gruppenbewegung wird als Gruppendatum erhalten und nicht kuenstlich an ein Hydrostatik- oder anderes Steuerelement innerhalb der Gruppe gehaengt. Bewegungsart, Achse, Drehpunkt, Bedienparameter und Gruppenmitgliedschaften werden validiert. Bestehende elementbezogene Bewegungsdefinitionen bleiben rueckwaertskompatibel."
+          },
+          {
+            "bereich": "Core-Schnittstelle",
+            "ort": "Modellstruktur, Inspektionssnapshot und Bewegungs-Vorschau",
+            "vorschlag": "Die API liefert Modell-, Gruppen- und Element-IDs, vollstaendige Gruppenmitgliedschaften, optionale typisierte Gruppenbewegungen, pro Element die individuelle Platzierung sowie die vorhandenen Darstellungs- und Fachinformationen. Eine Gruppen-Vorschau wird ueber die Gruppen-ID angefordert und liefert Geometrien mit stabiler Zuordnung zu den einzelnen Element-IDs. Der Core liefert typisierte Daten, niemals die rohe JSON-Datei."
+          },
+          {
+            "bereich": "Core-Transformation",
+            "ort": "Bewegungs-Vorschau und, falls fachlich freigegeben, Simulation",
+            "vorschlag": "Die Bewegung der Gruppe wird auf jedes Element der Gruppe angewendet, ohne dessen individuelle Platzierung zu verwerfen. Als zu pruefende Kompositionsregel gilt: Gruppenbewegung um ihren modellfesten Drehpunkt mal individuelle Elementplatzierung mal lokale Elementgeometrie. Diese Reihenfolge setzt voraus, dass die Elementplatzierung gruppenlokal ist; bei einem anderen Bezugsrahmen ist die Komposition entsprechend festzulegen. Der Core berechnet die Transformation; die GUI implementiert keine eigene Bewegungsphysik."
+          },
+          {
+            "bereich": "GUI",
+            "ort": "Modellbaum, Bewegungssteuerung und Darstellung",
+            "vorschlag": "Die GUI zeigt die vom Core gelieferten Gruppen und Elemente hierarchisch. Eine Bewegungssteuerung erscheint nur, wenn der Core fuer diese Gruppe eine Bewegungsdefinition liefert. Aenderungen an einer Gruppenbewegung betreffen alle von der Core-Vorschau gelieferten Gruppenmitglieder; die individuelle Elementplatzierung bleibt separat bedienbar."
+          },
+          {
+            "bereich": "GUI/Core-Grenze",
+            "ort": "Alle GUI-Modellzugriffe",
+            "vorschlag": "Die GUI kennt weder Modellordner noch Schema-Dateien, JSON-Dateien, Ressourcenpfade, Fingerprintberechnung oder Formatkonvertierung. Ordnerauflosung, Dateizugriff, Validierung, Fingerprints, Ressourcen und Bewegungsberechnung bleiben im Core gekapselt."
+          },
+          {
+            "bereich": "Modellhash",
+            "ort": "modells_validation.json: model.fingerprints.modelData",
+            "vorschlag": "Wird modells_data.json fachlich geaendert, aktualisiert der Core den modelData-Fingerprint ausdruecklich ueber seine Fingerprint-API. Code- oder GUI-Aenderungen allein erfordern keine Modellhash-Aktualisierung."
+          }
+        ],
+        "beispiel_420": "Die Gruppe mainsail enthaelt Mainsail und Boom; ihre vorhandene movement-Definition bewegt beide gemeinsam und erhaelt ihre jeweiligen placement-Werte. Die Gruppe jib mit Jib hat eine unabhaengige movement-Definition mit der Vorstagachse. Beide Definitionen stehen bereits in der aktuellen modells_data.json; es wird kein neues Bewegungsfeld eingefuehrt.",
+        "abnahmekriterien_vorschlag": [
+          "Ein Core-Test bestaetigt, dass movement ausschliesslich auf Gruppenebene Bewegung ausloest und eine Gruppe ohne movement statisch bleibt.",
+          "Eine Gruppenbewegung liefert Core-Vorschaugeometrien fuer alle und nur die zugehoerigen Elemente; jede Geometrie behaelt ihre Element-ID.",
+          "Die relative Lage der Elemente und ihre individuellen placement-Werte bleiben bei Gruppenbewegungen erhalten.",
+          "Zwei bewegte Gruppen, etwa mainsail und jib, koennen unabhaengige Achsen und Drehpunkte haben.",
+          "Die GUI stellt Gruppen, Elemente und Bewegungsdefinitionen aus Core-Daten dar und oeffnet keine Modelldateien oder Modellordner selbst.",
+          "Ein gezielter Modellinhaltstest vergleicht den gespeicherten modelData-Fingerprint mit dem Core-Ergebnis; bei einer Datenkorrektur werden ausschliesslich die vorgesehenen Fingerprintbereiche aktualisiert."
+        ],
+        "fachlich_offen": [
+          "Welche Steuerwerte, Normalstellungen und Grenzen gelten fuer Gruppenbewegungen; reichen die vorhandenen Felder unter movement.control?",
+          "Ist die Gruppenbewegung im ersten Schritt eine Inspektions-/Darstellungsvorschau, oder muss dieselbe Definition bereits Physik und Simulation steuern?",
+          "Sind verschachtelte oder ueberlappende Gruppen erlaubt, und falls ja, wie werden Bewegungen zusammengesetzt?",
+          "Wie wird eine einzeln geaenderte Benutzerplatzierung dauerhaft gespeichert und mit der Gruppenbewegung zusammengesetzt?"
+        ]
+      }
     },
     {
       "id": "IDEE-C-00005",
@@ -95,6 +162,66 @@
       "bezug": "../Beispiele_Modellformat/README.md#grenzen-und-weitere-verwendung",
       "uebernahme": "A-C-00030 bestaetigt den bestehenden Elementaufbau als erste Importgrundlage; A-C-00031 und A-C-00032 regeln eindeutige Fehler und den abfragbaren Katalog.",
       "frage": "Welche vollstaendigen Feld-, Versions- und Migrationsregeln werden benoetigt? Die speziellen entwurf-Bloecke entfallen spaeter; Herkunfts- und Modellannahmen sind vorher dauerhaft zu dokumentieren."
+    },
+    {
+      "id": "IDEE-C-00099",
+      "status": "angenommen",
+      "thema": "Erkennung und Koexistenz des Modellformats 0.3",
+      "bezug": "../Spezifikation_Modellbeschreibung.md#modellformat-03-fingerprints-und-modellpfade",
+      "anforderungen": ["A-C-00148"],
+      "umsetzungsschritte": ["U-C-000131", "U-C-000132", "U-C-000136"],
+      "entscheidung": "Der aktive Modellkatalog verwendet das Dateipaar modells_data.json und modells_validation.json ohne stillen Legacy-Fallback. Historische Legacy-Konverter und getrennte Importvertraege bleiben ausserhalb dieses Katalog-/Ladepfads.",
+      "quelle": "Nutzerfreigabe zur Finalisierung am 10.11.2026."
+    },
+    {
+      "id": "IDEE-C-00100",
+      "status": "angenommen",
+      "thema": "Schema-Bereitstellung und Validierungsengine",
+      "bezug": "../Spezifikation_Modellbeschreibung.md#modellformat-03-fingerprints-und-modellpfade",
+      "anforderungen": ["A-C-00148"],
+      "umsetzungsschritte": ["U-C-000131", "U-C-000134"],
+      "entscheidung": "Die beiden Draft-2020-12-Schemas werden aus dem konfigurierten Schema-Wurzelpfad aufgeloest; zusaetzliche Identitaets-, Ressourcen- und Pfadregeln sind Bestandteil der Core-Pruefung. Die konkrete Validatorbibliothek wird als technische Planentscheidung umgesetzt.",
+      "quelle": "Nutzerfreigabe zur Finalisierung am 10.11.2026."
+    },
+    {
+      "id": "IDEE-C-00101",
+      "status": "angenommen",
+      "thema": "Kanonischer Modellordner-Fingerprint",
+      "bezug": "../Spezifikation_Modellbeschreibung.md#modellformat-03-fingerprints-und-modellpfade",
+      "anforderungen": ["A-C-00149", "A-C-00150"],
+      "umsetzungsschritte": ["U-C-000133", "U-C-000135"],
+      "entscheidung": "SHA-256 ueber sortierte relative Pfade und exakte Datei-Bytes fuer die fuenf Schema-Bereiche; alle regulaeren Dateien einschliesslich versteckter Dateien werden erfasst, Symlinks abgelehnt und leere Bereiche deterministisch gehasht. Katalog/Laden vergleicht ohne Schreibzugriff; ausschliesslich der ausdrueckliche API-Aufruf aktualisiert angeforderte Bereiche atomar.",
+      "quelle": "Nutzerfreigabe zur Finalisierung am 10.11.2026."
+    },
+    {
+      "id": "IDEE-C-00102",
+      "status": "angenommen",
+      "thema": "Gemeinsamer Aufruf und Aktualisierung der Validierungsdatei",
+      "bezug": "../Spezifikation_Modellbeschreibung.md#modellformat-03-fingerprints-und-modellpfade",
+      "anforderungen": ["A-C-00150", "A-C-00151"],
+      "umsetzungsschritte": ["U-C-000133"],
+      "entscheidung": "Segelmacher bindet die oeffentliche C++-Core-Funktion direkt ein; kein CLI-Zweitvertrag. Sie aktualisiert explizit angeforderte Bereiche der bestehenden modells_validation.json, setzt modifiedAt nur bei geaendertem Hash und schreibt atomar. GUI-Rechtsklick erneuert nur visualisation.",
+      "quelle": "Nutzerfreigabe zur Finalisierung am 10.11.2026."
+    },
+    {
+      "id": "IDEE-C-00103",
+      "status": "angenommen",
+      "thema": "Nachgelagerter Modellordner-Cutover",
+      "bezug": "../Spezifikation_Modellbeschreibung.md#modellformat-03-fingerprints-und-modellpfade",
+      "anforderungen": ["A-C-00153"],
+      "umsetzungsschritte": ["U-C-000136", "U-C-000137"],
+      "entscheidung": "Erst nach vollstaendiger Core-/GUI-Implementierung und bestandenen Tests den bisherigen Modelle-Ordner zu Modelle_alt umbenennen und Modelle-NEW an den aktiven Pfad Modelle verschieben. Alte Daten erhalten; Ziele nie ueberschreiben; alle Pfadbezuge aktualisieren und gegen die neuen Modelldaten erneut pruefen.",
+      "quelle": "Nutzerfreigabe zur Finalisierung am 10.11.2026."
+    },
+    {
+      "id": "IDEE-C-00104",
+      "status": "angenommen",
+      "thema": "Zentrale Laufzeitkonfiguration fuer Modellpfade und Defaults",
+      "bezug": "../Spezifikation_Modellbeschreibung.md#modellformat-03-fingerprints-und-modellpfade",
+      "anforderungen": ["A-C-00152"],
+      "umsetzungsschritte": ["U-C-000134", "U-C-000136"],
+      "entscheidung": "Gemeinsame Datei %APPDATA%/SegelPhysik/defaults.json mit modelRoot, schemaRoot und erweiterbarem defaults-Objekt; explizite Benutzerwahl, Test-Override, Umgebungsvariable, dann Datei. Fehler werden sichtbar gemeldet.",
+      "quelle": "Nutzerfreigabe zur Finalisierung am 10.11.2026."
     }
   ]
 }

@@ -163,6 +163,30 @@
       "pruefstatus": "implementiert"
     },
     {
+      "id": "CORE-FPR-0001",
+      "kurztext": "Modell-Fingerprint nicht aktuell.",
+      "pass_kriterium": "Alle gespeicherten Bereichshashes entsprechen den aktuellen Datei- und Pfadbytes.",
+      "fail_kriterium": "Mindestens ein Bereichshash fehlt oder weicht ab; Simulation ist gesperrt. Ein Visualisierungsfehler sperrt auch die Ansicht.",
+      "handlungsanweisung": "Die geaenderten Quellen pruefen und nur die fachlich freigegebenen Bereiche ausdruecklich ueber die Core-Fingerprint-API aktualisieren.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-FPR-0002",
+      "kurztext": "Fingerprint-Aktualisierung durch Schreibkonflikt gesperrt.",
+      "pass_kriterium": "Die exklusive Schreibsperre ist verfuegbar und Quellen, Metadaten sowie Schemas bleiben bis zum Austausch unveraendert.",
+      "fail_kriterium": "Ein anderer Schreiber haelt die Sperre, die Sperre ist nicht anlegbar oder eine parallele Aenderung wird erkannt.",
+      "handlungsanweisung": "Andere Modellbearbeitungen beenden, Zugriffsrechte pruefen und nach erneuter Quellenpruefung wiederholen. Keine fremde Sperre loeschen.",
+      "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-FPR-0003",
+      "kurztext": "Validierungsdatei nicht atomar aktualisierbar.",
+      "pass_kriterium": "Die temporaere Datei kann vollstaendig geschrieben und atomar als Validierungsdatei eingesetzt werden.",
+      "fail_kriterium": "Erstellen, Schreiben oder atomarer Austausch scheitert; die vorherige Validierungsdatei bleibt erhalten.",
+      "handlungsanweisung": "Schreibrechte, freien Speicher und Dateisperren pruefen; keine manuelle Teilaktualisierung vornehmen.",
+      "pruefstatus": "implementiert"
+    },
+    {
       "id": "CORE-BIL-0001",
       "kurztext": "Kraft- oder Momentenbeitrag nicht endlich.",
       "pass_kriterium": "Vektor, Punkt und Moment jedes Beitrags sind endlich.",

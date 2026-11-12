@@ -35,6 +35,14 @@ und Zwischenspeicher. Der Core öffnet keine Dialoge.
 ([Schnittstelle Core → GUI](../Dokumentationen/Schnittstelle_Core_GUI.md))
 und Kraftdaten ([Kraft- und Momentenbilanz](Spezifikation_Kraft_und_Momentenbilanz.md)).
 
+**C-0.21-Ergänzung:** Modellformat 0.3, seine Schema-Prüfung und die
+gemeinsamen Fingerprints sind in
+[Modellbeschreibung, A-C-00148 bis A-C-00153](Spezifikation_Modellbeschreibung.md#modellformat-03-fingerprints-und-modellpfade)
+fachlich finalisiert. Der Katalog ergänzt die Felder `schema_valide`,
+`visualisierung_hash_aktuell` und `fingerprints_aktuell`, damit Konsumenten
+Ansichts- und Simulationsfreigaben getrennt behandeln können. Die 0.3-Daten
+werden über die vorhandene Katalog-/Detailoberfläche bereitgestellt.
+
 Bezug: [Modellbeschreibung](Spezifikation_Modellbeschreibung.md)
 (A-C-00001, A-C-00003, A-C-00030), [Hydrostatikkern](Spezifikation_Hydrostatikkern.md)
 (A-C-00017, A-C-00028, A-C-00031), IDEE-C-00006.
@@ -79,6 +87,9 @@ GUI hält; der Core führt keinen globalen Zustand. Je Hauptobjekt:
 | `modell_fassung` | Inhaltsfingerprint wie im Ergebnisvertrag |
 | `status` | `verwendbar` oder `fehlerhaft` |
 | `fehleranzahl` | Anzahl der Diagnosen; Details auf Abruf |
+| `schema_valide` | Schema-, Identitäts- und Ressourcenprüfung bestanden |
+| `visualisierung_hash_aktuell` | Visualisierungsbereich ist geprüft und aktuell |
+| `fingerprints_aktuell` | Alle fünf Fingerprint-Bereiche sind geprüft und aktuell |
 
 Die Reihenfolge ist stabil (nach Ordnername). Fehlerhafte Modelle erscheinen
 im Katalog als `fehlerhaft` (A-C-00031). Tragen mehrere Modelle dieselbe

@@ -1,7 +1,9 @@
 #include "segelphysik/katalog.hpp"
+#include "segelphysik/defaults.hpp"
 #include "segelphysik/inspektion.hpp"
 #include "katalog_intern.hpp"
 #include "modell_intern.hpp"
+#include "modellformat_03_intern.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -22,6 +24,22 @@ namespace segelphysik {
 namespace {
 
 const char* const modelldateiname = "modells_information.json";
+const char* const modelldatenname = "modells_data.json";
+
+std::filesystem::path modell_datei(const std::filesystem::path& ordner)
+{
+    const auto daten = ordner / modelldatenname;
+    std::error_code error;
+    if (std::filesystem::is_regular_file(daten, error)) return daten;
+    return ordner / modelldateiname;
+}
+
+bool modell_datei_vorhanden(const std::filesystem::path& ordner)
+{
+    std::error_code error;
+    return std::filesystem::is_regular_file(ordner / modelldatenname, error) ||
+        std::filesystem::is_regular_file(ordner / modelldateiname, error);
+}
 
 [[noreturn]] void kat_fehler(int nummer, const std::string& text)
 {
@@ -124,16 +142,16 @@ Modellkatalog modellkatalog(const std::filesystem::path& ordner)
     if (ordner.empty() || !std::filesystem::is_directory(ordner, fehler))
         kat_fehler(1, "Modellordner nicht lesbar");
     std::vector<std::pair<std::string, std::filesystem::path>> kandidaten;
-    if (std::filesystem::is_regular_file(ordner / modelldateiname, fehler))
-        kandidaten.emplace_back(std::string(), ordner / modelldateiname);
+    if (modell_datei_vorhanden(ordner))
+        kandidaten.emplace_back(std::string(), modell_datei(ordner));
     std::filesystem::directory_iterator it(ordner, fehler), ende;
     if (fehler) kat_fehler(1, "Modellordner nicht lesbar");
     for (; it != ende; it.increment(fehler)) {
         if (fehler) kat_fehler(1, "Modellordner nicht vollstaendig lesbar");
         std::error_code typfehler;
         if (!it->is_directory(typfehler)) continue;
-        const auto datei = it->path() / modelldateiname;
-        if (std::filesystem::is_regular_file(datei, typfehler))
+        const auto datei = modell_datei(it->path());
+        if (modell_datei_vorhanden(it->path()))
             kandidaten.emplace_back(it->path().filename().u8string(), datei);
     }
     // Stable order by folder name, case-insensitive like the GUI G-0.1 listing.
@@ -152,19 +170,63 @@ Modellkatalog modellkatalog(const std::filesystem::path& ordner)
         KatalogEintrag eintrag;
         std::vector<KatalogDiagnose> diagnosen;
         const auto modellordner = datei.parent_path();
+        std::string bereits_gepruefte_fassung;
+        const bool modellformat03 = detail::ist_modellformat03_datei(datei);
         try {
-            const auto beschreibung = lies_beschreibung(datei);
-            eintrag.modell_id = beschreibung.id;
-            eintrag.name = beschreibung.name;
-            eintrag.beschreibung = beschreibung.beschreibung;
+            if (modellformat03) {
+                eintrag.schema_valide = false;
+                eintrag.visualisierung_hash_aktuell = false;
+                eintrag.fingerprints_aktuell = false;
+                const auto pruefung =
+                    detail::pruefe_modellformat03(
+                        modellordner, schemaordner_fuer_modellordner(modellordner));
+                bereits_gepruefte_fassung =
+                    detail::modellformat03_fassung(pruefung);
+                eintrag.schema_valide = pruefung.schemas_gueltig;
+                eintrag.fingerprints_aktuell = pruefung.schemas_gueltig &&
+                    pruefung.veraltete_bereiche.empty() &&
+                    pruefung.fehler_bereiche.empty();
+                eintrag.visualisierung_hash_aktuell = pruefung.schemas_gueltig &&
+                    std::find(pruefung.veraltete_bereiche.begin(),
+                        pruefung.veraltete_bereiche.end(), "visualisation") ==
+                        pruefung.veraltete_bereiche.end() &&
+                    std::find(pruefung.fehler_bereiche.begin(),
+                        pruefung.fehler_bereiche.end(), "visualisation") ==
+                        pruefung.fehler_bereiche.end();
+                for (const auto& error : pruefung.fehler)
+                    diagnosen.push_back(diagnose_aus(error, modellordner, "CORE-MOD-0002"));
+                for (const auto& area : pruefung.veraltete_bereiche)
+                    diagnosen.push_back({"CORE-FPR-0001",
+                        "Fingerprint-Bereich veraltet: " + area,
+                        "modells_validation.json:model.fingerprints." + area});
+                for (const auto& area : pruefung.fehler_bereiche)
+                    diagnosen.push_back({"CORE-MOD-0005",
+                        "Fingerprint-Bereich konnte nicht geprueft werden: " + area,
+                        "modells_validation.json:model.fingerprints." + area});
+                if (!pruefung.schemas_gueltig && pruefung.fehler.empty())
+                    diagnosen.push_back({"CORE-MOD-0002",
+                        "Schema- und Ressourcenpruefung fehlgeschlagen",
+                        "modells_data.json"});
+                const auto beschreibung =
+                    lies_beschreibung_modellformat03(datei, pruefung.daten, false);
+                eintrag.modell_id = beschreibung.id;
+                eintrag.name = beschreibung.name;
+                eintrag.beschreibung = beschreibung.beschreibung;
+            } else {
+                const auto beschreibung = lies_beschreibung(datei);
+                eintrag.modell_id = beschreibung.id;
+                eintrag.name = beschreibung.name;
+                eintrag.beschreibung = beschreibung.beschreibung;
+            }
         } catch (const std::exception& e) {
             eintrag.modell_id = ordnername.empty() ? ordner.filename().u8string() : ordnername;
             eintrag.name = eintrag.modell_id;
             diagnosen.push_back(diagnose_aus(e.what(), modellordner, "CORE-MOD-0005"));
         }
         try {
-            eintrag.modell_fassung = modell_fassung(datei);
-            if (diagnosen.empty()) lade_modell(datei);
+            eintrag.modell_fassung = bereits_gepruefte_fassung.empty()
+                ? modell_fassung(datei) : bereits_gepruefte_fassung;
+            if (diagnosen.empty() && !modellformat03) lade_modell(datei);
         } catch (const std::exception& e) {
             diagnosen.push_back(diagnose_aus(e.what(), modellordner, "CORE-MOD-0005"));
         }
@@ -230,9 +292,24 @@ Darstellungsgeometrie darstellungsgeometrie_aus_dateien(const Modellkatalog& kat
     const std::optional<std::string>& element_id)
 {
     const auto& datei = katalog_datei(katalog, modell_id, erwartete_fassung);
+    if (const auto* entry = katalog.eintrag(modell_id);
+        entry && (!entry->schema_valide || !entry->visualisierung_hash_aktuell)) {
+        Darstellungsgeometrie result{modell_id, erwartete_fassung, {}, {}};
+        result.diagnosen = modelldiagnose(katalog, modell_id, erwartete_fassung);
+        return result;
+    }
     ModellBeschreibung beschreibung;
     try {
-        beschreibung = lies_beschreibung(datei);
+        if (detail::ist_modellformat03_datei(datei)) {
+            const auto pruefung = detail::pruefe_modellformat03(
+                datei.parent_path(), schemaordner_fuer_modellordner(datei.parent_path()), false);
+            if (!pruefung.schemas_gueltig)
+                throw std::runtime_error(pruefung.fehler.empty()
+                    ? "CORE-MOD-0002: Schema-Pruefung fehlgeschlagen" : pruefung.fehler.front());
+            beschreibung = lies_beschreibung_modellformat03(datei, pruefung.daten, false);
+        } else {
+            beschreibung = lies_beschreibung(datei);
+        }
     } catch (const std::exception& e) {
         if (element_id) kat_fehler(6, "Unbekannte Element-ID: " + *element_id);
         Darstellungsgeometrie result{modell_id, erwartete_fassung, {}, {}};
@@ -254,6 +331,7 @@ Darstellungsgeometrie darstellungsgeometrie_aus_beschreibung(
     for (const auto& e : beschreibung.elemente) {
         if (element_id && e.id != *element_id) continue;
         gefunden = true;
+        if (e.darstellung_verborgen) continue;
         const auto& quelle = e.darstellung ? e.darstellung : e.volumen;
         if (!quelle) continue;
         Darstellungsteil teil;
@@ -288,13 +366,7 @@ Darstellungsgeometrie darstellungsgeometrie_aus_beschreibung(
                 teil.dreiecke = std::move(netz.dreiecke);
             }
             const auto* setting = element_setting(beschreibung.dokument, e.id);
-            bool sail = false;
-            for (const auto& gruppe : beschreibung.dokument["gruppen"])
-                for (const auto& element : gruppe["elemente"])
-                    if (element.value("id", std::string{}) == e.id)
-                        sail = element.contains("Segel");
-            if (setting && (!sail || modell_id != "420") &&
-                setting->at("konfiguriert").get<bool>()) {
+            if (setting && setting->at("konfiguriert").get<bool>()) {
                 const auto pose = setting_pose(*setting);
                 for (auto& point : teil.punkte_m) point = pose.modellpunkt_nach_welt(point);
             }
@@ -312,22 +384,30 @@ Modellstruktur modellstruktur_aus_dateien(const Modellkatalog& katalog, const st
                               const std::string& erwartete_fassung)
 {
     const auto& datei = katalog_datei(katalog, modell_id, erwartete_fassung);
+    const bool modellformat03 = detail::ist_modellformat03_datei(datei);
     Modellstruktur result;
     result.modell_id = modell_id;
     result.modell_fassung = erwartete_fassung;
     try {
-        const auto beschreibung = lies_beschreibung(datei);
+        const auto beschreibung = modellformat03
+            ? lies_beschreibung_modellformat03(datei,
+                detail::pruefe_modellformat03(datei.parent_path(),
+                    schemaordner_fuer_modellordner(datei.parent_path()), false).daten, false)
+            : lies_beschreibung(datei);
         for (const auto& gruppe : beschreibung.gruppen) result.gruppen.push_back({gruppe, gruppe, {}});
         for (const auto& e : beschreibung.elemente) {
             auto gruppe = std::find_if(result.gruppen.begin(), result.gruppen.end(),
                 [&](const StrukturGruppe& g) { return g.id == e.gruppe; });
             if (gruppe != result.gruppen.end())
                 gruppe->elemente.push_back({e.id, e.id, e.darstellung.has_value(),
-                    e.volumen.has_value(), e.bewegung});
+                    e.volumen.has_value(), e.bewegung, e.referenz_visualisierung,
+                    e.referenz_hydrostatik, e.referenz_hydrodynamik,
+                    e.referenz_aerodynamik});
         }
     } catch (const std::exception&) {
         // Unreadable description: structure stays empty, see modelldiagnose.
     }
+    if (modellformat03) return result;
     const auto* eintrag = katalog.eintrag(modell_id);
     if (eintrag && eintrag->status == "verwendbar") {
         try { result.gesamtmasse_kg = lade_modell(datei).masse_kg; }
@@ -350,6 +430,10 @@ Darstellungsgeometrie darstellungsgeometrie(const Modellkatalog& katalog,
     const std::string& modell_id, const std::string& erwartete_fassung,
     const std::optional<std::string>& element_id)
 {
+    const auto& datei = katalog_datei(katalog, modell_id, erwartete_fassung);
+    if (detail::ist_modellformat03_datei(datei))
+        return darstellungsgeometrie_aus_dateien(
+            katalog, modell_id, erwartete_fassung, element_id);
     try {
         const auto inspection = readModelInspection(katalog, modell_id, erwartete_fassung);
         return darstellungsgeometrie(*inspection, element_id);
@@ -362,6 +446,9 @@ Darstellungsgeometrie darstellungsgeometrie(const Modellkatalog& katalog,
 Modellstruktur modellstruktur(const Modellkatalog& katalog, const std::string& modell_id,
                               const std::string& erwartete_fassung)
 {
+    const auto& datei = katalog_datei(katalog, modell_id, erwartete_fassung);
+    if (detail::ist_modellformat03_datei(datei))
+        return modellstruktur_aus_dateien(katalog, modell_id, erwartete_fassung);
     try {
         const auto inspection = readModelInspection(katalog, modell_id, erwartete_fassung);
         return modellstruktur(*inspection);
@@ -381,7 +468,11 @@ std::string katalog_json(const Modellkatalog& katalog)
             << ",\"name\":" << json_text(e.name) << ",\"beschreibung\":"
             << (e.beschreibung ? json_text(*e.beschreibung) : std::string("null"))
             << ",\"modell_fassung\":" << json_text(e.modell_fassung)
-            << ",\"status\":" << json_text(e.status) << ",\"fehleranzahl\":" << e.fehleranzahl << '}';
+            << ",\"status\":" << json_text(e.status) << ",\"fehleranzahl\":" << e.fehleranzahl
+            << ",\"schema_valide\":" << (e.schema_valide ? "true" : "false")
+            << ",\"visualisierung_hash_aktuell\":"
+            << (e.visualisierung_hash_aktuell ? "true" : "false")
+            << ",\"fingerprints_aktuell\":" << (e.fingerprints_aktuell ? "true" : "false") << '}';
     }
     out << "]}";
     return out.str();
@@ -401,7 +492,18 @@ std::string modellstruktur_json(const Modellstruktur& s)
             out << (i ? "," : "") << "{\"id\":" << json_text(e.id) << ",\"name\":" << json_text(e.name)
                 << ",\"darstellung\":" << (e.darstellung ? "true" : "false")
                 << ",\"hydrostatik_volumen\":" << (e.hydrostatik_volumen ? "true" : "false")
-                << ",\"bewegung\":";
+                << ",\"referenzen\":[";
+            bool first_reference = true;
+            for (const auto& reference : {
+                     std::pair<bool, const char*>{e.referenz_visualisierung, "V"},
+                     {e.referenz_hydrostatik, "S"},
+                     {e.referenz_hydrodynamik, "D"},
+                     {e.referenz_aerodynamik, "A"}}) {
+                if (!reference.first) continue;
+                out << (first_reference ? "" : ",") << json_text(reference.second);
+                first_reference = false;
+            }
+            out << "],\"bewegung\":";
             if (!e.bewegung) out << "null";
             else {
                 const auto& b = *e.bewegung;

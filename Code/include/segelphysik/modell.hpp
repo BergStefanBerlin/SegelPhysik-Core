@@ -177,6 +177,11 @@ struct ElementBeschreibung {
     std::optional<std::string> darstellung_mesh;
     std::optional<std::string> volumen_mesh;
     std::optional<std::string> masse_mesh;
+    bool darstellung_verborgen = false;
+    bool referenz_visualisierung = false;
+    bool referenz_hydrostatik = false;
+    bool referenz_hydrodynamik = false;
+    bool referenz_aerodynamik = false;
 };
 struct QuellMesh {
     std::string id;

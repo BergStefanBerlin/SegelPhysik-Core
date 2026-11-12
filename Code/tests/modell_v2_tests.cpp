@@ -220,7 +220,7 @@ void reference_models(const fs::path& source, const fs::path& output)
         std::cout << name << ": exact physics/display/movement equivalence\n";
     }
 }
-void schema_v3_migration(const fs::path& output)
+void schema_v3_migration(const fs::path& source, const fs::path& output)
 {
     const std::set<std::string> conflicted{"420", "folkeboot", "optimist"};
     const auto v3_output = output / "schema-v3-modelle";
@@ -274,6 +274,26 @@ void schema_v3_migration(const fs::path& output)
     const auto v2_target = v3_output / "quader-from-v2";
     konvertiere_modell_v3(v2_file, v2_target);
     same_model(lade_modell(v2_file), lade_modell(v2_target / "modells_information.json"));
+
+    const auto legacy_file = source / "420" / "modells_information.json";
+    const auto legacy_target = v3_output / "420-from-legacy-02";
+    const auto legacy_original = read(legacy_file);
+    const auto legacy_document = Json::parse(legacy_original);
+    require(legacy_document.value("schema_version", "") == "0.2" &&
+        legacy_document.contains("modell"), "Legacy 0.2 migration fixture changed");
+    rejects([&] { konvertiere_modell_v3(legacy_file, legacy_target); }, "CORE-MOD-0009");
+    require(!fs::exists(legacy_target) && read(legacy_file) == legacy_original,
+        "Rejected legacy migration changed source or created output");
+    konvertiere_modell_v3(legacy_file, legacy_target, true);
+    const auto migrated_legacy = Json::parse(read(legacy_target / "modells_information.json"));
+    require(migrated_legacy.value("schema_version", "") == "3" &&
+        !migrated_legacy.contains("modell"), "Legacy 0.2 metadata not normalized");
+    const auto legacy_model = lade_modell(legacy_file);
+    const auto migrated_model = lade_modell(legacy_target / "modells_information.json");
+    require(legacy_model.id == migrated_model.id &&
+        legacy_model.elemente.size() == migrated_model.elemente.size() &&
+        legacy_model.masse_kg == migrated_model.masse_kg,
+        "Legacy 0.2 migration changed model identity or mass");
 }
 
 void derived_migration(const fs::path& output)
@@ -381,7 +401,14 @@ void derived_migration(const fs::path& output)
     fs::create_directory(negative);
     auto document = Json::parse(read(output / "schema-v3-modelle" / "quader" / "modells_information.json"));
     write(negative / "boot.obj", read(output / "schema-v3-modelle" / "quader" / "boot.obj"));
-    auto& volume = document["gruppen"].begin().value()["elemente"][0]["Hydrostatik"]["volumen"];
+    Json* first_element = nullptr;
+    for (auto& group : document["gruppen"])
+        if (group.contains("elemente") && !group["elemente"].empty()) {
+            first_element = &group["elemente"][0];
+            break;
+        }
+    require(first_element != nullptr, "Derived-migration fixture has no physical element");
+    auto& volume = (*first_element)["Hydrostatik"]["volumen"];
     for (const auto& definition : {Json{{"art","unknown"},{"z_m",0.}},
             Json{{"art","z_schnitt"},{"z_m",1e6}},
             Json{{"art","z_schnitt"},{"z_m","invalid"}},
@@ -392,7 +419,7 @@ void derived_migration(const fs::path& output)
         rejects([&] { lade_modell(negative / "modells_information.json"); }, "CORE-MOD-0009");
     }
     volume.erase("ableitung");
-    auto& shell = document["gruppen"].begin().value()["elemente"][0]["Hydrostatik"]["masse"];
+    auto& shell = (*first_element)["Hydrostatik"]["masse"];
     shell["art"] = "schale"; shell["wanddicke_m"] = .01;
     shell["ableitung"] = {{"art","ohne_deckflaeche"},{"z_m",1e6}};
     write(negative / "modells_information.json", document.dump());
@@ -410,11 +437,18 @@ void validation(const fs::path& output)
     const auto geometry = read(output / "quader" / "boot.obj");
     const auto file = target / "modells_information.json";
     write(target / "boot.obj", geometry);
+    std::string populated_group;
+    for (auto group = root["gruppen"].begin(); group != root["gruppen"].end(); ++group)
+        if (group.value().contains("elemente") && !group.value()["elemente"].empty()) {
+            populated_group = group.key();
+            break;
+        }
+    require(!populated_group.empty(), "Validation fixture has no physical element");
     auto test = [&](const Json& document, const std::string& code) {
         write(file, document.dump());
         rejects([&] { lade_modell(file); }, code);
     };
-    auto& element = root["gruppen"].begin().value()["elemente"][0];
+    auto& element = root["gruppen"][populated_group]["elemente"][0];
     auto bad = root;
     bad["geometrie"]["laengeneinheit"] = "cm";
     test(bad, "CORE-MOD-0002");
@@ -439,7 +473,7 @@ void validation(const fs::path& output)
     element = original_element;
     const auto mesh_id = element["Hydrostatik"]["volumen"]["mesh"].get<std::string>();
     auto repeated = root;
-    repeated["gruppen"].begin().value()["elemente"].push_back(original_element);
+    repeated["gruppen"][populated_group]["elemente"].push_back(original_element);
     test(repeated, "CORE-MOD-0003");
     write(file, root.dump());
     auto repeated_role = read(file);
@@ -513,7 +547,7 @@ int main(int argc, char* argv[])
         if (fs::exists(output)) fs::remove_all(output);
         fs::create_directory(output);
         reference_models(argv[1], output);
-        schema_v3_migration(output);
+        schema_v3_migration(argv[1], output);
         derived_migration(output);
         validation(output);
         return 0;

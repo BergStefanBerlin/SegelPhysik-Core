@@ -79,7 +79,8 @@ std::pair<std::size_t, std::size_t> obj_zahlen(const fs::path& datei)
 }
 
 const std::set<std::string> katalogfelder{"katalogversion", "modelle", "modell_id", "name", "beschreibung",
-    "modell_fassung", "status", "fehleranzahl"};
+    "modell_fassung", "status", "fehleranzahl", "schema_valide",
+    "visualisierung_hash_aktuell", "fingerprints_aktuell"};
 
 void beispielordner(const fs::path& ordner)
 {
@@ -119,7 +120,7 @@ void details(const fs::path& quelle, const fs::path& tmp)
         "Struktur falsch");
     pruefe(struktur.gesamtmasse_kg && *struktur.gesamtmasse_kg > 0. && struktur.huellquader_m, "Masse/Huelle fehlt");
     nur_felder(modellstruktur_json(struktur), {"katalogversion", "modell_id", "modell_fassung", "gruppen", "id",
-        "name", "elemente", "darstellung", "hydrostatik_volumen", "bewegung", "art",
+        "name", "elemente", "darstellung", "hydrostatik_volumen", "referenzen", "bewegung", "art",
         "steuerung", "achse_modell", "drehpunkt_modell_m", "richtung_modell", "hubweg_m",
         "mitbewegte_elemente", "gesamtmasse_kg", "huellquader_m", "min", "max"},
         ordner);

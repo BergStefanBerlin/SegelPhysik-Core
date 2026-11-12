@@ -2,7 +2,7 @@
 
 ## Status und Geltungsbereich
 
-**Autorisierte Montage-Ablageaenderung 06.11.2026:** Aktive Dateien heissen
+**Bisheriger Montage-Ablagevertrag (vor C-0.21-Cutover):** Dateien heissen
 `modells_information.json`. Jedes vorhandene Element darf ein `setting` direkt
 neben `id` und `Darstellung` tragen: `translation_m`, `rotation_xyzw`,
 `konfiguriert`. Default ist Identitaet/false; endliche Translation und
@@ -25,7 +25,9 @@ die unveraenderte Quellgeometrie erneut und montiert sie genau einmal.
 der neutralen Mittschiffsbasis; Mast-/Vorliekneigung bleibt erhalten.
 Physische Netze, Massen und Traegheit
 werden dadurch nicht implizit transformiert; dynamische Winkel bleiben
-getrennt. Der gemeinsame Basisfingerprint blendet nur echte
+getrennt. Dieser Abschnitt beschreibt den vorhandenen Legacy-Vertrag bis zum
+separat geregelten C-0.21-Cutover; danach ist für den aktiven Modellkatalog
+ausschließlich A-C-00148 maßgeblich. Der gemeinsame Basisfingerprint blendet nur echte
 Element-Settings und gemeinsame Konfigurationsmetadaten aus.
 
 Die Koordinatenanforderungen A-C-00001 bis A-C-00003 wurden am
@@ -642,3 +644,173 @@ Die gemeinsame Objektinspektion und Bewegungsdaten sind im
 [Katalog-/Inspektionsvertrag](Spezifikation_Modellkatalog_Schnittstelle.md)
 spezifiziert. Rasterlinien und GUI-Layout sind ausschließlich Gegenstand
 der [GUI-Spezifikation](../../GUI/Spezifikationen/Spezifikation_GUI_Bootsauswahl.md).
+
+## Modellformat 0.3, Fingerprints und Modellpfade
+
+**Status:** Fachlich finalisiert am 10.11.2026; Zielversion C-0.21.
+Core-Umsetzung und technische Abnahme sind offen.
+**Anforderungen:** A-C-00148 bis A-C-00153.
+**Entwurfsquellen:** [Migrationslog](../../Modelle/Modelle-NEW/MIGRATIONSLOG.md),
+[Datenschema](../../Modelle/Modelle-NEW/schema_data.json) und
+[Validierungsschema](../../Modelle/Modelle-NEW/schema_validation.json).
+Technische Restdetails und Abnahmeschritte stehen im
+[Umsetzungsplan C-0.21](../Umsetzungsplaene/Umsetzungsplan_C-0.21.md).
+Nicht normativ offene Implementierungsdetails stehen in der
+[Entwurfspunkteliste Modellformat](Entwurfspunkte/Modellformat.json).
+
+Nach dem in A-C-00153 geregelten Cutover verwendet der aktive Modellbestand
+ausschließlich das Dateipaar `modells_data.json` und
+`modells_validation.json`. Der C-0.21-Core-Katalog erhält keinen stillen
+Legacy-Fallback. Historische und synthetische Fixtures werden im Rahmen der
+Umsetzung auf den aktuellen Vertrag migriert; getrennte Legacy-Konverter
+bleiben außerhalb des aktiven Katalog-/Ladepfads.
+
+### A-C-00148: Schema-geprüfter Import von Modellformat 0.3
+
+Ein Katalogmodell besteht ausschließlich aus `modells_data.json` und
+`modells_validation.json`. Der Core validiert beide vor der Deserialisierung
+gegen die Draft-2020-12-Schemas `schema_data.json` und
+`schema_validation.json` am Modellkatalog-Wurzelordner. Schema-Auflösung ist
+unabhängig vom Arbeitsverzeichnis. Fehlende/zusätzliche Dateien, fehlende
+oder unbekannte Schemas, Validatorfehler und Schema-Verletzungen erzeugen
+eindeutige Diagnosen und sperren Nutzung; es gibt keinen stillen Rückfall auf
+ein anderes Modellformat.
+
+Der Core prüft zusätzlich schemaübergreifende Bedingungen: `schema` und
+`identity` müssen in beiden Modelldateien übereinstimmen, `identity.id` muss
+dem Modellordnernamen entsprechen, und Ressourcenreferenzen müssen
+vorhanden, typgerecht und innerhalb des Modellordners auflösbar sein.
+Modellgruppen, Elemente, `placement`, `display`, `physics` und
+Gruppen-`movement` werden gemäß Schema 0.3 semantikerhaltend eingelesen.
+`schema.release` ist Metadatum und weder Simulationsfreigabe noch
+Ersatz für bestehende Simulationsprüfungen. Teilweise geparste Daten werden
+nicht als erfolgreiches Modell ausgegeben.
+
+**Abnahme:** Alle elf Modellordner werden eingelesen. Negativtests decken
+fehlende/zusätzliche Dateien, fehlerhaftes JSON, Schemafehler, unbekannte
+Version, Abweichungen zwischen `identity`/`schema`, Ordner-ID-Konflikte,
+fehlende Ressourcen und unzulässige Pfadfluchten ab. Kein Fehlerfall startet
+Simulation oder liefert eine erfolgreiche Modellansicht.
+
+### A-C-00149: Deterministische Bereichs-Fingerprints
+
+Der Core berechnet und vergleicht SHA-256 für genau die fünf
+Schema-Bereiche:
+
+| Eintrag in `model.fingerprints` | Quelle |
+|---|---|
+| `visualisation` | Dateien unter `modells/visualisation/` |
+| `mass` | Dateien unter `modells/mass/` |
+| `hydrostatics` | Dateien unter `modells/hydrostatics/` |
+| `aerodynamics` | Dateien unter `modells/aerodynamics/` |
+| `modelData` | Inhalt von `modells_data.json` |
+
+Jeder Bereichs-Hash umfasst alle regulären Dateien rekursiv, einschließlich
+versteckter Dateien. Symlinks werden abgelehnt. Dateien werden nach
+normalisiertem, relativem UTF-8-Pfad mit `/` byteweise sortiert; der
+Hashstrom codiert pro Datei eine 64-Bit-unsigned little-endian Pfadlänge,
+Pfadbytes, eine 64-Bit-unsigned little-endian Inhaltslänge und die exakten
+Datei-Bytes.
+Ein leerer Ressourcenbereich ergibt SHA-256 des leeren Eingabestroms.
+`modells_validation.json`, Schema-Dateien und Sperrdateien werden nicht in
+Bereichshashes aufgenommen. Absolute Pfade, Zeitstempel und
+Betriebssystemmetadaten sind nicht Bestandteil der Hashes.
+
+Bei jedem Katalog-/Ladevorgang vergleicht der Core alle fünf gespeicherten
+Werte mit den aktuellen Hashes, ohne Dateien zu ändern. Fehlende,
+unlesbare oder abweichende Hashwerte werden je Bereich diagnostiziert.
+Jede Abweichung sperrt Simulation. Ein aktueller Visualisierungs-Hash
+erlaubt die Ansicht bei schema-valider Modellbeschreibung und gültigen
+Darstellungsressourcen auch dann, wenn andere Bereiche fehlerhaft sind.
+Eine Visualisierungsabweichung sperrt die Ansicht bis zur ausdrücklichen
+Aktualisierung. Diagnosen bleiben in allen Fällen sichtbar.
+
+**Abnahme:** Wiederholte Läufe auf identischem Inhalt liefern bytegleiche
+Hashes. Tests variieren Dateiinhalt, Pfad, Verschachtelung, Reihenfolge,
+versteckte Dateien, leere Bereiche und Symlinks; nur die vorgesehenen
+Bereichshashes ändern sich. Änderungen an Validierungs-/Schema-Dateien
+ändern keinen Bereichs-Hash. Fingerprintfehler lösen keinen Schreibzugriff
+aus.
+
+### A-C-00150: Ausdrückliche atomare Fingerprint-Aktualisierung
+
+Eine Fingerprint-Aktualisierung erfolgt ausschließlich durch einen
+ausdrücklichen API-Aufruf, der den Modellordner und eine nichtleere,
+duplikatfreie Auswahl aus den fünf Bereichen erhält. Die Funktion validiert
+Eingaben, Schemas und Ressourcen, aktualisiert ausschließlich die
+angeforderten `.hash`-Felder und setzt `modifiedAt` nur bei tatsächlich
+geändertem Hash auf das UTC-Datum des Schreibvorgangs. Die Ausgabe wird
+schema-validiert und atomar ersetzt. Unbeteiligte Bereiche und sonstige
+Validierungsmetadaten bleiben unverändert. Bei einem Fehler bleibt die
+bestehende Datei unverändert; der Aufrufer erhält eine konkrete Core-
+Diagnose. Eine ungültige oder fehlende Validierungsdatei wird nicht
+automatisch neu angelegt.
+
+**Abnahme:** Tests aktualisieren einzelne und mehrere Bereiche, bestätigen
+idempotentes Verhalten und Datumsregeln, erhalten fremde Metadaten und
+simulieren Schreib-/Validierungsfehler sowie parallele Schreibkonflikte.
+Fehler lassen Dateiinhalt und Zeitstempel bytegleich unverändert.
+
+### A-C-00151: Öffentliche C++-Schnittstelle für Fingerprints
+
+Der Core exportiert die in
+[Schnittstelle Core → Modellwerkzeuge](../Dokumentationen/Schnittstelle_Core_Modellwerkzeuge.md)
+festgelegte C++-Bibliotheksfunktion. Modellwerkzeuge wie Segelmacher
+übergeben den Modellordner und die gewünschten Bereiche; sie implementieren
+keinen eigenen Hash-, JSON- oder Schemapfad. Die API liefert die berechneten
+Hashwerte und Aktualisierungsinformation zurück und meldet Fehler über
+dokumentierte Core-Diagnosen. Ein CLI-Zweitvertrag ist nicht Bestandteil.
+
+**Abnahme:** Core- und unabhängige Verbraucher-Builds binden dieselbe
+öffentliche API ein. Vertragstests prüfen alle Bereiche, Teilauswahl,
+Fehler- und Ergebniswerte; CPPI-0140, CPPI-0142, CPPI-0143 und CPPI-0144
+sind im Register nachvollziehbar.
+
+### A-C-00152: Gemeinsame, zur Laufzeit änderbare Defaults
+
+Modellbasis, Schema-Wurzel und weitere veränderbare Standardpfade liegen in
+`%APPDATA%\SegelPhysik\defaults.json`. Der gemeinsame Dateivertrag enthält
+mindestens `modelRoot`, `schemaRoot` und ein erweiterbares `defaults`-Objekt.
+`defaults` ist offen: Verbraucher weisen unbekannte Schlüssel nicht zurück
+und erhalten sie beim Schreiben; Standardwerte können ohne Neu-Build
+geändert oder ergänzt werden. Pfade sind absolut oder relativ zur
+Konfigurationsdatei aufzulösen.
+Priorität: explizite Aufruf-/Benutzerauswahl, dann Test-Override, dann
+entsprechende Umgebungsvariable, dann Datei. Fehlende oder ungültige
+Konfiguration wird sichtbar diagnostiziert; es gibt keinen stillen
+Festplatten- oder Quellcode-Fallback. Änderungen sind ohne Neu-Build wirksam.
+Die GUI und externe Modellwerkzeuge verwenden dieselbe Datei und Feldsemantik.
+
+**Abnahme:** Tests prüfen fehlende, ungültige und unlesbare Dateien,
+Relative-/Absolute-Pfade, Prioritätsreihenfolge, Laufzeitänderung und
+isolierte Test-Overrides. Produktions-Builddefinitionen enthalten keinen
+festcodierten aktiven Modellwurzelpfad.
+
+### A-C-00153: Sicherer Cutover des aktiven Modellbestands
+
+Erst nach bestandener Core- und GUI-Vorprüfung wird der bisherige
+`Segelphysik\Modelle`-Ordner vollständig in `Segelphysik\Modelle_alt`
+umbenannt und `Segelphysik\Modelle\Modelle-NEW` an den freien Zielpfad
+`Segelphysik\Modelle` verschoben. Keine Quelldaten werden gelöscht; ein
+bereits vorhandener Zielordner führt zum Abbruch ohne Überschreiben.
+Core-Katalog, Schemaauflösung, Tests, Werkzeuge, Start-/Entwicklungsprofile,
+CMake und Dokumentation beziehen aktive Pfade aus A-C-00152. Fehler beim
+Cutover dürfen keinen teilweisen aktiven Modellbestand hinterlassen.
+
+**Abnahme:** Vor dem Verschieben bestehen Core- und GUI-Builds und
+vollständige Tests gegen die neue Quelle. Danach bestehen sie erneut gegen
+den endgültigen `Modelle`-Pfad; alle elf Modelle sind über den Katalog
+erreichbar und werden schema-/fingerprintgeprüft. `Modelle_alt` bleibt
+inhaltlich erhalten; Datei- und Hashinventare werden vor/nachgewiesen.
+Die GUI-Abnahme bleibt separat in ihrer Spezifikation und ihrem Plan.
+
+### C-0.21 Nachverfolgbarkeit
+
+| Anforderung | Umsetzungsschritte |
+|---|---|
+| A-C-00148 | U-C-000131, U-C-000132, U-C-000136 |
+| A-C-00149 | U-C-000133, U-C-000135 |
+| A-C-00150 | U-C-000133, U-C-000135 |
+| A-C-00151 | U-C-000132, U-C-000133 |
+| A-C-00152 | U-C-000134, U-C-000136 |
+| A-C-00153 | U-C-000136, U-C-000137 |

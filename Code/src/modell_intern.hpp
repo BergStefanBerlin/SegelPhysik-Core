@@ -7,6 +7,8 @@
 
 namespace segelphysik {
 
+std::string sha256_bytes(const std::string& value);
+
 Mesh lade_quellmesh(const std::filesystem::path& datei,
                    const std::optional<std::string>& objekt = std::nullopt,
                    bool darstellung = false);
@@ -22,9 +24,13 @@ nlohmann::json aktualisiere_modell_information(const nlohmann::json& information
 Pose setting_pose(const nlohmann::json& setting);
 void validiere_element_settings(const nlohmann::json& dokument,
                                 const std::string& kontext = "modells_information.json");
+ModellBeschreibung lies_beschreibung_modellformat03(
+    const std::filesystem::path& datei, const nlohmann::json& daten,
+    bool lade_quellmeshes);
 
 struct ModellInspektionsImport {
     ModellBeschreibung beschreibung;
+    nlohmann::json modelldokument;
     std::optional<Modell> modell;
     std::string import_fehler;
 };

@@ -91,16 +91,18 @@ Beispiele, vom Repository aus (Ausgabedateien dürfen noch nicht existieren):
 
 ```powershell
 $cli = ".\build\standard\Release\segelphysik_cli.exe"
-$modell = "..\Modelle\quader\modells_information.json"
+$modell = "..\Modelle_alt\quader\modells_information.json"
 & $cli --pruefen $modell
 & $cli --statisch $modell ".\build\statik.json"
 & $cli --dynamisch $modell ".\build\dynamik.jsonl" 1 0.01
 ```
 
-Die Beispielmodelle liegen außerhalb des Repositories im gemeinsamen
-Ordner `Segelphysik\Modelle` neben `CORE` und `GUI`. CMake-Variable
-`SEGELPHYSIK_MODELLE_DIR` (Standard `../../Modelle` relativ zu `Code`)
-legt den Ordner für Tests und GUI fest.
+Die Legacy-Beispielmodelle liegen außerhalb des Core-Repositories unter
+`Segelphysik\Modelle_alt`. CMake-Variable
+`SEGELPHYSIK_MODELLE_DIR` (Standard `../../Modelle_alt` relativ zu
+`Code`) stellt sie für explizite Kompatibilitätstests bereit. Der aktive
+Format-0.3-Bestand liegt in `Segelphysik\Modelle`; Tests verwenden dafür
+`SEGELPHYSIK_MODELFORMAT03_TEST_ROOT` (Standard `../../Modelle`).
 
 Die Montageinspektion liest diesen Originalbestand nur. `getMesh` mit
 Typ `darstellung` liefert genau eine aktuelle Geometrie je bestehender
