@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -1367,6 +1368,75 @@ std::vector<InspectionMesh> getMesh(const ModelInspection& inspection, const std
                 [&](const std::string& id) { return selected.count(id) != 0; })))
             result.push_back(mesh);
     return result;
+}
+
+MastspitzenErgebnis bestimmeMastspitze(const ModelInspection& inspection)
+{
+    const auto structure = modellstruktur(inspection);
+    std::vector<std::string> candidates;
+    std::vector<std::string> main_masts;
+    for (const auto& group : structure.gruppen) {
+        for (const auto& element : group.elemente) {
+            std::string id = element.id;
+            std::transform(id.begin(), id.end(), id.begin(),
+                [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+            if (id == "hauptmast" || id == "mainmast") {
+                main_masts.push_back(element.id);
+                candidates.push_back(element.id);
+            } else if (id == "mast" || id == "vormast" || id == "besanmast" ||
+                       id == "foremast" || id == "mizzenmast") {
+                candidates.push_back(element.id);
+            }
+        }
+    }
+    if (main_masts.size() == 1) return bestimmeMastspitze(inspection, main_masts.front());
+    if (main_masts.empty() && candidates.size() == 1)
+        return bestimmeMastspitze(inspection, candidates.front());
+    if (candidates.empty()) return {{}, {}, "Kein eindeutig bezeichneter Mast vorhanden"};
+    return {{}, {}, "Hauptmast nicht eindeutig"};
+}
+
+MastspitzenErgebnis bestimmeMastspitze(const ModelInspection& inspection,
+                                       const std::string& mast_element_id)
+{
+    const auto structure = modellstruktur(inspection);
+    bool found = false;
+    for (const auto& group : structure.gruppen) {
+        for (const auto& element : group.elemente)
+            found = found || element.id == mast_element_id;
+    }
+    if (mast_element_id.empty() || !found)
+        return {{}, mast_element_id, "Angegebener Mast nicht vorhanden"};
+
+    const auto types = getAvailableMeshTypes(inspection);
+    if (std::none_of(types.begin(), types.end(),
+                     [](const InspectionType& type) { return type.id == "darstellung"; }))
+        return {{}, mast_element_id, "Keine Mast-Darstellungsgeometrie vorhanden"};
+    const auto meshes = getMesh(inspection, "darstellung", std::vector<std::string>{mast_element_id});
+    double max_z = -std::numeric_limits<double>::infinity();
+    Vektor3 sum{0., 0., 0.};
+    std::size_t count = 0;
+    for (const auto& mesh : meshes) {
+        if (mesh.origin != "darstellung") continue;
+        for (const auto& point : mesh.points_m) {
+            if (!std::isfinite(point[0]) || !std::isfinite(point[1]) || !std::isfinite(point[2]))
+                return {{}, mast_element_id, "Mast-Darstellungsgeometrie enthaelt ungueltige Koordinaten"};
+            if (point[2] > max_z) {
+                max_z = point[2];
+                sum = point;
+                count = 1;
+            } else if (point[2] == max_z) {
+                sum[0] += point[0];
+                sum[1] += point[1];
+                sum[2] += point[2];
+                ++count;
+            }
+        }
+    }
+    if (!count) return {{}, mast_element_id, "Keine verwendbare Mast-Darstellungsgeometrie vorhanden"};
+    const double n = static_cast<double>(count);
+    return {Vektor3{sum[0] / n, sum[1] / n, sum[2] / n}, mast_element_id, {},
+        "mast_darstellungsgeometrie"};
 }
 
 Modellstruktur modellstruktur(const ModelInspection& inspection)

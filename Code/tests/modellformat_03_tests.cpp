@@ -351,6 +351,36 @@ void pruefe_gruppenvorschau_ohne_aerodynamik(const std::filesystem::path& source
         std::any_of(hidden_preview->diagnostics.begin(), hidden_preview->diagnostics.end(),
             [](const auto& diagnostic) { return diagnostic.fundstelle == "Boom"; }),
         "Fehlendes Gruppenmesh muss diagnostiziert und unvollstaendige Posen unterdrueckt werden");
+
+    auto additional_mast = data["groups"]["rig"]["elements"][0];
+    additional_mast.erase("physics");
+    const auto inspect_masts = [&]() {
+        schreiben(target / "modells_data.json", data.dump());
+        segelphysik::aktualisiere_modell_fingerprints(target,
+            {segelphysik::ModellFingerprintBereich::modelData});
+        const auto mast_catalog = segelphysik::modellkatalog(temp_root);
+        const auto* mast_entry = mast_catalog.eintrag("420");
+        pruefung(mast_entry && mast_entry->schema_valide, "Mehrmast-Testmodell ungueltig");
+        const auto mast_inspection = segelphysik::readModelInspection(
+            mast_catalog, "420", mast_entry->modell_fassung);
+        return segelphysik::bestimmeMastspitze(*mast_inspection);
+    };
+    additional_mast["id"] = "Vormast";
+    data["groups"]["rig"]["elements"].push_back(additional_mast);
+    const auto ambiguous = inspect_masts();
+    pruefung(!ambiguous.position_modell_m && !ambiguous.diagnose.empty(),
+        "Mehrere Masten ohne eindeutigen Hauptmast muessen diagnostiziert werden");
+    additional_mast["id"] = "Hauptmast";
+    data["groups"]["rig"]["elements"].push_back(additional_mast);
+    const auto main_mast = inspect_masts();
+    pruefung(main_mast.position_modell_m && main_mast.element_id == "Hauptmast" &&
+        main_mast.quelle == "mast_darstellungsgeometrie",
+        "Eindeutig bezeichneter Hauptmast muss ausgewaehlt werden");
+    additional_mast["id"] = "mainmast";
+    data["groups"]["rig"]["elements"].push_back(additional_mast);
+    const auto ambiguous_main = inspect_masts();
+    pruefung(!ambiguous_main.position_modell_m && !ambiguous_main.diagnose.empty(),
+        "Mehrere Hauptmasten muessen als mehrdeutig diagnostiziert werden");
 }
 
 template<class Aktion>
@@ -642,6 +672,30 @@ int main(int argc, char** argv)
                     catalog, entry.modell_id, entry.modell_fassung);
                 pruefung(inspection->info().model_id == entry.modell_id,
                     "Inspektion hat eine falsche Modell-ID");
+                if (entry.modell_id == "420" || entry.modell_id == "optimist" ||
+                    entry.modell_id == "folkeboot") {
+                    const auto tip = segelphysik::bestimmeMastspitze(*inspection, "Mast");
+                    const auto automatic_tip = segelphysik::bestimmeMastspitze(*inspection);
+                    pruefung(tip.position_modell_m && tip.element_id == "Mast" &&
+                             tip.diagnose.empty() && tip.quelle == "mast_darstellungsgeometrie" &&
+                             automatic_tip.position_modell_m == tip.position_modell_m &&
+                             automatic_tip.element_id == tip.element_id,
+                        entry.modell_id + ": Mastspitze fehlt: " + tip.diagnose);
+                    const double expected_height = entry.modell_id == "420" ? 6.36 :
+                        entry.modell_id == "optimist" ? 2.31087 : 10.55;
+                    const double expected_x = entry.modell_id == "420" ? 0.85070668 :
+                        entry.modell_id == "optimist" ? 0.87042090625 : 0.45;
+                    pruefung(std::abs((*tip.position_modell_m)[0] - expected_x) < 1e-5 &&
+                             std::abs((*tip.position_modell_m)[1]) < 1e-5 &&
+                             std::abs((*tip.position_modell_m)[2] - expected_height) < 1e-5,
+                        entry.modell_id + ": falscher Mastspitzenmittelpunkt");
+                } else if (entry.modell_id == "quader") {
+                    const auto tip = segelphysik::bestimmeMastspitze(*inspection, "Mast");
+                    const auto automatic_tip = segelphysik::bestimmeMastspitze(*inspection);
+                    pruefung(!tip.position_modell_m && !tip.diagnose.empty() &&
+                             !automatic_tip.position_modell_m && !automatic_tip.diagnose.empty(),
+                        "Fehlender Mast muss als nicht verfuegbar diagnostiziert werden");
+                }
                 if (inspection->info().status != "verwendbar") {
                     std::string message = entry.modell_id +
                         ": keine verwendbare Inspektion";

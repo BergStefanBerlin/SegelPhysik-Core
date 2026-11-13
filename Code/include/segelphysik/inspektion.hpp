@@ -81,6 +81,18 @@ struct InspectionMesh {
     std::optional<MontageReferenz> montage;
 };
 
+struct MastspitzenErgebnis {
+    std::optional<Vektor3> position_modell_m;
+    std::string element_id;
+    std::string diagnose;
+    std::string quelle;
+};
+
+// Der Aufrufer muss den Mast beziehungsweise Hauptmast eindeutig zuordnen.
+MastspitzenErgebnis bestimmeMastspitze(const ModelInspection& inspection,
+                                       const std::string& mast_element_id);
+MastspitzenErgebnis bestimmeMastspitze(const ModelInspection& inspection);
+
 struct InspectionMovementPose {
     std::string label;
     double value{};

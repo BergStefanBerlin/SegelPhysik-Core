@@ -101,6 +101,23 @@ int main(int argc,char* argv[])
         }
         std::filesystem::remove(dynamic_force_path);
         {
+            segelphysik::Zustand start;
+            start.mast = segelphysik::MastReferenz{
+                segelphysik::Vektor3{0., 0., 2.}, "mast-test",
+                "explizite_modellvorgabe", "", modell.fassung};
+            const auto next = segelphysik::dynamikschritt(modell, start, .01);
+            const auto first_json = nlohmann::json::parse(
+                segelphysik::zustand_json(modell, start, "laufend"));
+            const auto next_json = nlohmann::json::parse(
+                segelphysik::zustand_json(modell, next, "laufend"));
+            if (!next.mast || next.wind ||
+                first_json.at("referenzpunkte")[0].at("quelle") != "explizite_modellvorgabe" ||
+                next_json.at("referenzpunkte")[0].at("positionsstatus") != "gueltig" ||
+                next_json.at("referenzpunkte")[0].at("position_modell_m") !=
+                    first_json.at("referenzpunkte")[0].at("position_modell_m"))
+                throw std::runtime_error("Mastreferenz ohne Wind muss durch den Dynamikschritt erhalten bleiben");
+        }
+        {
             const auto original = segelphysik::dynamische_fremdkraft_start(
                 modell, segelphysik::Zustand{}, dynamic_force);
             const auto original_json = segelphysik::zustand_json(modell, original, "laufend");

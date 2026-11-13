@@ -225,3 +225,20 @@ Die Schnittstellen ergänzen den unveränderlichen Inspektionssnapshot.
 | CPPI-0150 | `groupMovementPreviewJson(const ModelInspection&, const string&)` | implementiert, gezielt und regressiv getestet | C-0.22 / A-C-00156, A-C-00157; JSON-Projektion derselben gruppeneigenen Vorschau |
 | CPPI-0151 | `ModellBeschreibung::gruppenbewegungen` | implementiert, gezielt und regressiv getestet | C-0.22 / A-C-00154; gruppeneigene Bewegungsdefinitionen für Format 0.3 |
 | CPPI-0152 | `StrukturGruppe::bewegung` | implementiert, gezielt und regressiv getestet | C-0.22 / A-C-00154, A-C-00156; optionale gruppeneigene Bewegungsdefinition |
+| CPPI-0153 | `MastspitzenErgebnis` | implementiert, teilweise getestet | C-0.23 / A-C-00165, A-C-00166; modellfester Punkt mit Herkunft oder ausdrückliche Diagnose |
+| CPPI-0154 | `bestimmeMastspitze(const ModelInspection&, const std::string&)` | implementiert, teilweise getestet | C-0.23 / A-C-00165, A-C-00166; höchste Stelle des vom Aufrufer eindeutig zugeordneten Mast-Darstellungsmeshes |
+| CPPI-0155 | `WindModus` | implementiert, teilweise getestet | C-0.23 / A-C-00159; weltfeste oder bootmitgeführte Richtung |
+| CPPI-0156 | `WindKonfiguration` | implementiert, teilweise getestet | C-0.23 / A-C-00158 bis A-C-00160; bestätigte Referenzwerte |
+| CPPI-0157 | `WindKontext` | implementiert, teilweise getestet | C-0.23 / A-C-00163 bis A-C-00165; unveränderlicher historischer Laufkontext |
+| CPPI-0158 | `WindVektor` | implementiert, teilweise getestet | C-0.23 / A-C-00161, A-C-00162; Strömungsvektor und getrennte Richtungsstatus |
+| CPPI-0159 | `WindAuswertung` | implementiert, teilweise getestet | C-0.23 / A-C-00161 bis A-C-00165; lokale Werte und Diagnose |
+| CPPI-0160 | `Zustand::wind` | implementiert, teilweise getestet | C-0.23 / A-C-00163; historischer Windkontext |
+| CPPI-0161 | `wind_start` | implementiert, teilweise getestet | C-0.23 / A-C-00163, A-C-00164; validierter Laufbeginn |
+| CPPI-0162 | `wind_aendern` | implementiert, teilweise getestet | C-0.23 / A-C-00159, A-C-00163; zeitbezogene Änderung ohne Sprung beim Moduswechsel |
+| CPPI-0163 | `windprofil` | implementiert, teilweise getestet | C-0.23 / A-C-00160; Auswertung des Höhenprofils |
+| CPPI-0164 | `wind_auswertung` | implementiert, teilweise getestet | C-0.23 / A-C-00158 bis A-C-00165; Windvektoren eines Ergebnisstands |
+| CPPI-0165 | `Referenzpunkt` | implementiert, teilweise getestet | C-0.23 / A-C-00166 bis A-C-00168; Identität, Herkunft und unabhängige Positions- und Bewegungsdaten |
+| CPPI-0166 | `referenzpunkte` | implementiert, teilweise getestet | C-0.23 / A-C-00166 bis A-C-00168; Punktesammlung desselben Auswertungszustands mit windunabhängigem Mastbezug |
+| CPPI-0167 | `bestimmeMastspitze(const ModelInspection&)` | implementiert, teilweise getestet | C-0.23 / A-C-00165, A-C-00166; Auswahl anhand benannter Mastelemente; Mehrmastfälle mit eindeutigem und mehrdeutigem Hauptmast getestet |
+| CPPI-0168 | `MastReferenz` | implementiert, teilweise getestet | C-0.23 / A-C-00166 bis A-C-00168; windunabhängiger, modellfassungsbezogener Mastbezug mit Herkunft und Diagnose |
+| CPPI-0169 | `Zustand::mast` | implementiert, teilweise getestet | C-0.23 / A-C-00166 bis A-C-00168; historischer Mastbezug auch ohne Windkontext |

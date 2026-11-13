@@ -1,4 +1,6 @@
 #include "segelphysik/simulation.hpp"
+#include "segelphysik/referenzpunkte.hpp"
+#include "segelphysik/wind.hpp"
 #include "aufbereitung_intern.hpp"
 #include <algorithm>
 #include <cmath>
@@ -533,6 +535,55 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
             out<<'}';
         }
         out<<'}';
+    }
+    const auto points = referenzpunkte(m, s, k, ldp, stationaer);
+    auto optional_vector = [&](const std::optional<Vektor3>& value) {
+        if (value) array(out, *value); else out << "null";
+    };
+    out << ",\"referenzpunkte\":[";
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        const auto& p = points[i];
+        if (i) out << ',';
+        out << "{\"id\":" << text(p.id) << ",\"art\":" << text(p.art)
+            << ",\"element_id\":" << text(p.element_id) << ",\"quelle\":" << text(p.quelle)
+            << ",\"fachstatus\":" << text(p.fachstatus)
+            << ",\"positionsstatus\":" << text(p.positionsstatus)
+            << ",\"geschwindigkeitsstatus\":" << text(p.geschwindigkeitsstatus)
+            << ",\"diagnose\":" << text(p.diagnose) << ",\"position_modell_m\":";
+        optional_vector(p.position_modell_m);
+        out << ",\"position_welt_m\":";
+        optional_vector(p.position_welt_m);
+        out << ",\"geschwindigkeit_modell_m_s\":";
+        optional_vector(p.geschwindigkeit_modell_m_s);
+        out << ",\"geschwindigkeit_welt_m_s\":";
+        optional_vector(p.geschwindigkeit_welt_m_s);
+        out << '}';
+    }
+    out << ']';
+    if (s.wind) {
+        const auto value = wind_auswertung(m, s, k.schwerpunkt_modell_m);
+        const auto& c = s.wind->konfiguration;
+        auto wind_vector = [&](const std::optional<WindVektor>& wind) {
+            if (!wind) { out << "null"; return; }
+            out << "{\"stroemung_welt_m_s\":";
+            array(out, wind->stroemung_welt_m_s);
+            out << ",\"horizontal_m_s\":" << wind->horizontal_m_s
+                << ",\"raeumlich_m_s\":" << wind->raeumlich_m_s
+                << ",\"herkunft_welt_grad\":";
+            if (wind->herkunft_welt_grad) out << *wind->herkunft_welt_grad; else out << "null";
+            out << ",\"kompass_sichtbar\":" << (wind->kompass_sichtbar ? "true" : "false")
+                << ",\"pfeil_sichtbar\":" << (wind->pfeil_sichtbar ? "true" : "false") << '}';
+        };
+        out << ",\"wind\":{\"zeit_s\":" << value.zeit_s << ",\"schritt\":" << value.schritt
+            << ",\"modell_fassung\":" << text(s.wind->modell_fassung)
+            << ",\"modus\":" << text(c.modus == WindModus::weltfest ? "weltfest" : "bootmitgefuehrt")
+            << ",\"referenzgeschwindigkeit_m_s\":" << c.referenzgeschwindigkeit_m_s
+            << ",\"referenzhoehe_m\":" << c.referenzhoehe_m
+            << ",\"diagnose\":" << text(value.diagnose) << ",\"wahr\":";
+        wind_vector(value.wahr);
+        out << ",\"scheinbar\":";
+        wind_vector(value.scheinbar);
+        out << '}';
     }
     out<<'}';return out.str();
 }

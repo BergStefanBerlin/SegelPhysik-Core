@@ -71,7 +71,7 @@ void ids_und_zustaende(const Modell& m)
     // Dry body: buoyancy is a valid zero vector, never omitted.
     const auto trocken = hydrostatik(m, Pose{{0., 0., 100.}, {0., 0., 0., 1.}});
     const auto& auftrieb = trocken.beitraege.at(1);
-    pruefe(auftrieb.id == "Rumpf:auftrieb" && auftrieb.zustand == Datenzustand::null &&
+    pruefe(auftrieb.id == "Hull:auftrieb" && auftrieb.zustand == Datenzustand::null &&
         nahe(auftrieb.vektor, {0, 0, 0}), "Trockener Auftrieb nicht als null geliefert");
     auto kopie = trocken.beitraege;
     pruefe(bilanz(m, kopie).status == "vollstaendig", "null ist keine Luecke");
@@ -82,14 +82,14 @@ void ids_und_zustaende(const Modell& m)
     pruefe(kopie[0].zustand == Datenzustand::ungueltig && kopie[0].fehler_id == "CORE-BIL-0001",
         "Ungueltiger Wert nicht markiert");
     pruefe(ungueltig.status == "teilsumme" && ungueltig.fehlende_beitraege.size() == 1 &&
-        ungueltig.fehlende_beitraege[0] == "Rumpf:gewicht", "Teilsumme ohne Luecken-ID");
+        ungueltig.fehlende_beitraege[0] == "Hull:gewicht", "Teilsumme ohne Luecken-ID");
     const auto json = zustand_json(m, z, "laufend");
     pruefe(json.find("\"zustand\":\"null\"") == std::string::npos, "Unerwarteter null-Zustand");
     // Forced missing contribution.
     kopie = a.beitraege;
     kopie.erase(kopie.begin() + 1);
     const auto fehlt = bilanz(m, kopie);
-    pruefe(fehlt.status == "teilsumme" && fehlt.fehlende_beitraege == std::vector<std::string>{"Rumpf:auftrieb"},
+    pruefe(fehlt.status == "teilsumme" && fehlt.fehlende_beitraege == std::vector<std::string>{"Hull:auftrieb"},
         "Fehlender Beitrag nicht gemeldet");
     kopie = a.beitraege;
     kopie[1].zustand = Datenzustand::deaktiviert;

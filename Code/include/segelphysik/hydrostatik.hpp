@@ -196,6 +196,16 @@ struct DynamischeFremdkraftKontext {
     double auswertung_zeit_s{};
 };
 
+struct WindKontext;
+
+struct MastReferenz {
+    std::optional<Vektor3> position_modell_m;
+    std::string element_id;
+    std::string quelle;
+    std::string diagnose;
+    std::string modell_fassung;
+};
+
 struct Zustand {
     Pose pose{{}, {0., 0., 0., 1.}};
     Vektor3 geschwindigkeit_welt_m_s{};
@@ -212,6 +222,8 @@ struct Zustand {
     std::optional<BewegungsUebergang> bewegungsuebergang;
     std::shared_ptr<const DynamischeFremdkraftKontext> dynamische_fremdkraft;
     bool dynamische_fremdkraft_erforderlich = false;
+    std::optional<MastReferenz> mast;
+    std::shared_ptr<const WindKontext> wind;
 };
 
 // Returned states own an immutable historical context; no global live flag.

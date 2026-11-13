@@ -562,42 +562,42 @@ void referenzboot(const std::filesystem::path& path)
         throw std::runtime_error("Einfacher Referenzkoerper nicht als Rumpf zugeordnet: " + model.id);
     if (model.id == "optimist") {
         const auto sword = std::find_if(model.elemente.begin(), model.elemente.end(),
-            [](const Element& element) { return element.id == "Schwert"; });
+            [](const Element& element) { return element.id == "Centerboard"; });
         if (sword == model.elemente.end() || !sword->bewegung ||
             sword->bewegung->art != Bewegungsart::heben ||
             sword->bewegung->richtung_modell != Vektor3{0., 0., 1.} ||
             std::abs(sword->bewegung->hubweg_m - .523) > .02)
             throw std::runtime_error("Optimist-Schwert-Hubweg weicht von der Meshreferenz ab");
         const auto rudder = std::find_if(model.elemente.begin(), model.elemente.end(),
-            [](const Element& element) { return element.id == "Ruder"; });
+            [](const Element& element) { return element.id == "Rudder"; });
         if (rudder == model.elemente.end() || !rudder->bewegung ||
             !rudder->bewegung->ruderwinkel ||
             rudder->bewegung->achse_modell != Vektor3{0., 0., 1.} ||
             rudder->bewegung->drehpunkt_modell_m != Vektor3{-1.189895, 0., 0.182972} ||
             rudder->bewegung->mitbewegte_elemente !=
-                std::vector<std::string>{"Pinne", "Pinnenausleger", "Gummigelenk"})
+                std::vector<std::string>{"Tiller", "TillerExtension", "RubberJoint"})
             throw std::runtime_error("Optimist-Ruderbewegung fehlt oder ist unvollstaendig");
     }
     if (model.id == "420") {
         const auto sword = std::find_if(model.elemente.begin(), model.elemente.end(),
-            [](const Element& element) { return element.id == "Schwert"; });
+            [](const Element& element) { return element.id == "Centerboard"; });
         if (sword == model.elemente.end() || !sword->bewegung ||
             sword->bewegung->art != Bewegungsart::drehen ||
             sword->bewegung->achse_modell != Vektor3{0., 1., 0.} ||
             sword->bewegung->drehpunkt_modell_m != Vektor3{-0.359293, 0., 0.56})
             throw std::runtime_error("420er-Drehschwertdefinition fehlt");
         const auto rudder = std::find_if(model.elemente.begin(), model.elemente.end(),
-            [](const Element& element) { return element.id == "Ruder"; });
+            [](const Element& element) { return element.id == "Rudder"; });
         if (rudder == model.elemente.end() || !rudder->bewegung ||
             !rudder->bewegung->ruderwinkel ||
             rudder->bewegung->achse_modell != Vektor3{0., 0., 1.} ||
             rudder->bewegung->drehpunkt_modell_m != Vektor3{-2.279293, 0., 0.410047} ||
-            rudder->bewegung->mitbewegte_elemente != std::vector<std::string>{"Ruderkopf"})
+            rudder->bewegung->mitbewegte_elemente != std::vector<std::string>{"RudderStock"})
             throw std::runtime_error("420er-Ruderbewegung fehlt oder ist unvollstaendig");
     }
     if (model.id == "folkeboot") {
         const auto rudder = std::find_if(model.elemente.begin(), model.elemente.end(),
-            [](const Element& element) { return element.id == "Ruder"; });
+            [](const Element& element) { return element.id == "Rudder"; });
         if (rudder == model.elemente.end() || !rudder->bewegung ||
             !rudder->bewegung->ruderwinkel ||
             rudder->bewegung->achse_modell != Vektor3{0., 0., 1.} ||
@@ -622,7 +622,7 @@ void referenzboot(const std::filesystem::path& path)
     const auto active = hydrodynamik_start(model, start, config());
     const auto forces = kraefte(model, start.pose, nullptr, 1000., 9.81, {},
         active.hydrodynamik.get(), start.geschwindigkeit_welt_m_s);
-    const auto& friction = rumpfbeitrag(forces);
+    const auto& friction = hydrobeitrag(forces, hull->id, "reibung");
     if (friction.zustand != Datenzustand::gueltig ||
         !std::isfinite(friction.vektor[0]) || friction.vektor[0] >= 0.)
         throw std::runtime_error("Referenzmodell-Rumpfreibung ungueltig: " + model.id);
@@ -635,8 +635,8 @@ void referenzboot(const std::filesystem::path& path)
         const auto rudder_force = [&](double angle) {
             const auto pose_forces = kraefte(model, start.pose, nullptr, 1000., 9.81, {},
                 active.hydrodynamik.get(), start.geschwindigkeit_welt_m_s, {},
-                {{"Ruder", angle}, {"Schwert", 100.}});
-            return hydrobeitrag(pose_forces, "Ruder", "seitenkraft");
+                {{"Rudder", angle}, {"Centerboard", 100.}});
+            return hydrobeitrag(pose_forces, "Rudder", "seitenkraft");
         };
         const auto port_rudder = rudder_force(-20.);
         const auto neutral_rudder = rudder_force(0.);

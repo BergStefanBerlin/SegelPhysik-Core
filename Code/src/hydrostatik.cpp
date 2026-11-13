@@ -2679,6 +2679,8 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         mal(midbeschl.linear_welt,dt));
     result.omega_modell_rad_s=plus(s.omega_modell_rad_s,mal(midalpha,dt));
     result.zeit_s=s.zeit_s+dt;result.schritt=s.schritt+1;
+    result.mast=s.mast;
+    result.wind=s.wind;
     result.geflutet=flutung(physisches_modell,result.pose,geflutet);
     result.bewegungsstellungen=std::move(bewegungsstellungen);
     result.letzte_bewegungsereigniskennung=letzte_bewegungskennung;
