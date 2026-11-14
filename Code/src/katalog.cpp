@@ -23,22 +23,17 @@
 namespace segelphysik {
 namespace {
 
-const char* const modelldateiname = "modells_information.json";
 const char* const modelldatenname = "modells_data.json";
 
 std::filesystem::path modell_datei(const std::filesystem::path& ordner)
 {
-    const auto daten = ordner / modelldatenname;
-    std::error_code error;
-    if (std::filesystem::is_regular_file(daten, error)) return daten;
-    return ordner / modelldateiname;
+    return ordner / modelldatenname;
 }
 
 bool modell_datei_vorhanden(const std::filesystem::path& ordner)
 {
     std::error_code error;
-    return std::filesystem::is_regular_file(ordner / modelldatenname, error) ||
-        std::filesystem::is_regular_file(ordner / modelldateiname, error);
+    return std::filesystem::is_regular_file(ordner / modelldatenname, error);
 }
 
 [[noreturn]] void kat_fehler(int nummer, const std::string& text)
@@ -171,53 +166,41 @@ Modellkatalog modellkatalog(const std::filesystem::path& ordner)
         std::vector<KatalogDiagnose> diagnosen;
         const auto modellordner = datei.parent_path();
         std::string bereits_gepruefte_fassung;
-        const bool modellformat03 = detail::ist_modellformat03_datei(datei);
         try {
-            if (modellformat03) {
-                eintrag.schema_valide = false;
-                eintrag.visualisierung_hash_aktuell = false;
-                eintrag.fingerprints_aktuell = false;
-                const auto pruefung =
-                    detail::pruefe_modellformat03(
-                        modellordner, schemaordner_fuer_modellordner(modellordner));
-                bereits_gepruefte_fassung =
-                    detail::modellformat03_fassung(pruefung);
-                eintrag.schema_valide = pruefung.schemas_gueltig;
-                eintrag.fingerprints_aktuell = pruefung.schemas_gueltig &&
-                    pruefung.veraltete_bereiche.empty() &&
-                    pruefung.fehler_bereiche.empty();
-                eintrag.visualisierung_hash_aktuell = pruefung.schemas_gueltig &&
-                    std::find(pruefung.veraltete_bereiche.begin(),
-                        pruefung.veraltete_bereiche.end(), "visualisation") ==
-                        pruefung.veraltete_bereiche.end() &&
-                    std::find(pruefung.fehler_bereiche.begin(),
-                        pruefung.fehler_bereiche.end(), "visualisation") ==
-                        pruefung.fehler_bereiche.end();
-                for (const auto& error : pruefung.fehler)
-                    diagnosen.push_back(diagnose_aus(error, modellordner, "CORE-MOD-0002"));
-                for (const auto& area : pruefung.veraltete_bereiche)
-                    diagnosen.push_back({"CORE-FPR-0001",
-                        "Fingerprint-Bereich veraltet: " + area,
-                        "modells_validation.json:model.fingerprints." + area});
-                for (const auto& area : pruefung.fehler_bereiche)
-                    diagnosen.push_back({"CORE-MOD-0005",
-                        "Fingerprint-Bereich konnte nicht geprueft werden: " + area,
-                        "modells_validation.json:model.fingerprints." + area});
-                if (!pruefung.schemas_gueltig && pruefung.fehler.empty())
-                    diagnosen.push_back({"CORE-MOD-0002",
-                        "Schema- und Ressourcenpruefung fehlgeschlagen",
-                        "modells_data.json"});
-                const auto beschreibung =
-                    lies_beschreibung_modellformat03(datei, pruefung.daten, false);
-                eintrag.modell_id = beschreibung.id;
-                eintrag.name = beschreibung.name;
-                eintrag.beschreibung = beschreibung.beschreibung;
-            } else {
-                const auto beschreibung = lies_beschreibung(datei);
-                eintrag.modell_id = beschreibung.id;
-                eintrag.name = beschreibung.name;
-                eintrag.beschreibung = beschreibung.beschreibung;
-            }
+            eintrag.schema_valide = false;
+            eintrag.visualisierung_hash_aktuell = false;
+            eintrag.fingerprints_aktuell = false;
+            const auto pruefung = detail::pruefe_modellformat03(
+                modellordner, schemaordner_fuer_modellordner(modellordner));
+            bereits_gepruefte_fassung = detail::modellformat03_fassung(pruefung);
+            eintrag.schema_valide = pruefung.schemas_gueltig;
+            eintrag.fingerprints_aktuell = pruefung.schemas_gueltig &&
+                pruefung.veraltete_bereiche.empty() && pruefung.fehler_bereiche.empty();
+            eintrag.visualisierung_hash_aktuell = pruefung.schemas_gueltig &&
+                std::find(pruefung.veraltete_bereiche.begin(),
+                    pruefung.veraltete_bereiche.end(), "visualisation") ==
+                    pruefung.veraltete_bereiche.end() &&
+                std::find(pruefung.fehler_bereiche.begin(),
+                    pruefung.fehler_bereiche.end(), "visualisation") ==
+                    pruefung.fehler_bereiche.end();
+            for (const auto& error : pruefung.fehler)
+                diagnosen.push_back(diagnose_aus(error, modellordner, "CORE-MOD-0002"));
+            for (const auto& area : pruefung.veraltete_bereiche)
+                diagnosen.push_back({"CORE-FPR-0001",
+                    "Fingerprint-Bereich veraltet: " + area,
+                    "modells_validation.json:model.fingerprints." + area});
+            for (const auto& area : pruefung.fehler_bereiche)
+                diagnosen.push_back({"CORE-MOD-0005",
+                    "Fingerprint-Bereich konnte nicht geprueft werden: " + area,
+                    "modells_validation.json:model.fingerprints." + area});
+            if (!pruefung.schemas_gueltig && pruefung.fehler.empty())
+                diagnosen.push_back({"CORE-MOD-0002",
+                    "Schema- und Ressourcenpruefung fehlgeschlagen", "modells_data.json"});
+            const auto beschreibung =
+                lies_beschreibung_modellformat03(datei, pruefung.daten, false);
+            eintrag.modell_id = beschreibung.id;
+            eintrag.name = beschreibung.name;
+            eintrag.beschreibung = beschreibung.beschreibung;
         } catch (const std::exception& e) {
             eintrag.modell_id = ordnername.empty() ? ordner.filename().u8string() : ordnername;
             eintrag.name = eintrag.modell_id;
@@ -226,7 +209,6 @@ Modellkatalog modellkatalog(const std::filesystem::path& ordner)
         try {
             eintrag.modell_fassung = bereits_gepruefte_fassung.empty()
                 ? modell_fassung(datei) : bereits_gepruefte_fassung;
-            if (diagnosen.empty() && !modellformat03) lade_modell(datei);
         } catch (const std::exception& e) {
             diagnosen.push_back(diagnose_aus(e.what(), modellordner, "CORE-MOD-0005"));
         }
@@ -248,6 +230,23 @@ Modellkatalog modellkatalog(const std::filesystem::path& ordner)
     return katalog;
 }
 
+Modellkatalog katalog_nach_segel_speicherung(const Modellkatalog& katalog,
+    const std::string& modell_id, const std::string& alte_fassung,
+    const std::string& neue_fassung)
+{
+    const auto& datei = katalog_datei(katalog, modell_id, neue_fassung);
+    auto result = katalog;
+    for (std::size_t i = 0; i < result.eintraege_.size(); ++i) {
+        auto& entry = result.eintraege_[i];
+        if (result.dateien_[i] != datei) continue;
+        if (entry.modell_fassung != alte_fassung || entry.status != "verwendbar")
+            kat_fehler(4, "Katalogstand passt nicht zur gespeicherten Segellage");
+        entry.modell_fassung = neue_fassung;
+        return result;
+    }
+    kat_fehler(3, "Unbekannte Modell-ID: " + modell_id);
+}
+
 const std::filesystem::path& katalog_datei(const Modellkatalog& katalog,
     const std::string& modell_id, const std::string& erwartete_fassung)
 {
@@ -260,9 +259,19 @@ const std::filesystem::path& katalog_datei(const Modellkatalog& katalog,
         }
     if (treffer == katalog.eintraege_.size()) kat_fehler(3, "Unbekannte Modell-ID: " + modell_id);
     const auto& datei = katalog.dateien_[treffer];
+    if (katalog.eintraege_[treffer].status != "verwendbar") {
+        if (erwartete_fassung != katalog.eintraege_[treffer].modell_fassung)
+            kat_fehler(4, "Modellfassung passt nicht zum Katalogeintrag");
+        return datei;
+    }
     std::string aktuell;
     try {
-        aktuell = modell_fassung(datei);
+        const auto pruefung = detail::pruefe_modellformat03(
+            datei.parent_path(), schemaordner_fuer_modellordner(datei.parent_path()),
+            false, true);
+        if (!pruefung.schemas_gueltig || !pruefung.fehler.empty())
+            kat_fehler(4, "Modell " + modell_id + " ist nicht mehr lesbar; Katalog neu abrufen");
+        aktuell = pruefung.fassung;
     } catch (const std::exception&) {
         kat_fehler(4, "Modell " + modell_id + " ist nicht mehr lesbar; Katalog neu abrufen");
     }
@@ -300,16 +309,12 @@ Darstellungsgeometrie darstellungsgeometrie_aus_dateien(const Modellkatalog& kat
     }
     ModellBeschreibung beschreibung;
     try {
-        if (detail::ist_modellformat03_datei(datei)) {
-            const auto pruefung = detail::pruefe_modellformat03(
-                datei.parent_path(), schemaordner_fuer_modellordner(datei.parent_path()), false);
-            if (!pruefung.schemas_gueltig)
-                throw std::runtime_error(pruefung.fehler.empty()
-                    ? "CORE-MOD-0002: Schema-Pruefung fehlgeschlagen" : pruefung.fehler.front());
-            beschreibung = lies_beschreibung_modellformat03(datei, pruefung.daten, false);
-        } else {
-            beschreibung = lies_beschreibung(datei);
-        }
+        const auto pruefung = detail::pruefe_modellformat03(
+            datei.parent_path(), schemaordner_fuer_modellordner(datei.parent_path()), false);
+        if (!pruefung.schemas_gueltig)
+            throw std::runtime_error(pruefung.fehler.empty()
+                ? "CORE-MOD-0002: Schema-Pruefung fehlgeschlagen" : pruefung.fehler.front());
+        beschreibung = lies_beschreibung_modellformat03(datei, pruefung.daten, false);
     } catch (const std::exception& e) {
         if (element_id) kat_fehler(6, "Unbekannte Element-ID: " + *element_id);
         Darstellungsgeometrie result{modell_id, erwartete_fassung, {}, {}};
@@ -384,16 +389,13 @@ Modellstruktur modellstruktur_aus_dateien(const Modellkatalog& katalog, const st
                               const std::string& erwartete_fassung)
 {
     const auto& datei = katalog_datei(katalog, modell_id, erwartete_fassung);
-    const bool modellformat03 = detail::ist_modellformat03_datei(datei);
     Modellstruktur result;
     result.modell_id = modell_id;
     result.modell_fassung = erwartete_fassung;
     try {
-        const auto beschreibung = modellformat03
-            ? lies_beschreibung_modellformat03(datei,
-                detail::pruefe_modellformat03(datei.parent_path(),
-                    schemaordner_fuer_modellordner(datei.parent_path()), false).daten, false)
-            : lies_beschreibung(datei);
+        const auto beschreibung = lies_beschreibung_modellformat03(datei,
+            detail::pruefe_modellformat03(datei.parent_path(),
+                schemaordner_fuer_modellordner(datei.parent_path()), false).daten, false);
         for (const auto& gruppe : beschreibung.gruppen) {
             StrukturGruppe struktur{gruppe, gruppe, {}};
             const auto bewegung = beschreibung.gruppenbewegungen.find(gruppe);
@@ -413,22 +415,6 @@ Modellstruktur modellstruktur_aus_dateien(const Modellkatalog& katalog, const st
     } catch (const std::exception&) {
         // Unreadable description: structure stays empty, see modelldiagnose.
     }
-    if (modellformat03) return result;
-    const auto* eintrag = katalog.eintrag(modell_id);
-    if (eintrag && eintrag->status == "verwendbar") {
-        try { result.gesamtmasse_kg = lade_modell(datei).masse_kg; }
-        catch (const std::exception&) {}
-    }
-    const auto geometrie = darstellungsgeometrie_aus_dateien(
-        katalog, modell_id, erwartete_fassung, std::nullopt);
-    for (const auto& teil : geometrie.teile)
-        for (const auto& p : teil.punkte_m) {
-            if (!result.huellquader_m) result.huellquader_m = std::array<Vektor3, 2>{p, p};
-            for (std::size_t i = 0; i < 3; ++i) {
-                (*result.huellquader_m)[0][i] = std::min((*result.huellquader_m)[0][i], p[i]);
-                (*result.huellquader_m)[1][i] = std::max((*result.huellquader_m)[1][i], p[i]);
-            }
-        }
     return result;
 }
 
@@ -436,32 +422,14 @@ Darstellungsgeometrie darstellungsgeometrie(const Modellkatalog& katalog,
     const std::string& modell_id, const std::string& erwartete_fassung,
     const std::optional<std::string>& element_id)
 {
-    const auto& datei = katalog_datei(katalog, modell_id, erwartete_fassung);
-    if (detail::ist_modellformat03_datei(datei))
-        return darstellungsgeometrie_aus_dateien(
-            katalog, modell_id, erwartete_fassung, element_id);
-    try {
-        const auto inspection = readModelInspection(katalog, modell_id, erwartete_fassung);
-        return darstellungsgeometrie(*inspection, element_id);
-    } catch (const std::runtime_error& error) {
-        if (std::string(error.what()).rfind("CORE-INSP-0003", 0) != 0) throw;
-        return darstellungsgeometrie_aus_dateien(katalog, modell_id, erwartete_fassung, element_id);
-    }
+    return darstellungsgeometrie_aus_dateien(
+        katalog, modell_id, erwartete_fassung, element_id);
 }
 
 Modellstruktur modellstruktur(const Modellkatalog& katalog, const std::string& modell_id,
                               const std::string& erwartete_fassung)
 {
-    const auto& datei = katalog_datei(katalog, modell_id, erwartete_fassung);
-    if (detail::ist_modellformat03_datei(datei))
-        return modellstruktur_aus_dateien(katalog, modell_id, erwartete_fassung);
-    try {
-        const auto inspection = readModelInspection(katalog, modell_id, erwartete_fassung);
-        return modellstruktur(*inspection);
-    } catch (const std::runtime_error& error) {
-        if (std::string(error.what()).rfind("CORE-INSP-0003", 0) != 0) throw;
-        return modellstruktur_aus_dateien(katalog, modell_id, erwartete_fassung);
-    }
+    return modellstruktur_aus_dateien(katalog, modell_id, erwartete_fassung);
 }
 
 std::string katalog_json(const Modellkatalog& katalog)

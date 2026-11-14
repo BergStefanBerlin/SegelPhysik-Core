@@ -89,7 +89,7 @@ GUI hält; der Core führt keinen globalen Zustand. Je Hauptobjekt:
 | `fehleranzahl` | Anzahl der Diagnosen; Details auf Abruf |
 | `schema_valide` | Schema-, Identitäts- und Ressourcenprüfung bestanden |
 | `visualisierung_hash_aktuell` | Visualisierungsbereich ist geprüft und aktuell |
-| `fingerprints_aktuell` | Alle fünf Fingerprint-Bereiche sind geprüft und aktuell |
+| `fingerprints_aktuell` | Alle derzeit aktiven Fingerprint-Prüfungen sind aktuell; `aerodynamics` ist bis zur Implementierung der Aerodynamik ausgesetzt |
 
 Die Reihenfolge ist stabil (nach Ordnername). Fehlerhafte Modelle erscheinen
 im Katalog als `fehlerhaft` (A-C-00031). Tragen mehrere Modelle dieselbe

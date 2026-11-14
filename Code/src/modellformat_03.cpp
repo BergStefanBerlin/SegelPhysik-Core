@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -30,6 +31,11 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#else
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
 #endif
 
 namespace segelphysik::detail {
@@ -330,7 +336,7 @@ void pruefe_identitaet(const Json& data, const Json& validation,
 }
 
 std::vector<std::string> bereiche{
-    "visualisation", "mass", "hydrostatics", "modelData"};
+    "visualisation", "mass", "hydrostatics", "aerodynamics", "modelData"};
 
 ModellFingerprintBereich parse_bereich(const std::string& name)
 {
@@ -344,23 +350,43 @@ ModellFingerprintBereich parse_bereich(const std::string& name)
 
 class Schreibsperre {
 public:
-    explicit Schreibsperre(const std::filesystem::path& path) : path_(path)
+    explicit Schreibsperre(const std::filesystem::path& path)
     {
-        std::error_code error;
-        if (!std::filesystem::create_directory(path_, error))
+#ifdef _WIN32
+        handle_ = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+            OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (handle_ == INVALID_HANDLE_VALUE)
+#else
+        descriptor_ = ::open(path.c_str(), O_CREAT | O_RDWR, 0600);
+        if (descriptor_ < 0 || ::flock(descriptor_, LOCK_EX | LOCK_NB) != 0) {
+            if (descriptor_ >= 0) ::close(descriptor_);
+            descriptor_ = -1;
+#endif
             throw std::runtime_error("CORE-FPR-0002: Validierungsdatei wird bereits bearbeitet "
                 "oder Schreibsperre nicht verfuegbar");
+#ifndef _WIN32
+        }
+#endif
     }
     ~Schreibsperre()
     {
-        if (active_) {
-            std::error_code ignored;
-            std::filesystem::remove(path_, ignored);
+#ifdef _WIN32
+        if (handle_ != INVALID_HANDLE_VALUE) CloseHandle(handle_);
+#else
+        if (descriptor_ >= 0) {
+            ::flock(descriptor_, LOCK_UN);
+            ::close(descriptor_);
         }
+#endif
     }
+    Schreibsperre(const Schreibsperre&) = delete;
+    Schreibsperre& operator=(const Schreibsperre&) = delete;
 private:
-    std::filesystem::path path_;
-    bool active_ = true;
+#ifdef _WIN32
+    HANDLE handle_ = INVALID_HANDLE_VALUE;
+#else
+    int descriptor_ = -1;
+#endif
 };
 
 std::optional<std::string> umgebung(const char* name)
@@ -441,35 +467,148 @@ std::filesystem::path config_pfad(const Json& config, const char* field,
 
 void atomar_ersetzen(const std::filesystem::path& path, const std::string& contents)
 {
-    const auto temporary = path.parent_path() / ".modells_validation.lock" / "replacement.json";
-    {
-        std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
-        if (!output) throw std::runtime_error("CORE-FPR-0003: Temporaere Validierungsdatei "
-            "kann nicht erstellt werden");
-        output.write(contents.data(), static_cast<std::streamsize>(contents.size()));
-        output.flush();
-        if (!output) {
+    static std::atomic<std::uint64_t> sequence{0};
+#ifdef _WIN32
+    const auto process = static_cast<std::uint64_t>(GetCurrentProcessId());
+#else
+    const auto process = static_cast<std::uint64_t>(::getpid());
+#endif
+    std::filesystem::path temporary;
+    bool created = false;
+    for (int attempt = 0; attempt < 100 && !created; ++attempt) {
+        temporary = path.parent_path() / (path.filename().u8string() + ".tmp." +
+            std::to_string(process) + "." +
+            std::to_string(sequence.fetch_add(1, std::memory_order_relaxed)));
+#ifdef _WIN32
+        HANDLE file = CreateFileW(temporary.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+            FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file == INVALID_HANDLE_VALUE) {
+            if (GetLastError() == ERROR_FILE_EXISTS) continue;
+            throw std::runtime_error("CORE-FPR-0003: Temporaere Datei nicht erstellbar");
+        }
+        created = true;
+        std::size_t offset = 0;
+        bool ok = true;
+        while (offset < contents.size()) {
+            const auto count = static_cast<DWORD>(
+                std::min<std::size_t>(contents.size() - offset, 65536));
+            DWORD written = 0;
+            if (!WriteFile(file, contents.data() + offset, count, &written, nullptr) ||
+                written != count) { ok = false; break; }
+            offset += written;
+        }
+        if (ok) ok = FlushFileBuffers(file) != 0;
+        CloseHandle(file);
+#else
+        const int file = ::open(temporary.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0600);
+        if (file < 0) {
+            if (errno == EEXIST) continue;
+            throw std::runtime_error("CORE-FPR-0003: Temporaere Datei nicht erstellbar");
+        }
+        created = true;
+        std::size_t offset = 0;
+        bool ok = true;
+        while (offset < contents.size()) {
+            const auto written = ::write(file, contents.data() + offset, contents.size() - offset);
+            if (written < 0 && errno == EINTR) continue;
+            if (written <= 0) { ok = false; break; }
+            offset += static_cast<std::size_t>(written);
+        }
+        if (ok) ok = ::fsync(file) == 0;
+        if (::close(file) != 0) ok = false;
+#endif
+        if (!ok) {
             std::error_code ignored;
             std::filesystem::remove(temporary, ignored);
-            throw std::runtime_error("CORE-FPR-0003: Validierungsdatei kann nicht geschrieben werden");
+            throw std::runtime_error("CORE-FPR-0003: Temporaere Datei nicht dauerhaft schreibbar");
         }
     }
+    if (!created) throw std::runtime_error("CORE-FPR-0003: Kein temporaerer Dateiname verfuegbar");
 #ifdef _WIN32
     if (!MoveFileExW(temporary.c_str(), path.c_str(),
-            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
         std::error_code ignored;
         std::filesystem::remove(temporary, ignored);
-        throw std::runtime_error("CORE-FPR-0003: Validierungsdatei kann nicht atomar ersetzt werden");
+        throw std::runtime_error("CORE-FPR-0003: Datei kann nicht atomar ersetzt werden");
     }
 #else
     std::error_code error;
     std::filesystem::rename(temporary, path, error);
     if (error) {
-        std::filesystem::remove(temporary);
-        throw std::runtime_error("CORE-FPR-0003: Validierungsdatei kann nicht atomar ersetzt werden: "
-            + error.message());
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
+        throw std::runtime_error("CORE-FPR-0003: Datei kann nicht atomar ersetzt werden: " + error.message());
     }
+    const int directory = ::open(path.parent_path().c_str(), O_RDONLY);
+    if (directory < 0) throw std::runtime_error("CORE-FPR-0003: Modellordner nicht synchronisierbar");
+    const bool synced = ::fsync(directory) == 0;
+    ::close(directory);
+    if (!synced) throw std::runtime_error("CORE-FPR-0003: Modellordner nicht dauerhaft synchronisiert");
 #endif
+}
+
+std::string modelldaten_fingerprint(const std::string& bytes)
+{
+    Sha256 digest;
+    const std::string name = "modells_data.json";
+    laenge(digest, static_cast<std::uint64_t>(name.size()));
+    digest.update(name);
+    laenge(digest, static_cast<std::uint64_t>(bytes.size()));
+    digest.update(bytes);
+    return digest.finish();
+}
+
+void stelle_transaktion_fertig(const std::filesystem::path& root,
+                              const std::filesystem::path& schemas)
+{
+    const auto path = root / ".modells_placement.journal";
+    if (!std::filesystem::exists(path)) return;
+    const auto journal = json_lesen(path);
+    if (!journal.is_object() || journal.value("kind", std::string{}) != "segel-placement-03" ||
+        (journal.value("version", 0) != 1 && journal.value("version", 0) != 2))
+        throw std::runtime_error("CORE-FPR-0002: Ungueltiges Segeltransaktionsjournal");
+    const auto old_data = journal.at("oldData").get<std::string>();
+    const auto new_data = journal.at("newData").get<std::string>();
+    const auto old_validation = journal.at("oldValidation").get<std::string>();
+    const auto new_validation = journal.at("newValidation").get<std::string>();
+    const auto parsed_data = json_aus_bytes(new_data, "modells_data.json");
+    const auto parsed_validation = json_aus_bytes(new_validation, "modells_validation.json");
+    SchemaPruefer data_schema(json_aus_bytes(journal.at("dataSchema").get<std::string>(),
+                                             "schema_data.json"));
+    SchemaPruefer validation_schema(json_aus_bytes(journal.at("validationSchema").get<std::string>(),
+                                                   "schema_validation.json"));
+    if (!data_schema.pruefe(parsed_data).empty() ||
+        !validation_schema.pruefe(parsed_validation).empty() ||
+        parsed_validation.at("model").at("fingerprints").at("modelData").at("hash") !=
+            modelldaten_fingerprint(new_data))
+        throw std::runtime_error("CORE-FPR-0002: Ungueltiger Zielstand im Transaktionsjournal");
+    pruefe_identitaet(parsed_data, parsed_validation, root);
+    const auto data_path = root / "modells_data.json";
+    const auto validation_path = root / "modells_validation.json";
+    const auto current_data = lesen(data_path);
+    const auto current_validation = lesen(validation_path);
+    if ((current_data != old_data && current_data != new_data) ||
+        (current_validation != old_validation && current_validation != new_validation))
+        throw std::runtime_error("CORE-FPR-0002: Fremde Aenderung verhindert Transaktionswiederanlauf");
+    if (lesen(schemas / "schema_data.json") != journal.at("dataSchema").get<std::string>() ||
+        lesen(schemas / "schema_validation.json") !=
+            journal.at("validationSchema").get<std::string>())
+        throw std::runtime_error("CORE-FPR-0002: Schemadateien seit Transaktionsbeginn geaendert");
+    if (current_data != new_data) {
+        if (lesen(data_path) != old_data || lesen(validation_path) != current_validation)
+            throw std::runtime_error("CORE-FPR-0002: Parallele Aenderung der Modelldateien");
+        atomar_ersetzen(data_path, new_data);
+    }
+    if (current_validation != new_validation) {
+        if (lesen(data_path) != new_data || lesen(validation_path) != old_validation)
+            throw std::runtime_error("CORE-FPR-0002: Parallele Aenderung der Modelldateien");
+        atomar_ersetzen(validation_path, new_validation);
+    }
+    if (lesen(data_path) != new_data || lesen(validation_path) != new_validation)
+        throw std::runtime_error("CORE-FPR-0002: Transaktion durch fremde Aenderung unterbrochen");
+    std::error_code error;
+    if (!std::filesystem::remove(path, error) || error)
+        throw std::runtime_error("CORE-FPR-0003: Transaktionsjournal nicht entfernbar");
 }
 
 } // namespace
@@ -481,7 +620,7 @@ bool ist_modellformat03_datei(const std::filesystem::path& datei)
 
 Modellformat03Pruefung pruefe_modellformat03(
     const std::filesystem::path& modellordner, const std::filesystem::path& schemaordner,
-    bool fingerprints)
+    bool fingerprints, bool gespeicherte_fingerprints)
 {
     Modellformat03Pruefung result;
     const auto data_path = modellordner / "modells_data.json";
@@ -505,6 +644,10 @@ Modellformat03Pruefung pruefe_modellformat03(
         if (model_status_error || !std::filesystem::is_directory(model_status) ||
             std::filesystem::is_symlink(model_status))
             modelfehler("Modellordner", "Regulaerer Modellordner ohne Symlink erforderlich");
+        if (std::filesystem::exists(modellordner / ".modells_placement.journal")) {
+            Schreibsperre lock(modellordner / ".modells_validation.lock");
+            stelle_transaktion_fertig(modellordner, schemaordner);
+        }
         std::error_code legacy_status_error;
         if (std::filesystem::exists(modellordner / "modells_information.json", legacy_status_error))
             modelfehler("modells_information.json",
@@ -531,6 +674,11 @@ Modellformat03Pruefung pruefe_modellformat03(
             for (const auto& name : bereiche) {
                 try {
                     const auto expected = stored[name].value("hash", std::string{});
+                    if (name == "aerodynamics") {
+                        // Pruefung bis zur Implementierung der Aerodynamik ausgesetzt.
+                        result.berechnete_hashes.emplace(name, expected);
+                        continue;
+                    }
                     const auto actual = fingerprint(modellordner, parse_bereich(name));
                     result.berechnete_hashes.emplace(name, actual);
                     if (expected != actual) result.veraltete_bereiche.push_back(name);
@@ -539,6 +687,10 @@ Modellformat03Pruefung pruefe_modellformat03(
                     result.fehler_bereiche.push_back(name);
                 }
             }
+        } else if (gespeicherte_fingerprints && result.schemas_gueltig) {
+            const auto& stored = result.validierung.at("model").at("fingerprints");
+            for (const auto& name : bereiche)
+                result.berechnete_hashes.emplace(name, stored.at(name).at("hash").get<std::string>());
         }
     } catch (const std::exception& exception) {
         const std::string message = exception.what();
@@ -575,6 +727,10 @@ Json normalisiere_modellformat03(const Json& daten, const std::filesystem::path&
             if (!source.is_object() || !source.contains("id") || !source["id"].is_string())
                 modelfehler("groups." + group.key(), "Element-ID fehlt");
             Json element{{"id", source["id"]}};
+            if (source.contains("mountingPoints"))
+                element["mountingPoints"] = source["mountingPoints"];
+            if (source.contains("mounting"))
+                element["mounting"] = source["mounting"];
             element["darstellung_verborgen"] = source.at("display").at("hidden");
             if (source.contains("display") && source["display"].is_object() &&
                 !source["display"].value("hidden", false)) {
@@ -730,6 +886,70 @@ std::string modellformat03_fassung(const Modellformat03Pruefung& pruefung)
     return pruefung.fassung;
 }
 
+std::string speichere_segel_placement03(
+    const std::filesystem::path& root, const std::string& element_id,
+    const nlohmann::json& placement, const std::string& erwartete_fassung)
+{
+    const auto schemas = schemaordner_fuer_modellordner(root);
+    Schreibsperre lock(root / ".modells_validation.lock");
+    stelle_transaktion_fertig(root, schemas);
+    const auto check = pruefe_modellformat03(root, schemas, false, true);
+    if (!check.schemas_gueltig || !check.fehler.empty() ||
+        !check.veraltete_bereiche.empty() || !check.fehler_bereiche.empty())
+        throw std::runtime_error("CORE-FPR-0002: Modell oder Fingerprints fuer Speicherung ungueltig");
+    if (check.fassung != erwartete_fassung)
+        throw std::runtime_error("CORE-FPR-0002: Modellfassung seit Vorschau geaendert");
+    auto updated = check.daten;
+    Json* found = nullptr;
+    for (auto& group : updated.at("groups"))
+        for (auto& element : group.at("elements"))
+            if (element.value("id", std::string{}) == element_id) {
+                if (found) throw std::runtime_error("CORE-FPR-0002: Segel-ID nicht eindeutig");
+                found = &element;
+            }
+    if (!found || (element_id != "Mainsail" && element_id != "Jib"))
+        throw std::runtime_error("CORE-FPR-0002: Segel-ID nicht vorhanden");
+    (*found)["placement"] = placement;
+    const auto data_schema_bytes = lesen(schemas / "schema_data.json");
+    const auto validation_schema_bytes = lesen(schemas / "schema_validation.json");
+    SchemaPruefer data_schema(json_aus_bytes(data_schema_bytes, "schema_data.json"));
+    const auto errors = data_schema.pruefe(updated);
+    if (!errors.empty())
+        throw std::runtime_error("CORE-MOD-0002: Segellage verletzt Modellformat: " + errors.front());
+    const auto old_data = lesen(root / "modells_data.json");
+    const auto old_validation = lesen(root / "modells_validation.json");
+    if (json_aus_bytes(old_data, "modells_data.json") != check.daten ||
+        json_aus_bytes(old_validation, "modells_validation.json") != check.validierung)
+        throw std::runtime_error("CORE-FPR-0002: Modell waehrend Speicherung geaendert");
+    const auto new_data = updated.dump(2) + "\n";
+    auto validation = check.validierung;
+    auto& fingerprint_data = validation["model"]["fingerprints"]["modelData"];
+    const auto hash = modelldaten_fingerprint(new_data);
+    if (fingerprint_data.at("hash") != hash) {
+        fingerprint_data["hash"] = hash;
+        fingerprint_data["modifiedAt"] = modified_at();
+    }
+    SchemaPruefer validation_schema(json_aus_bytes(validation_schema_bytes, "schema_validation.json"));
+    const auto validation_errors = validation_schema.pruefe(validation);
+    if (!validation_errors.empty())
+        throw std::runtime_error("CORE-MOD-0002: Validierungsdatei ungueltig: " +
+                                 validation_errors.front());
+    const Json journal = {{"kind", "segel-placement-03"}, {"version", 2},
+        {"oldData", old_data}, {"newData", new_data},
+        {"oldValidation", old_validation}, {"newValidation", validation.dump(2) + "\n"},
+        {"dataSchema", data_schema_bytes}, {"validationSchema", validation_schema_bytes}};
+    if (lesen(root / "modells_data.json") != old_data ||
+        lesen(root / "modells_validation.json") != old_validation)
+        throw std::runtime_error("CORE-FPR-0002: Modell vor Transaktionsbeginn geaendert");
+    atomar_ersetzen(root / ".modells_placement.journal", journal.dump(2) + "\n");
+    stelle_transaktion_fertig(root, schemas);
+    const auto result = pruefe_modellformat03(root, schemas, false, true);
+    if (!result.schemas_gueltig || !result.fehler.empty() ||
+        !result.veraltete_bereiche.empty() || !result.fehler_bereiche.empty())
+        throw std::runtime_error("CORE-FPR-0002: Gespeicherter Modellstand ist nicht gueltig");
+    return result.fassung;
+}
+
 } // namespace segelphysik::detail
 
 namespace segelphysik {
@@ -788,6 +1008,7 @@ ModellFingerprintErgebnis aktualisiere_modell_fingerprints(
     }
     const auto schemaordner = schemaordner_fuer_modellordner(modellordner);
     detail::Schreibsperre lock(modellordner / ".modells_validation.lock");
+    detail::stelle_transaktion_fertig(modellordner, schemaordner);
     const auto original = detail::lesen(modellordner / "modells_validation.json");
     const auto original_data = detail::lesen(modellordner / "modells_data.json");
     const auto original_data_schema = detail::lesen(schemaordner / "schema_data.json");
@@ -820,9 +1041,6 @@ ModellFingerprintErgebnis aktualisiere_modell_fingerprints(
     if (!output_errors.empty())
         throw std::runtime_error("CORE-MOD-0002 [modells_validation.json]: "
             + output_errors.front());
-    for (const auto& value : result.werte)
-        if (detail::fingerprint(modellordner, value.bereich) != value.hash)
-            throw std::runtime_error("CORE-FPR-0002: Parallele Aenderung der Ressourcen erkannt");
     if (detail::lesen(modellordner / "modells_validation.json") != original ||
         detail::lesen(modellordner / "modells_data.json") != original_data ||
         detail::lesen(schemaordner / "schema_data.json") != original_data_schema ||

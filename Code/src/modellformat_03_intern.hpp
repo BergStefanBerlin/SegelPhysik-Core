@@ -23,7 +23,8 @@ struct Modellformat03Pruefung {
 Modellformat03Pruefung pruefe_modellformat03(
     const std::filesystem::path& modellordner,
     const std::filesystem::path& schemaordner,
-    bool fingerprints = true);
+    bool fingerprints = true,
+    bool gespeicherte_fingerprints = false);
 
 nlohmann::json normalisiere_modellformat03(
     const nlohmann::json& daten,
@@ -32,5 +33,9 @@ nlohmann::json normalisiere_modellformat03(
 std::string modellformat03_fassung(const Modellformat03Pruefung& pruefung);
 
 bool ist_modellformat03_datei(const std::filesystem::path& datei);
+
+std::string speichere_segel_placement03(
+    const std::filesystem::path& modellordner, const std::string& element_id,
+    const nlohmann::json& placement, const std::string& erwartete_fassung);
 
 }

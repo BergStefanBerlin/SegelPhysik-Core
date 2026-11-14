@@ -79,10 +79,7 @@ endif()
 
 add_executable(segelphysik_cli src/cli.cpp)
 target_link_libraries(segelphysik_cli PRIVATE segelphysik_core)
-add_executable(segelphysik_konvertieren src/konvertieren.cpp)
-target_link_libraries(segelphysik_konvertieren PRIVATE segelphysik_core)
-
-set(core_targets segelphysik_core segelphysik_cli segelphysik_konvertieren)
+set(core_targets segelphysik_core segelphysik_cli)
 if(BUILD_TESTING)
     set(SEGELPHYSIK_MODELFORMAT03_TEST_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../Modelle"
         CACHE PATH "Active model format 0.3 test data root")
@@ -195,6 +192,12 @@ if(BUILD_TESTING)
         "${SEGELPHYSIK_MODELFORMAT03_TEST_ROOT}")
     add_test(NAME modellformat_03_schemabestand COMMAND modellformat_03_tests
         --source-schemas "${SEGELPHYSIK_MODELFORMAT03_TEST_ROOT}")
+    add_test(NAME modellformat_03_montage_schema COMMAND modellformat_03_tests
+        --mounting-schema "${SEGELPHYSIK_MODELFORMAT03_TEST_ROOT}")
+    add_test(NAME modellformat_03_montage_vorschau COMMAND modellformat_03_tests
+        --mounting-preview "${SEGELPHYSIK_MODELFORMAT03_TEST_ROOT}")
+    add_test(NAME modellformat_03_montage_speicherung COMMAND modellformat_03_tests
+        --mounting-save "${SEGELPHYSIK_MODELFORMAT03_TEST_ROOT}")
     add_test(NAME modellformat_03_fehlermatrix COMMAND modellformat_03_tests
         --schema-error-matrix "${SEGELPHYSIK_MODELFORMAT03_TEST_ROOT}")
     add_test(NAME modellformat_03_source_integration COMMAND modellformat_03_tests
@@ -207,24 +210,15 @@ if(BUILD_TESTING)
     list(APPEND core_targets inspektion_tests)
     add_test(NAME modellinspektion_c08 COMMAND inspektion_tests
         "${SEGELPHYSIK_MODELLE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}")
-    add_executable(modell_v2_tests tests/modell_v2_tests.cpp)
-    target_link_libraries(modell_v2_tests PRIVATE segelphysik_core)
-    list(APPEND core_targets modell_v2_tests)
-    add_test(NAME modell_geometrie_v2 COMMAND modell_v2_tests
-        "${SEGELPHYSIK_MODELLE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}")
-    add_executable(segelkonfigurator_tests tests/segelkonfigurator_tests.cpp)
-    target_link_libraries(segelkonfigurator_tests PRIVATE segelphysik_core)
-    list(APPEND core_targets segelkonfigurator_tests)
-    add_test(NAME segelkonfiguration_contract COMMAND segelkonfigurator_tests
-        "${SEGELPHYSIK_MODELLE_DIR}/420/modells_information.json")
     set_tests_properties(modell_import modellkatalog_schnittstelle
-        modellinspektion_c08 modell_geometrie_v2 segelkonfiguration_contract
+        modellinspektion_c08
         PROPERTIES LABELS "legacy-compatibility")
     set_tests_properties(modellformat_03_fingerprints modellformat_03_schemabestand
+        modellformat_03_montage_schema
+        modellformat_03_montage_vorschau
+        modellformat_03_montage_speicherung
         modellformat_03_fehlermatrix modellformat_03_source_integration
         PROPERTIES LABELS "model-format-0.3")
-    add_test(NAME segel_mittschiffs_basis COMMAND segelkonfigurator_tests
-        --zero-base-contract "${SEGELPHYSIK_MODELLE_DIR}")
     add_executable(montage_tests tests/montage_tests.cpp)
     target_link_libraries(montage_tests PRIVATE segelphysik_core)
     list(APPEND core_targets montage_tests)

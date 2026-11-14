@@ -1,5 +1,14 @@
 # Core-Spezifikation: persistente starre Segel-Einbaulage
 
+**Aktueller Modellvertrag 0.3:** Die nachfolgenden historischen C-0.12-
+Datei- und OBJ-Indexangaben gelten nicht mehr als aktuelle Schnittstelle.
+Der Core verwendet `modells_data.json`, die Element-IDs `Mainsail` und
+`Jib`, lokale `mountingPoints` und benannte `mounting`-Referenzen. Details
+zu Kardinalitaet, Placement, Diagnose und Wiederanlauf stehen im
+[aktuellen Core-GUI-Vertrag](../Dokumentationen/Schnittstelle_Core_GUI.md#segel-einbaulage-im-modellformat-03)
+und im Schema des Modelle-Repositories. Bestehende Anforderungskennungen
+und die historische Herkunft bleiben unten nachvollziehbar.
+
 **Status:** FINAL fachlich spezifiziert auf Nutzerauftrag vom 06.11.2026.
 **Arbeitszielversion:** C-0.12. Core-Implementierung und Debug-/Release-
 Feature-Nachweise sind vorhanden; sechs native Bestandsfehler wurden auf

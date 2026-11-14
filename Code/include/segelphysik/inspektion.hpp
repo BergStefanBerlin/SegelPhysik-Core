@@ -155,6 +155,7 @@ private:
     friend std::shared_ptr<const ModelInspection> readModelInspection(
         const Modellkatalog&, const std::string&, const std::string&);
     friend Modellstruktur modellstruktur(const ModelInspection&);
+    friend Modell modellAusInspektion(const ModelInspection&);
     friend Darstellungsgeometrie darstellungsgeometrie(
         const ModelInspection&, const std::optional<std::string>&);
     friend std::vector<InspectionType> getAvailableObjectTreeTypes(const ModelInspection&);
@@ -185,6 +186,7 @@ private:
 std::shared_ptr<const ModelInspection> readModelInspection(
     const Modellkatalog& katalog, const std::string& model_id,
     const std::string& expected_model_version);
+Modell modellAusInspektion(const ModelInspection& inspection);
 std::vector<InspectionType> getAvailableObjectTreeTypes(const ModelInspection& inspection);
 std::vector<InspectionNode> getObjectTree(
     const ModelInspection& inspection, const std::string& tree_type);

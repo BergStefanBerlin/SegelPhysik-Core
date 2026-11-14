@@ -200,22 +200,7 @@ struct ModellBeschreibung {
 };
 ModellBeschreibung lies_beschreibung(const std::filesystem::path& datei);
 
-// Hashes canonical nlohmann JSON without top-level konfiguration and settings
-// on gruppen.*.elemente[] with string IDs, then sorted unique datei,
-// quelle_datei and lookup_datei references with their bytes. Missing files
-// have an explicit marker; read
-// failures throw. For an importable model it equals lade_modell(datei).fassung.
+// Returns the validated model-format 0.3 revision.
 std::string modell_fassung(const std::filesystem::path& datei);
-
-// Creates a new directory containing modells_information.json and boot.obj. Never overwrites
-// an existing destination; originals are read only. Uses the regular importer.
-// Schema-3 derivations become explicit source meshes in schema 2.
-void konvertiere_modell_v2(const std::filesystem::path& quelle,
-                          const std::filesystem::path& zielordner);
-// Explicit opt-in permits validated source-derived surface selections/plane
-// cuts. The default still rejects competing geometry without selecting it.
-void konvertiere_modell_v3(const std::filesystem::path& quelle,
-                          const std::filesystem::path& zielordner,
-                          bool ableitungen_zulassen = false);
 
 }

@@ -107,10 +107,10 @@ std::string safe_text(const std::string& value)
 
 std::string logical_location(std::string value)
 {
-    const auto model_file = value.find("modells_information.json");
+    const auto model_file = value.find("modells_data.json");
     const bool model_diagnostic = model_file != std::string::npos;
     if (model_file != std::string::npos) {
-        value.erase(0, model_file + std::string("modells_information.json").size());
+        value.erase(0, model_file + std::string("modells_data.json").size());
         while (!value.empty() && (value.front() == ',' || value.front() == ':' ||
                value.front() == ' ' || value.front() == '\\' || value.front() == '/'))
             value.erase(value.begin());
@@ -732,6 +732,13 @@ ModelInspection::ModelInspection(std::unique_ptr<Impl> impl) : impl_(std::move(i
 ModelInspection::~ModelInspection() = default;
 const InspectionInfo& ModelInspection::info() const { return impl_->info; }
 
+Modell modellAusInspektion(const ModelInspection& inspection)
+{
+    if (inspection.impl_->info.status != "verwendbar" || !inspection.impl_->model)
+        inspection_error("CORE-INSP-0004", "Modellinspektion ist nicht zur Simulation freigegeben");
+    return *inspection.impl_->model;
+}
+
 std::shared_ptr<const ModelInspection> readModelInspection(
     const Modellkatalog& katalog, const std::string& model_id,
     const std::string& expected_model_version)
@@ -753,22 +760,16 @@ std::shared_ptr<const ModelInspection> readModelInspection(
 
     ModellInspektionsImport imported;
     try {
-        imported = lade_inspektionsimport(model_file);
+        imported = lade_inspektionsimport(model_file, expected_model_version,
+            catalogue_entry && catalogue_entry->fingerprints_aktuell);
     } catch (const std::exception& error) {
         throw std::runtime_error("CORE-INSP-0003: " +
             without_paths(error.what(), model_folder));
     }
     impl->description = std::move(imported.beschreibung);
     const Json& mounting_document = imported.modelldokument;
-    std::vector<std::pair<std::filesystem::path, std::string>> display_versions;
-    for (const auto& entry : impl->description.elemente)
-        if (entry.darstellung)
-            display_versions.emplace_back(*entry.darstellung, path_fingerprint(*entry.darstellung));
     impl->display = darstellungsgeometrie_aus_beschreibung(
         model_id, expected_model_version, model_file, impl->description, std::nullopt);
-    for (const auto& [path, before] : display_versions)
-        if (path_fingerprint(path) != before)
-            inspection_error("CORE-INSP-0003", "Darstellungsdatei waehrend Einlesen geaendert");
     impl->model = std::move(imported.modell);
     if (!imported.import_fehler.empty()) {
         impl->info.status = "nur_ansicht";

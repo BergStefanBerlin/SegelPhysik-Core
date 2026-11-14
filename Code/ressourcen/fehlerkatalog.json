@@ -289,6 +289,14 @@
       "fail_kriterium": "Legacy-Referenz fehlt oder ist entartet; die Umrechnung darf dann nicht ausgefuehrt werden.",
       "handlungsanweisung": "Read-only Umrechnung pruefen; erst nach ausdruecklicher Aktion aktuelle Quellenbindung bestaetigen. Physische Quellen unveraendert lassen.",
       "pruefstatus": "implementiert"
+    },
+    {
+      "id": "CORE-SEG-0033",
+      "kurztext": "Segelmontagehilfe fehlt oder ist ungueltig.",
+      "pass_kriterium": "Alle fuer die Segelart benoetigten Montagepunkte sind eindeutig und ihre Richtungen nicht entartet.",
+      "fail_kriterium": "Ein Montageelement oder -punkt fehlt, ist mehrdeutig oder die Montageachsen sind entartet.",
+      "handlungsanweisung": "Segel manuell platzieren oder gueltige Montagepunkte im Modell definieren.",
+      "pruefstatus": "implementiert"
     }
   ]
 }

@@ -588,8 +588,8 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
     out<<'}';return out.str();
 }
 
-Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::path& ausgabe,
-    const Laufoptionen& o)
+static Laufbericht simulieren_impl(const std::filesystem::path& path,
+    const std::filesystem::path& ausgabe, const Laufoptionen& o, const Modell* modell)
 {
     const auto start=std::chrono::steady_clock::now();
     testmessungen_zuruecksetzen();
@@ -605,7 +605,7 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
             throw std::invalid_argument("CORE-SIM-0001: Ausgabedatei darf nicht Modelldatei sein.");
         if (std::filesystem::exists(ausgabe))
             throw std::invalid_argument("CORE-SIM-0001: Ausgabedatei existiert bereits; kein Ueberschreiben.");
-        Modellaufbereitung aufbereitung(lade_modell(path));
+        Modellaufbereitung aufbereitung(modell ? *modell : lade_modell(path));
         detail::Aufbereitungsbereich bereich(aufbereitung);
         const auto& m=aufbereitung.modell();
         Zustand s=o.start;
@@ -751,5 +751,17 @@ Laufbericht simulieren(const std::filesystem::path& path,const std::filesystem::
     result.gesamtlaufzeit_s=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
     result.messungen=testmessungen();
     return result;
+}
+
+Laufbericht simulieren(const std::filesystem::path& path,
+    const std::filesystem::path& ausgabe, const Laufoptionen& optionen)
+{
+    return simulieren_impl(path, ausgabe, optionen, nullptr);
+}
+
+Laufbericht simulieren(const Modell& modell, const std::filesystem::path& path,
+    const std::filesystem::path& ausgabe, const Laufoptionen& optionen)
+{
+    return simulieren_impl(path, ausgabe, optionen, &modell);
 }
 }

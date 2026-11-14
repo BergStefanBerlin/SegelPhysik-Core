@@ -43,6 +43,8 @@ public:
 
 private:
     friend Modellkatalog modellkatalog(const std::filesystem::path& ordner);
+    friend Modellkatalog katalog_nach_segel_speicherung(const Modellkatalog&,
+        const std::string&, const std::string&, const std::string&);
     friend const std::filesystem::path& katalog_datei(const Modellkatalog&, const std::string&,
                                                       const std::string&);
     friend std::vector<KatalogDiagnose> modelldiagnose(const Modellkatalog&, const std::string&,
@@ -52,12 +54,16 @@ private:
     std::vector<std::vector<KatalogDiagnose>> diagnosen_;
 };
 
-// Searches ordner/modells_information.json and ordner/*/modells_information.json, sorted by folder name.
+// Searches ordner/modells_data.json and ordner/*/modells_data.json, sorted by folder name.
 // CORE-KAT-0001 if the folder is not readable.
 Modellkatalog modellkatalog(const std::filesystem::path& ordner);
 
-// Resolves a catalogue entry and checks the expected model version against
-// the current files (CORE-KAT-0003 unknown ID, CORE-KAT-0004 outdated version).
+// Carries a successfully saved sail placement into an already checked catalogue.
+Modellkatalog katalog_nach_segel_speicherung(const Modellkatalog& katalog,
+    const std::string& modell_id, const std::string& alte_fassung,
+    const std::string& neue_fassung);
+
+// Resolves the model and checks its JSON version without rescanning resource folders.
 const std::filesystem::path& katalog_datei(const Modellkatalog& katalog,
     const std::string& modell_id, const std::string& erwartete_fassung);
 

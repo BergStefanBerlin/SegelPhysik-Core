@@ -3,6 +3,7 @@
 #include "segelphysik/katalog.hpp"
 #include "segelphysik/inspektion.hpp"
 #include "segelphysik/core.hpp"
+#include "segelphysik/segelkonfigurator.hpp"
 #include "../src/modell_intern.hpp"
 #include "../src/modellformat_03_intern.hpp"
 
@@ -19,6 +20,15 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#else
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+#endif
 
 namespace {
 
@@ -486,6 +496,386 @@ void pruefe_ungueltige_modelle(const std::filesystem::path& model,
     schreiben(validation_path, validation);
 }
 
+void pruefe_montage_schema(const std::filesystem::path& source_root)
+{
+    using nlohmann::json;
+    const auto root = std::filesystem::temp_directory_path() /
+        ("segelphysik-montage-schema-" +
+            std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Bereinigung {
+        std::filesystem::path path;
+        ~Bereinigung() { std::error_code error; std::filesystem::remove_all(path, error); }
+    } cleanup{root};
+    std::filesystem::create_directories(root);
+    std::filesystem::copy(source_root / "bleistift", root / "bleistift",
+        std::filesystem::copy_options::recursive);
+    const auto path = root / "bleistift" / "modells_data.json";
+    auto data = json::parse(lesen(path));
+    auto& element = data["groups"]["body"]["elements"][0];
+    element["mountingPoints"] = {{"tack", {0., 0., 0.}}, {"upper", {0., 0., 1.}}};
+    element["mounting"] = {
+        {"tack", {{"element", "Mast"}, {"point", "tack"}}},
+        {"luffUpper", {{"element", "Mast"}, {"point", "upper"}}},
+        {"boomStart", {{"element", "Boom"}, {"point", "start"}}},
+        {"boomEnd", {{"element", "Boom"}, {"point", "end"}}}
+    };
+    const auto check = [&](const json& value, bool expected, const char* text) {
+        schreiben(path, value.dump());
+        const auto result =
+            segelphysik::detail::pruefe_modellformat03(root / "bleistift", source_root, false);
+        pruefung(result.schemas_gueltig == expected, text);
+    };
+    check(data, true, "Gueltige Montagebeschreibung abgelehnt");
+    const auto normalisiert =
+        segelphysik::detail::normalisiere_modellformat03(data, root / "bleistift");
+    const auto& normalisiertes_element = normalisiert.at("gruppen").at("body")
+        .at("elemente").at(0);
+    pruefung(normalisiertes_element.at("mountingPoints") == element.at("mountingPoints") &&
+        normalisiertes_element.at("mounting") == element.at("mounting"),
+        "Montagebeschreibung beim 0.3-Import verloren");
+    auto invalid = data;
+    invalid["groups"]["body"]["elements"][0]["mounting"].erase("boomStart");
+    invalid["groups"]["body"]["elements"][0]["mounting"].erase("boomEnd");
+    check(invalid, true, "Montage ohne Baumreferenz abgelehnt");
+    invalid = data;
+    invalid["groups"]["body"]["elements"][0]["mounting"].erase("tack");
+    check(invalid, false, "Montage ohne Halsreferenz akzeptiert");
+    invalid = data;
+    invalid["groups"]["body"]["elements"][0]["mountingPoints"]["tack"] = {0., 0.};
+    check(invalid, false, "Montagepunkt ohne drei Koordinaten akzeptiert");
+    invalid = data;
+    invalid["groups"]["body"]["elements"][0]["mountingPoints"] = json::object();
+    check(invalid, false, "Leere Montagepunktliste akzeptiert");
+    invalid = data;
+    invalid["groups"]["body"]["elements"][0]["mountingPoints"]["_bad"] = {0., 0., 0.};
+    check(invalid, false, "Ungueltiger Montagepunktname akzeptiert");
+    invalid = data;
+    invalid["groups"]["body"]["elements"][0]["mounting"].erase("boomEnd");
+    check(invalid, false, "Unvollstaendige Baumreferenz akzeptiert");
+    invalid = data;
+    invalid["groups"]["body"]["elements"][0]["mounting"]["tack"]["extra"] = true;
+    check(invalid, false, "Unbekanntes Referenzfeld akzeptiert");
+    check(data, true, "Gueltiges Testmodell nach Schema-Tests nicht wiederhergestellt");
+    const auto legacy = root / "legacyOnly";
+    std::filesystem::create_directories(legacy);
+    const auto legacy_file = legacy / "modells_information.json";
+    schreiben(legacy_file, R"({"schema_version":"0.2"})");
+    muss_fehlschlagen([&] { (void)segelphysik::lade_modell(legacy_file); });
+    muss_fehlschlagen([&] { (void)segelphysik::lies_beschreibung(legacy_file); });
+    muss_fehlschlagen([&] { (void)segelphysik::modell_fassung(legacy_file); });
+    muss_fehlschlagen([&] { (void)segelphysik::lade_inspektionsimport(legacy_file, "", false); });
+    Umgebung schema_root("SEGELPHYSIK_TEST_SCHEMA_ROOT");
+    schema_root.setzen(source_root.u8string());
+    const auto katalog = segelphysik::modellkatalog(root);
+    pruefung(katalog.eintrag("legacyOnly") == nullptr,
+        "0.2-Datei wurde als Modellkandidat akzeptiert");
+    pruefung(katalog.eintrag("bleistift") != nullptr,
+        "0.3-Datei fehlt im Modellkatalog");
+}
+
+void pruefe_montage_vorschau(const std::filesystem::path& source_root)
+{
+    using nlohmann::json;
+    const auto root = std::filesystem::temp_directory_path() /
+        ("segelphysik-montage-vorschau-" +
+            std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Bereinigung {
+        std::filesystem::path path;
+        ~Bereinigung() { std::error_code error; std::filesystem::remove_all(path, error); }
+    } cleanup{root};
+    const auto source = source_root / "420";
+    const auto target = root / "420";
+    std::filesystem::create_directories(target / "modells");
+    for (const auto& file : {"modells_data.json", "modells_validation.json"})
+        std::filesystem::copy_file(source / file, target / file);
+    for (const auto& folder : {"visualisation", "mass", "hydrostatics"})
+        std::filesystem::copy(source / "modells" / folder, target / "modells" / folder,
+            std::filesystem::copy_options::recursive);
+    Umgebung schema_root("SEGELPHYSIK_TEST_SCHEMA_ROOT");
+    schema_root.setzen(source_root.u8string());
+    const auto data_path = target / "modells_data.json";
+    auto data = json::parse(lesen(data_path));
+    auto original_data = data;
+    for (auto& group : original_data["groups"])
+        for (auto& element : group["elements"])
+            if (element.contains("physics")) {
+                element["physics"].erase("aerodynamic");
+                if (element["physics"].empty()) element.erase("physics");
+            }
+    auto& rig = data["groups"]["rig"]["elements"];
+    rig[0]["mountingPoints"] = {{"sailTack", {0.85, 0., 1.35}},
+                                {"mastUpper", {0.85, 0., 6.}}};
+    rig[1]["mountingPoints"] = {{"lowerEnd", {2., 0., 0.6}},
+                                {"upperEnd", {1., 0., 4.}}};
+    auto& main = data["groups"]["mainsail"]["elements"];
+    main[0]["mountingPoints"] = {{"tack", {0., 0., 0.}}, {"clew", {-2.3, 0., 0.}},
+                                 {"luffUpper", {0., 0., 4.8856934}},
+                                 {"leechUpper", {-0.115, 0., 4.8856934}}};
+    main[0].erase("physics");
+    main[1]["mountingPoints"] = {{"mastEnd", {0.8, 0., 1.35}},
+                                 {"outerEnd", {-1.5, 0., 1.35}}};
+    main[0]["mounting"] = {
+        {"tack", {{"element", "Mast"}, {"point", "sailTack"}}},
+        {"luffUpper", {{"element", "Mast"}, {"point", "mastUpper"}}},
+        {"boomStart", {{"element", "Boom"}, {"point", "mastEnd"}}},
+        {"boomEnd", {{"element", "Boom"}, {"point", "outerEnd"}}}
+    };
+    auto& jib = data["groups"]["jib"]["elements"][0];
+    jib["mountingPoints"] = {{"tack", {0., 0., 0.}},
+                             {"clew", {-1.592919562, 0., 0.724642857}},
+                             {"luffUpper", {0., 0., 3.5}}};
+    jib.erase("physics");
+    jib["mounting"] = {
+        {"tack", {{"element", "Forestay"}, {"point", "lowerEnd"}}},
+        {"luffUpper", {{"element", "Forestay"}, {"point", "upperEnd"}}}
+    };
+    const auto schema_check = [&](const json& value, bool expected, const char* message) {
+        schreiben(data_path, value.dump());
+        pruefung(segelphysik::detail::pruefe_modellformat03(target, source_root, false)
+            .schemas_gueltig == expected, message);
+    };
+    schema_check(data, true, "Gueltige Segelpunkte abgelehnt");
+    auto invalid = data;
+    invalid["groups"]["mainsail"]["elements"][0]["mountingPoints"].erase("clew");
+    schema_check(invalid, false, "Segel ohne Schothornpunkt akzeptiert");
+    invalid = data;
+    invalid["groups"]["mainsail"]["elements"][0]["mounting"].erase("boomStart");
+    invalid["groups"]["mainsail"]["elements"][0]["mounting"].erase("boomEnd");
+    schema_check(invalid, false, "Grosssegel-Montage ohne Baumreferenzen akzeptiert");
+    invalid = data;
+    invalid["groups"]["jib"]["elements"][0]["mounting"]["boomStart"] =
+        {{"element", "Boom"}, {"point", "mastEnd"}};
+    invalid["groups"]["jib"]["elements"][0]["mounting"]["boomEnd"] =
+        {{"element", "Boom"}, {"point", "outerEnd"}};
+    schema_check(invalid, false, "Baumreferenzen bei Fock akzeptiert");
+    const auto snapshot = [&]() {
+        schreiben(data_path, data.dump());
+        segelphysik::aktualisiere_modell_fingerprints(target,
+            {segelphysik::ModellFingerprintBereich::modelData,
+             segelphysik::ModellFingerprintBereich::aerodynamics});
+        (void)segelphysik::lade_modell(data_path);
+        const auto catalog = segelphysik::modellkatalog(root);
+        const auto* entry = catalog.eintrag("420");
+        pruefung(entry && entry->schema_valide, "Montage-Testmodell ungueltig");
+        const auto inspection =
+            segelphysik::readModelInspection(catalog, "420", entry->modell_fassung);
+        return segelphysik::leseSegelKonfiguration(catalog, *inspection);
+    };
+    auto config = snapshot();
+    pruefung(config.status != segelphysik::SegelKonfigurationsStatus::Fehler,
+        "Segelkonfiguration mit Montagehilfe nicht lesbar");
+    for (const auto& id : {"Mainsail", "Jib"}) {
+        segelphysik::SegelAktionAnforderung request{};
+        request.element_id = id;
+        request.aktion = segelphysik::SegelAktion::Automatisch;
+        const auto result = segelphysik::pruefeSegelAktion(config, request);
+        pruefung(result.status == segelphysik::SegelErgebnisStatus::Vorschau && result.lage,
+            std::string(id) + ": automatische Montage fehlgeschlagen");
+        const auto target_x = std::string(id) == "Mainsail" ? 0.85 : 2.;
+        pruefung(std::abs(result.lage->translation_m[0] - target_x) < 1e-8,
+            std::string(id) + ": Hals nicht am Montagepunkt");
+        if (std::string(id) == "Mainsail")
+            pruefung(std::abs(result.lage->rotation_xyzw[2]) > 1e-3,
+                "Baumrichtung wurde faelschlich auf Mittschiffs zurueckgesetzt");
+    }
+    data["groups"]["jib"]["elements"][0]["mounting"]["tack"]["element"] = "Fehlt";
+    config = snapshot();
+    pruefung(config.status != segelphysik::SegelKonfigurationsStatus::Fehler,
+        "Fehlender Montagebezug blockiert die manuelle Konfiguration");
+    segelphysik::SegelAktionAnforderung request{};
+    request.element_id = "Jib";
+    request.aktion = segelphysik::SegelAktion::Automatisch;
+    const auto automatic = segelphysik::pruefeSegelAktion(config, request);
+    pruefung(automatic.status == segelphysik::SegelErgebnisStatus::Fehler &&
+        !automatic.diagnosen.empty() && automatic.diagnosen.front().code == "CORE-SEG-0033",
+        "Fehlender Montagebezug wird nicht diagnostiziert");
+    request.aktion = segelphysik::SegelAktion::Translation;
+    request.translation_m = {0.1, 0., 0.};
+    pruefung(segelphysik::pruefeSegelAktion(config, request).status ==
+        segelphysik::SegelErgebnisStatus::Vorschau,
+        "Manuelle Platzierung trotz fehlendem Montagebezug nicht moeglich");
+    data = std::move(original_data);
+    config = snapshot();
+    for (const auto* id : {"Mainsail", "Jib"}) {
+        request = {};
+        request.element_id = id;
+        request.aktion = segelphysik::SegelAktion::Automatisch;
+        pruefung(segelphysik::pruefeSegelAktion(config, request).status ==
+            segelphysik::SegelErgebnisStatus::Vorschau,
+            std::string(id) + ": Montage mit Original-420-Daten fehlgeschlagen");
+    }
+}
+
+void pruefe_montage_speicherung(const std::filesystem::path& source_root)
+{
+    using nlohmann::json;
+    const auto root = std::filesystem::temp_directory_path() /
+        ("segelphysik-montage-save-" +
+            std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Bereinigung {
+        std::filesystem::path path;
+        ~Bereinigung() { std::error_code error; std::filesystem::remove_all(path, error); }
+    } cleanup{root};
+    const auto target = root / "420";
+    std::filesystem::create_directories(target / "modells");
+    for (const auto* file : {"modells_data.json", "modells_validation.json"})
+        std::filesystem::copy_file(source_root / "420" / file, target / file);
+    for (const auto* folder : {"visualisation", "mass", "hydrostatics"})
+        std::filesystem::copy(source_root / "420" / "modells" / folder,
+            target / "modells" / folder, std::filesystem::copy_options::recursive);
+    Umgebung schema_root("SEGELPHYSIK_TEST_SCHEMA_ROOT");
+    schema_root.setzen(source_root.u8string());
+    const auto data_path = target / "modells_data.json";
+    const auto validation_path = target / "modells_validation.json";
+    auto data = json::parse(lesen(data_path));
+    for (auto& group : data["groups"])
+        for (auto& element : group["elements"])
+            if (element.contains("physics")) {
+                element["physics"].erase("aerodynamic");
+                if (element["physics"].empty()) element.erase("physics");
+            }
+    schreiben(data_path, data.dump());
+    segelphysik::aktualisiere_modell_fingerprints(target,
+        {segelphysik::ModellFingerprintBereich::modelData,
+         segelphysik::ModellFingerprintBereich::aerodynamics});
+    const auto old_data = lesen(data_path);
+    const auto old_validation = lesen(validation_path);
+    const auto initial_check = segelphysik::detail::pruefe_modellformat03(target, source_root);
+    pruefung(initial_check.schemas_gueltig && initial_check.veraltete_bereiche.empty(),
+        "Ausgangsmodell fuer Transaktion ungueltig");
+    const auto catalog = segelphysik::modellkatalog(root);
+    const auto* entry = catalog.eintrag("420");
+    pruefung(entry && entry->fingerprints_aktuell, "Ausgangskatalog ungueltig");
+    const auto inspection = segelphysik::readModelInspection(catalog, "420", entry->modell_fassung);
+    const auto snapshot = segelphysik::leseSegelKonfiguration(catalog, *inspection);
+    pruefung(snapshot.status != segelphysik::SegelKonfigurationsStatus::Fehler,
+        "Ausgangskonfiguration unlesbar");
+    segelphysik::SegelAktionAnforderung request{};
+    request.element_id = "Mainsail";
+    request.aktion = segelphysik::SegelAktion::Translation;
+    request.ebene = segelphysik::SegelEbene::XY;
+    request.translation_m = {0.1, 0.2, 0.};
+    auto working = snapshot;
+    const auto translation = segelphysik::pruefeSegelAktion(working, request);
+    pruefung(translation.status == segelphysik::SegelErgebnisStatus::Vorschau &&
+        translation.lage, "Manuelle Translation nicht vorgemerkt");
+    const auto working_lage = std::find_if(working.lagen.begin(), working.lagen.end(),
+        [](const auto& value) { return value.element_id == "Mainsail"; });
+    pruefung(working_lage != working.lagen.end(), "Manuelle Segellage fehlt");
+    *working_lage = *translation.lage;
+    request.aktion = segelphysik::SegelAktion::Rotation;
+    request.bewegte_ecke = segelphysik::SegelEcke::Schothorn;
+    request.winkel_grad = 15.;
+    const auto rotation = segelphysik::pruefeSegelAktion(working, request);
+    pruefung(rotation.status == segelphysik::SegelErgebnisStatus::Vorschau &&
+        rotation.lage && lesen(data_path) == old_data &&
+        lesen(validation_path) == old_validation,
+        "Manuelle Vorschau darf keine Dateien aendern");
+    request.aktion = segelphysik::SegelAktion::AbsoluteLage;
+    request.absolute_lage = *rotation.lage;
+    auto invalid_request = request;
+    invalid_request.absolute_lage->element_id = "Jib";
+    pruefung(segelphysik::pruefeSegelAktion(snapshot, invalid_request).status ==
+        segelphysik::SegelErgebnisStatus::Fehler, "Fremde Segellage akzeptiert");
+    invalid_request = request;
+    invalid_request.absolute_lage->rotation_xyzw = {0., 0., 0., 0.};
+    pruefung(segelphysik::pruefeSegelAktion(snapshot, invalid_request).status ==
+        segelphysik::SegelErgebnisStatus::Fehler, "Ungueltige absolute Rotation akzeptiert");
+    const auto aero_path = target / "modells" / "aerodynamics" / "unrelated.dat";
+    std::filesystem::create_directories(aero_path.parent_path());
+    schreiben(aero_path, "unrelated aerodynamic data");
+#ifdef _WIN32
+    const auto aero_lock = CreateFileW(aero_path.c_str(), GENERIC_READ, 0, nullptr,
+        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    pruefung(aero_lock != INVALID_HANDLE_VALUE, "Aerodynamik-Testdatei nicht sperrbar");
+#endif
+    const auto result = segelphysik::bestaetigeSegelAktion(
+        catalog, *inspection, snapshot, request, snapshot.revision);
+    pruefung(result.status == segelphysik::SegelErgebnisStatus::Gespeichert,
+        "Speicherung darf die gesperrte Aerodynamikdatei nicht lesen");
+    const auto reused_catalog = segelphysik::katalog_nach_segel_speicherung(
+        catalog, "420", snapshot.modell_fassung, result.revision);
+    const auto* reused_entry = reused_catalog.eintrag("420");
+    pruefung(reused_entry && reused_entry->modell_fassung == result.revision &&
+        reused_entry->fingerprints_aktuell,
+        "Gepruefter Katalog wurde nicht ohne erneutes Fingerprinting aktualisiert");
+#ifdef _WIN32
+    CloseHandle(aero_lock);
+#endif
+    pruefung(std::filesystem::remove(aero_path), "Aerodynamik-Testdatei nicht entfernbar");
+    pruefung(result.status == segelphysik::SegelErgebnisStatus::Gespeichert && result.lage &&
+        result.revision != snapshot.revision, "Segellage nicht dauerhaft gespeichert: " +
+            (result.diagnosen.empty() ? std::string{} : result.diagnosen.front().nachricht));
+    const auto new_data = lesen(data_path);
+    const auto new_validation = lesen(validation_path);
+    const auto old_hashes = json::parse(old_validation).at("model").at("fingerprints");
+    const auto new_hashes = json::parse(new_validation).at("model").at("fingerprints");
+    for (auto it = old_hashes.begin(); it != old_hashes.end(); ++it)
+        if (it.key() != "modelData")
+            pruefung(new_hashes.at(it.key()) == it.value(),
+                "Ungeaenderter Fingerprint wurde beim Speichern veraendert");
+    const auto refreshed = segelphysik::modellkatalog(root);
+    const auto* refreshed_entry = refreshed.eintrag("420");
+    pruefung(refreshed_entry && refreshed_entry->fingerprints_aktuell &&
+        refreshed_entry->modell_fassung == result.revision, "Neue Modellfassung ungueltig");
+    const auto refreshed_inspection = segelphysik::readModelInspection(
+        refreshed, "420", refreshed_entry->modell_fassung);
+    const auto refreshed_snapshot =
+        segelphysik::leseSegelKonfiguration(refreshed, *refreshed_inspection);
+    const auto stored = std::find_if(refreshed_snapshot.lagen.begin(), refreshed_snapshot.lagen.end(),
+        [](const auto& value) { return value.element_id == "Mainsail"; });
+    pruefung(stored != refreshed_snapshot.lagen.end() &&
+        stored->translation_m == result.lage->translation_m &&
+        stored->rotation_xyzw == result.lage->rotation_xyzw,
+        "Gespeicherte Segellage wird nach Neustart nicht gelesen");
+    const auto stale = segelphysik::bestaetigeSegelAktion(
+        catalog, *inspection, snapshot, request, snapshot.revision);
+    pruefung(stale.status == segelphysik::SegelErgebnisStatus::Fehler &&
+        lesen(data_path) == new_data && lesen(validation_path) == new_validation,
+        "Veralteter Snapshot ueberschreibt neue Konfiguration");
+    json sources = json::object();
+    for (const auto& pair : initial_check.berechnete_hashes)
+        if (pair.first != "modelData") sources[pair.first] = pair.second;
+    sources["aerodynamics"] =
+        initial_check.validierung.at("model").at("fingerprints").at("aerodynamics").at("hash");
+    const json journal = {{"kind", "segel-placement-03"}, {"version", 1},
+        {"oldData", old_data}, {"newData", new_data},
+        {"oldValidation", old_validation}, {"newValidation", new_validation},
+        {"dataSchema", lesen(source_root / "schema_data.json")},
+        {"validationSchema", lesen(source_root / "schema_validation.json")},
+        {"sources", sources}};
+    const auto journal_path = target / ".modells_placement.journal";
+    for (const auto& phase : {0, 1, 2}) {
+        schreiben(data_path, phase == 0 ? old_data : new_data);
+        schreiben(validation_path, phase == 2 ? new_validation : old_validation);
+        schreiben(journal_path, journal.dump());
+        const auto recovered = segelphysik::detail::pruefe_modellformat03(target, source_root);
+        pruefung(recovered.schemas_gueltig && recovered.fehler.empty() &&
+            recovered.veraltete_bereiche.empty() && lesen(data_path) == new_data &&
+            lesen(validation_path) == new_validation && !std::filesystem::exists(journal_path),
+            "Abgebrochene Transaktion wurde nicht vollstaendig fortgesetzt");
+    }
+    schreiben(data_path, old_data + " ");
+    schreiben(validation_path, old_validation);
+    schreiben(journal_path, journal.dump());
+    const auto conflict = segelphysik::detail::pruefe_modellformat03(target, source_root);
+    pruefung(!conflict.fehler.empty() && lesen(data_path) == old_data + " " &&
+        lesen(validation_path) == old_validation && std::filesystem::exists(journal_path),
+        "Fremde Aenderung wurde beim Wiederanlauf ueberschrieben");
+    schreiben(data_path, old_data);
+    const auto mesh_path = target / "modells" / "visualisation" / "mast.obj";
+    const auto mesh = lesen(mesh_path);
+    schreiben(mesh_path, mesh + "\n# fremde Aenderung\n");
+    const auto source_conflict = segelphysik::detail::pruefe_modellformat03(target, source_root);
+    pruefung(source_conflict.schemas_gueltig &&
+        std::find(source_conflict.veraltete_bereiche.begin(),
+                  source_conflict.veraltete_bereiche.end(), "visualisation") !=
+            source_conflict.veraltete_bereiche.end() &&
+        lesen(data_path) == new_data && lesen(validation_path) == new_validation &&
+        !std::filesystem::exists(journal_path),
+        "Quellaenderung muss beim Einlesen nach Wiederanlauf erkannt werden");
+}
+
 void pruefe_schema_fehlermatrix(const std::filesystem::path& source_root)
 {
     using nlohmann::json;
@@ -639,6 +1029,33 @@ void pruefe_schema_fehlermatrix(const std::filesystem::path& source_root)
 
 int main(int argc, char** argv)
 {
+    if (argc == 3 && std::string(argv[1]) == "--mounting-save") {
+        try {
+            pruefe_montage_speicherung(std::filesystem::path(argv[2]));
+            return 0;
+        } catch (const std::exception& error) {
+            std::cerr << error.what() << '\n';
+            return 1;
+        }
+    }
+    if (argc == 3 && std::string(argv[1]) == "--mounting-preview") {
+        try {
+            pruefe_montage_vorschau(std::filesystem::path(argv[2]));
+            return 0;
+        } catch (const std::exception& error) {
+            std::cerr << error.what() << '\n';
+            return 1;
+        }
+    }
+    if (argc == 3 && std::string(argv[1]) == "--mounting-schema") {
+        try {
+            pruefe_montage_schema(std::filesystem::path(argv[2]));
+            return 0;
+        } catch (const std::exception& error) {
+            std::cerr << error.what() << '\n';
+            return 1;
+        }
+    }
     if (argc == 3 && std::string(argv[1]) == "--schema-error-matrix") {
         try {
             pruefe_schema_fehlermatrix(std::filesystem::path(argv[2]));
@@ -839,13 +1256,23 @@ int main(int argc, char** argv)
 
         const auto aero_dir = model / "modells" / "aerodynamics";
         std::filesystem::create_directories(aero_dir);
-        schreiben(aero_dir / "deferred.json", "{ not parsed or hashed");
-        const auto deferred_aero_catalog = segelphysik::modellkatalog(temp_root);
-        const auto* deferred_aero_entry = deferred_aero_catalog.eintrag("bleistift");
-        pruefung(deferred_aero_entry &&
-            deferred_aero_entry->status == "verwendbar" &&
-            deferred_aero_entry->fingerprints_aktuell,
-            "Aerodynamikdateien beeinflussen den vorlaeufigen Katalogstatus");
+        const auto deferred_aero = aero_dir / "deferred.json";
+        schreiben(deferred_aero, "{ not parsed or hashed");
+#ifdef _WIN32
+        const auto aero_lock = CreateFileW(deferred_aero.c_str(), GENERIC_READ, 0, nullptr,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        pruefung(aero_lock != INVALID_HANDLE_VALUE, "Aerodynamik-Testdatei nicht sperrbar");
+#endif
+        const auto changed_aero_catalog = segelphysik::modellkatalog(temp_root);
+        const auto* changed_aero_entry = changed_aero_catalog.eintrag("bleistift");
+        pruefung(changed_aero_entry &&
+            changed_aero_entry->status == "verwendbar" &&
+            changed_aero_entry->fingerprints_aktuell &&
+            changed_aero_entry->modell_fassung == valid.fassung,
+            "Ausgesetzte Aerodynamikpruefung darf Katalog oder Fassung nicht beeinflussen");
+#ifdef _WIN32
+        CloseHandle(aero_lock);
+#endif
         std::filesystem::remove_all(aero_dir);
 
         auto catalog = segelphysik::modellkatalog(temp_root);
@@ -874,12 +1301,26 @@ int main(int argc, char** argv)
         muss_fehlschlagen([&] {
             segelphysik::aktualisiere_modell_fingerprints(model, {});
         });
-        std::filesystem::create_directory(model / ".modells_validation.lock");
+        const auto lock_path = model / ".modells_validation.lock";
+#ifdef _WIN32
+        const auto held_lock = CreateFileW(lock_path.c_str(), GENERIC_READ | GENERIC_WRITE,
+            0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        pruefung(held_lock != INVALID_HANDLE_VALUE, "Testsperre nicht verfuegbar");
+#else
+        const auto held_lock = ::open(lock_path.c_str(), O_CREAT | O_RDWR, 0600);
+        pruefung(held_lock >= 0 && ::flock(held_lock, LOCK_EX | LOCK_NB) == 0,
+            "Testsperre nicht verfuegbar");
+#endif
         muss_fehlschlagen([&] {
             segelphysik::aktualisiere_modell_fingerprints(model,
                 {segelphysik::ModellFingerprintBereich::visualisation});
         });
-        std::filesystem::remove(model / ".modells_validation.lock");
+#ifdef _WIN32
+        CloseHandle(held_lock);
+#else
+        ::flock(held_lock, LOCK_UN);
+        ::close(held_lock);
+#endif
         schreiben(model / "modells_data.json", lesen(model / "modells_data.json") + "\n");
         const auto stale = segelphysik::detail::pruefe_modellformat03(model, temp_root);
         pruefung(stale.schemas_gueltig && stale.veraltete_bereiche ==
@@ -1040,20 +1481,6 @@ int main(int argc, char** argv)
                 .at("setting").at("original_buglage") == "unbekannt",
             "Originalbuglage fehlt am Segel oder wird auf andere Gruppenmitglieder uebertragen");
 
-        const auto metadata_model = temp_root / "tack-metadata";
-        std::filesystem::create_directories(metadata_model);
-        const auto metadata_file = metadata_model / "modells_information.json";
-        nlohmann::json metadata{
-            {"schema_version", "0.1-entwurf"}, {"id", "tack-metadata"},
-            {"gruppen", nlohmann::json::object()}};
-        metadata["gruppen"]["mainsail"]["elemente"] = nlohmann::json::array({
-            {{"id", "sail"}, {"setting", {
-                {"translation_m", {0, 0, 0}}, {"rotation_xyzw", {0, 0, 0, 1}},
-                {"konfiguriert", true}, {"original_buglage", "backbord"}}}}
-        });
-        schreiben(metadata_file, metadata.dump());
-        pruefung(segelphysik::lies_beschreibung(metadata_file).elemente.size() == 1,
-            "Original-Buglage ohne aerodynamische Quelle wird abgelehnt");
         for (auto& group : data.at("groups"))
             for (auto& element : group.at("elements"))
                 element["display"]["hidden"] = true;

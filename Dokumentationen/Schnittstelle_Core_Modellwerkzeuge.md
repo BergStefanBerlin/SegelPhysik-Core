@@ -75,9 +75,13 @@ ausschließlich `ModellFingerprintBereich::visualisation`.
    `modifiedAt` wird für einen Bereich nur aktualisiert, wenn dessen Hashwert
    sich ändert. Andere Bereiche und sonstige Validierungsmetadaten bleiben
    unverändert.
-4. Vorhandene Fingerprints werden bei normalen Katalog-/Ladevorgängen
-   geprüft, aber nicht automatisch überschrieben. Das Aktualisieren ist
-   immer eine ausdrückliche Aktion des Aufrufers.
+4. Vorhandene Fingerprints werden beim Einlesen geprüft, aber nicht
+   automatisch überschrieben. Die Prüfung von `aerodynamics` ist bis zur
+   Implementierung der Aerodynamik ausgesetzt; dieser Ordner wird beim
+   Einlesen nicht für den Fingerprint gelesen. Ein ausdrückliches Update von
+   `aerodynamics` bleibt möglich. Bei einer Aktualisierung wird jeder
+   angeforderte Bereich einmal berechnet; andere Bereiche werden nicht
+   erneut gehasht.
 5. Die Ausgabe wird vor dem atomaren Ersetzen erneut schema-validiert. Bei
    Lese-, Schema-, Schreib- oder Konfliktfehlern liefert die Funktion keinen
    Erfolg und lässt die bestehende Validierungsdatei unverändert. Fehler
@@ -89,6 +93,13 @@ ausschließlich `ModellFingerprintBereich::visualisation`.
 7. Fehler werfen `std::runtime_error` mit einer dokumentierten,
    eindeutigen Core-Fehlerkennung und Datei-/Feldkontext. Ein Fehler liefert
    keinen erfolgsförmigen Ergebniswert.
+
+Segel-Placement und Fingerprint-Aktualisierung verwenden dieselbe
+prozessuebergreifende `.modells_validation.lock`. Vor einer Aktualisierung
+wird ein vorhandenes `.modells_placement.journal` auf unveraenderte
+Schemata und zulaessige Modelldateistaende geprueft und
+gegebenenfalls abgeschlossen. Bei Konflikten wird eine Diagnose ausgegeben;
+andere Werkzeuge muessen die Sperre ebenfalls beachten.
 
 `CORE-FPR-0001` kennzeichnet veraltete Fingerprints beim Lesen,
 `CORE-FPR-0002` eine nicht verfügbare Schreibsperre oder erkannte

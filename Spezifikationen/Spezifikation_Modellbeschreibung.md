@@ -2,6 +2,17 @@
 
 ## Status und Geltungsbereich
 
+**Aktueller Montagevertrag:** Modellformat 0.3 verwendet benannte lokale
+`mountingPoints` und `mounting`-Referenzen statt OBJ-Indizes. Die persistente
+Segellage liegt als `placement` an `Mainsail` bzw. `Jib`; die Modellfassung
+und der `modelData`-Fingerprint werden beim Speichern aktualisiert.
+Dabei werden unveränderte Ressourcenbereiche nicht erneut gehasht;
+externe Ressourcenänderungen werden erst beim nächsten Einlesen erkannt.
+Der [Core-GUI-Vertrag](../Dokumentationen/Schnittstelle_Core_GUI.md#segel-einbaulage-im-modellformat-03)
+beschreibt die API und Wiederanlaufregeln. 0.2 und die ehemaligen
+Schema-2-/Schema-3-Konverter sind keine aktiven Importpfade mehr; die
+nachfolgenden frueheren Anforderungen bleiben historisch nachvollziehbar.
+
 **Bisheriger Montage-Ablagevertrag (vor C-0.21-Cutover):** Dateien heissen
 `modells_information.json`. Jedes vorhandene Element darf ein `setting` direkt
 neben `id` und `Darstellung` tragen: `translation_m`, `rotation_xyzw`,
@@ -694,8 +705,7 @@ Simulation oder liefert eine erfolgreiche Modellansicht.
 
 ### A-C-00149: Deterministische Bereichs-Fingerprints
 
-Der Core berechnet und vergleicht SHA-256 für genau die fünf
-Schema-Bereiche:
+Der Core kann SHA-256 für die fünf Schema-Bereiche berechnen:
 
 | Eintrag in `model.fingerprints` | Quelle |
 |---|---|
@@ -716,8 +726,14 @@ Ein leerer Ressourcenbereich ergibt SHA-256 des leeren Eingabestroms.
 Bereichshashes aufgenommen. Absolute Pfade, Zeitstempel und
 Betriebssystemmetadaten sind nicht Bestandteil der Hashes.
 
-Bei jedem Katalog-/Ladevorgang vergleicht der Core alle fünf gespeicherten
-Werte mit den aktuellen Hashes, ohne Dateien zu ändern. Fehlende,
+Bis zur Implementierung der Aerodynamik ist deren Fingerprintprüfung
+ausgesetzt: Der Core liest den Aerodynamikordner beim Katalog-/Ladevorgang
+nicht für den Fingerprint und verwendet den gespeicherten Wert für die
+Modellfassung. Ein explizites Fingerprint-Update für `aerodynamics` bleibt
+möglich. Die Prüfung wird bei Implementierung der Aerodynamik wieder aktiviert.
+
+Bei jedem Katalog-/Ladevorgang vergleicht der Core die übrigen vier
+gespeicherten Werte mit den aktuellen Hashes, ohne Dateien zu ändern. Fehlende,
 unlesbare oder abweichende Hashwerte werden je Bereich diagnostiziert.
 Jede Abweichung sperrt Simulation. Ein aktueller Visualisierungs-Hash
 erlaubt die Ansicht bei schema-valider Modellbeschreibung und gültigen

@@ -86,7 +86,7 @@ GUI-Integration und Nutzerabnahme bleiben getrennte Schritte.
 | CPPI-0062 | `ElementBeschreibung::volumen_mesh` | implementiert | C-0.8 / A-C-00105, A-C-00108 |
 | CPPI-0063 | `ElementBeschreibung::masse_mesh` | implementiert | C-0.8 / A-C-00105, A-C-00108 |
 | CPPI-0064 | `ModellBeschreibung::quellmeshes` | implementiert | C-0.8 / A-C-00108; auch unbenutzte OBJ-Varianten |
-| CPPI-0065 | `konvertiere_modell_v2` | implementiert | C-0.8 / A-C-00109; neuer Zielordner, kein Überschreiben |
+| CPPI-0065 | `konvertiere_modell_v2` | stillgelegt | Historische Migration C-0.8 / A-C-00109; im aktuellen 0.3-Core entfernt |
 | CPPI-0066 | `InspectionNode::mesh_ids` | implementiert | C-0.8 / A-C-00108; direkte Mesh-Verweise eines Elements |
 | CPPI-0067 | `InspectionMesh::source_id` | implementiert | C-0.8 / A-C-00108; stabile o-ID im Schema 2 |
 | CPPI-0068 | `InspectionMesh::provenance` | implementiert | C-0.8 / A-C-00108; `quelle` oder `abgeleitet` |
@@ -100,7 +100,7 @@ GUI-Integration und Nutzerabnahme bleiben getrennte Schritte.
 | CPPI-0076 | `InspectionMovementPreview` | implementiert | C-0.8 / A-C-00113; Referenz, Achse, optionale Grenzen und Posen |
 | CPPI-0077 | `getMovementPreview` | implementiert | C-0.8 / A-C-00113; Core-transformierte Normal-/Grenzgeometrie |
 | CPPI-0078 | `movementPreviewJson` | implementiert | C-0.8 / A-C-00113; JSON-Projektion der Bewegungs-Vorschau |
-| CPPI-0079 | `konvertiere_modell_v3` | implementiert | C-0.8 / A-C-00111; Schema-3-Migration mit Konfliktabbruch; optional `ableitungen_zulassen=false`, explizit `true` für geprüfte Ebenenschnitte/Flächenauswahl |
+| CPPI-0079 | `konvertiere_modell_v3` | stillgelegt | Historische Migration C-0.8 / A-C-00111; im aktuellen 0.3-Core entfernt |
 | CPPI-0080 | `StationaereGleichgewichtKonfiguration` | implementiert | C-0.8 / A-C-00114; eine optionale, feste Fremdkraft und Elementstellungen |
 | CPPI-0081 | `StationaeresGleichgewichtErgebnis` | implementiert | C-0.8 / A-C-00116; vollständige sechs Residuen, Toleranzen, Status und Ergebniszustand |
 | CPPI-0082 | `stationaeres_gleichgewicht` | implementiert | C-0.8 / A-C-00114 bis A-C-00117; begrenzte stationäre Suche mit Hydrodynamik |
@@ -180,12 +180,11 @@ Die bisherigen freien Funktionen bleiben kompatibel.
 
 ## C-0.12: Persistente Segel-Einbaulage
 
-Autorisierte 0-Grad-Grundstellungsrevision vom 06.11.2026: bestehende
-Segel-Interfaces unter ihren Kennungen unveraendert weitergefuehrt.
-420/Folkeboot/Optimist verwenden neutrale Montagebasis getrennt von
-Betriebswinkel delta; Folk/Opti liefern belegte OBJ-Referenzen und
-`CORE-SEG-0030` fuer die nicht kompatible intrinsische Kopplung.
-Keine neuen Objekt-IDs oder neuen exportierten Interfaces.
+Die bestehenden Segel-Interfaces bleiben unter ihren Kennungen erhalten.
+Aktuell verwendet der Core Modellformat 0.3 mit `Mainsail` und `Jib`,
+benannten lokalen Montagepunkten und `placement`; OBJ-Index- und
+0.2-Dateipfade sind historisch. Fehlende Riggbezuege melden
+`CORE-SEG-0033`. Der Betriebswinkel bleibt von der Einbaulage getrennt.
 
 Maßgeblich ist [Spezifikation Segelkonfigurator](../Spezifikationen/Spezifikation_Segelkonfigurator.md).
 Die Schnittstellen ergänzen den unveränderlichen Inspektionssnapshot.
@@ -204,13 +203,13 @@ Die Schnittstellen ergänzen den unveränderlichen Inspektionssnapshot.
 | CPPI-0129 | `SegelLage` | implementiert | A-C-00137 bis A-C-00141, A-C-00147; normierte starre Lage, abgeleiteter Fockversatz, Originalbuglage |
 | CPPI-0130 | `SegelDiagnose` | implementiert | A-C-00143; maschinenlesbarer Code, Meldung und Elementbezug |
 | CPPI-0131 | `SegelKonfigurationSnapshot` | implementiert | A-C-00141, A-C-00143; Modellfassung, Revision, Referenzen, bestätigte Lagen und Ausgangsmeshes |
-| CPPI-0132 | `SegelAktionAnforderung` | implementiert | A-C-00137 bis A-C-00141, A-C-00147; typisierte Modellachsen-/Ecken-/cm-/Originalseitenanforderung |
+| CPPI-0132 | `SegelAktionAnforderung` | implementiert | A-C-00137 bis A-C-00141, A-C-00147; typisierte Modellachsen-/Ecken-/cm-/Originalseitenanforderung oder validierte absolute Segellage |
 | CPPI-0133 | `SegelKonfigurationErgebnis` | implementiert | A-C-00143; Status, Revision, Lage, betroffene Meshkopien und Diagnosen |
 | CPPI-0134 | `leseSegelKonfiguration(const Modellkatalog&, const ModelInspection&)` | implementiert | A-C-00136, A-C-00141, A-C-00143; fehlende Konfiguration ist kein Fehler, Quellen-/Versionskonflikte werden diagnostiziert |
 | CPPI-0135 | `leseKonfigurierteSegelgeometrie(const SegelKonfigurationSnapshot&)` | implementiert | A-C-00142, A-C-00143; read-only Meshes aller Segel mit bestätigter Lage |
 | CPPI-0136 | `pruefeSegelAktion(const SegelKonfigurationSnapshot&, const SegelAktionAnforderung&)` | implementiert | A-C-00137 bis A-C-00141, A-C-00143; persistenzfreie Vorschau, nur betroffene Segelmeshes |
-| CPPI-0137 | `bestaetigeSegelAktion(const Modellkatalog&, const ModelInspection&, const SegelKonfigurationSnapshot&, const SegelAktionAnforderung&, const string&)` | implementiert | A-C-00141, A-C-00143; Prozesssperre, Revisions-/Quellprüfung und atomare Transaktion |
-| CPPI-0138 | `stelleSegelStellwinkelVorschauDar(const SegelKonfigurationSnapshot&, const string&, double)` | implementiert | A-C-00146, A-C-00147; 420 lokale Achse -Z, Folk/Opti belegte Kopf-zum-Hals-Achse, delta=0 neutrale Montage, Gradkonvention und bedingte Konturspiegelung |
+| CPPI-0137 | `bestaetigeSegelAktion(const Modellkatalog&, const ModelInspection&, const SegelKonfigurationSnapshot&, const SegelAktionAnforderung&, const string&)` | implementiert | A-C-00141, A-C-00143; Prozesssperre, JSON-Revisionsprüfung und atomare Transaktion ohne erneutes Ressourcen-Hashing |
+| CPPI-0138 | `stelleSegelStellwinkelVorschauDar(const SegelKonfigurationSnapshot&, const string&, double)` | implementiert | A-C-00146, A-C-00147; lokale Kopf-zum-Hals-Achse aus 0.3-Montagepunkten, Gradkonvention und bedingte Konturspiegelung |
 | CPPI-0139 | `MontageReferenz` | implementiert | A-C-00136, A-C-00143; gemeinsamer Objektbezug in `InspectionMesh.montage` und `SegelReferenz.montage`, lokale semantische Basis, starre Lage, Herkunft und Quellfingerprint; keine neue Objekt-ID |
 | CPPI-0140 | `ModellFingerprintBereich` | implementiert, Abnahme offen | C-0.21 / A-C-00149 bis A-C-00151; Auswahl der fünf einzeln aktualisierbaren Fingerprint-Bereiche |
 | CPPI-0141 | Zurückgezogen: `ModellFingerprintWert` und `ModellFingerprintErgebnis` gemeinsam | zurückgezogen | C-0.21 / A-C-00151; Entwurfsregistrierung bündelte zwei Interfaces entgegen der Nummerierungsregel; ersetzt durch CPPI-0143 und CPPI-0144 |
@@ -242,3 +241,6 @@ Die Schnittstellen ergänzen den unveränderlichen Inspektionssnapshot.
 | CPPI-0167 | `bestimmeMastspitze(const ModelInspection&)` | implementiert, teilweise getestet | C-0.23 / A-C-00165, A-C-00166; Auswahl anhand benannter Mastelemente; Mehrmastfälle mit eindeutigem und mehrdeutigem Hauptmast getestet |
 | CPPI-0168 | `MastReferenz` | implementiert, teilweise getestet | C-0.23 / A-C-00166 bis A-C-00168; windunabhängiger, modellfassungsbezogener Mastbezug mit Herkunft und Diagnose |
 | CPPI-0169 | `Zustand::mast` | implementiert, teilweise getestet | C-0.23 / A-C-00166 bis A-C-00168; historischer Mastbezug auch ohne Windkontext |
+| CPPI-0170 | `katalog_nach_segel_speicherung(const Modellkatalog&, const string&, const string&, const string&)` | implementiert, gezielt getestet | Übernimmt die bestätigte Segelrevision in eine Kopie des geprüften Katalogs ohne erneute Ressourcen-Fingerprints |
+| CPPI-0171 | `modellAusInspektion(const ModelInspection&)` | implementiert, gezielt getestet | Gibt das zur Simulation freigegebene, eingelesene Modell als Kopie zurück |
+| CPPI-0172 | `simulieren(const Modell&, const filesystem::path&, const filesystem::path&, const Laufoptionen&)` | implementiert, gezielt getestet | Simuliert ein bereits eingelesenes Modell ohne erneutes Fingerprinting; der Modellpfad schützt vor Überschreiben der Quelldatei |

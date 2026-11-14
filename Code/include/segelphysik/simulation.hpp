@@ -33,6 +33,8 @@ struct Laufbericht {
 };
 Laufbericht simulieren(const std::filesystem::path& modell,
     const std::filesystem::path& ausgabe, const Laufoptionen& optionen);
+Laufbericht simulieren(const Modell& modell, const std::filesystem::path& modellpfad,
+    const std::filesystem::path& ausgabe, const Laufoptionen& optionen);
 // Contract version 2: all version-1 fields keep their meaning; added are the
 // contribution metadata, sums, balance status and (static only) equilibrium data.
 std::string zustand_json(const Modell& modell,const Zustand& zustand,

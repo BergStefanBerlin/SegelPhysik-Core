@@ -35,7 +35,6 @@ namespace {
 
 using Json = nlohmann::json;
 constexpr double pi = 3.141592653589793238462643383279502884;
-constexpr double angle_tolerance = 1e-6;
 constexpr double matrix_tolerance = 1e-10;
 
 struct Sha256 {
@@ -304,12 +303,6 @@ bool valid_rotation(const QuaternionXyzw& q)
     return std::abs(determinant - 1.) <= matrix_tolerance;
 }
 
-struct SourceFiles {
-    std::string source_path;
-    std::string display_path;
-    std::string lookup_path;
-};
-
 std::string buglage_name(SegelBuglage side)
 {
     switch (side) {
@@ -341,176 +334,18 @@ Vektor3 json_vector(const Json& value)
     return result;
 }
 
-Json read_json(const std::filesystem::path& path)
-{
-    std::ifstream input(path, std::ios::binary);
-    if (!input) throw std::runtime_error("Datei nicht lesbar: " + path.filename().u8string());
-    Json value;
-    input >> value;
-    if (!input.good() && !input.eof()) throw std::runtime_error("JSON-Lesefehler");
-    return value;
-}
-
 Json read_model_json(const std::filesystem::path& path)
 {
-    if (detail::ist_modellformat03_datei(path)) {
-        const auto model_folder = path.parent_path();
-        const auto validation = detail::pruefe_modellformat03(
-            model_folder, schemaordner_fuer_modellordner(model_folder), false);
-        if (!validation.schemas_gueltig || !validation.fehler.empty())
-            throw std::runtime_error(validation.fehler.empty()
-                ? "CORE-MOD-0002: Modellformat-0.3-Schema-Pruefung fehlgeschlagen"
-                : validation.fehler.front());
-        return detail::normalisiere_modellformat03(validation.daten, model_folder);
-    }
-    return normalisiere_modell_information(read_json(path));
-}
-
-std::vector<Vektor3> read_obj_vertices(const std::filesystem::path& path)
-{
-    std::ifstream input(path);
-    if (!input) throw std::runtime_error("Riggeometrie nicht lesbar: " + path.filename().u8string());
-    std::vector<Vektor3> vertices;
-    std::string line;
-    while (std::getline(input, line)) {
-        std::istringstream row(line);
-        std::string kind;
-        row >> kind;
-        if (kind != "v") continue;
-        Vektor3 vertex{};
-        if (!(row >> vertex[0] >> vertex[1] >> vertex[2]) || !finite(vertex))
-            throw std::runtime_error("Ungueltiger Vertex in Riggeometrie: " +
-                                     path.filename().u8string());
-        vertices.push_back(vertex);
-    }
-    if (input.bad()) throw std::runtime_error("Lesefehler in Riggeometrie");
-    return vertices;
-}
-
-Vektor3 vertex_section_center(const std::vector<Vektor3>& vertices,
-                              std::size_t first, std::size_t count)
-{
-    if (count == 0 || first > vertices.size() || count > vertices.size() - first)
-        throw std::runtime_error("Semantischer Rigg-Querschnitt fehlt");
-    Vektor3 center{};
-    for (std::size_t i = first; i < first + count; ++i)
-        center = add(center, vertices[i]);
-    return scale(center, 1. / static_cast<double>(count));
-}
-
-struct Mastachse {
-    Vektor3 punkt_m;
-    Vektor3 richtung;
-};
-
-std::vector<Vektor3> horizontal_section_centers(const std::vector<Vektor3>& vertices)
-{
-    std::map<double, std::vector<Vektor3>> sections;
-    for (const auto& vertex : vertices) sections[vertex[2]].push_back(vertex);
-    std::vector<Vektor3> centers;
-    for (const auto& section : sections) {
-        if (section.second.size() < 3)
-            throw std::runtime_error("Keine belegten horizontalen Riggquerschnitte");
-        const auto center = vertex_section_center(section.second, 0, section.second.size());
-        double radius = 0.;
-        for (const auto& point : section.second)
-            radius = std::max(radius, norm(subtract(point, center)));
-        if (!(radius > 1e-8))
-            throw std::runtime_error("Entarteter Riggquerschnitt");
-        centers.push_back(center);
-    }
-    if (centers.size() < 2) throw std::runtime_error("Riggachse hat zu wenige Querschnitte");
-    return centers;
-}
-
-Mastachse mastachse_bei_z(const std::vector<Vektor3>& vertices, double z)
-{
-    const auto centers = horizontal_section_centers(vertices);
-    for (std::size_t i = 0; i + 1 < centers.size(); ++i) {
-        const double lower = centers[i][2];
-        const double upper = centers[i + 1][2];
-        if (z < lower || z > upper) continue;
-        const double span = upper - lower;
-        if (!(span > 1e-9)) throw std::runtime_error("Mastquerschnitte nicht aufsteigend");
-        const double fraction = (z - lower) / span;
-        return {add(centers[i], scale(subtract(centers[i + 1], centers[i]), fraction)),
-                subtract(centers[i + 1], centers[i])};
-    }
-    throw std::runtime_error("Mastachse reicht nicht bis zur Baumanschlaghoehe");
-}
-
-struct Riggmetadaten {
-    Vektor3 grosssegel_hals_m;
-    Vektor3 mastachse_modell;
-    Vektor3 baumrichtung_modell;
-    Vektor3 fock_hals_m;
-    Vektor3 vorstagachse_modell;
-};
-
-const Json& find_model_element(const Json& model, const std::string& id);
-std::string json_string(const Json& object, const char* field);
-Vektor3 obj_reference_point(const std::vector<Vektor3>& points, const Json& indices);
-bool shared_geometry_schema(const Json& model);
-std::string display_file_reference(const Json& model, const Json& element);
-Mesh read_display_mesh(const std::filesystem::path& root, const Json& model,
-                       const Json& element, const ModellBeschreibung& description);
-
-Riggmetadaten riggreferenzen(const std::filesystem::path& root, const Json& model,
-                             const ModellBeschreibung& description)
-{
-    const auto mounted_vertices = [&](const std::string& id) {
-        const auto& element = find_model_element(model, id);
-        auto points = read_display_mesh(root, model, element, description).punkte;
-        const auto* setting = element_setting(model, id);
-        if (setting && setting->at("konfiguriert").get<bool>()) {
-            const auto pose = setting_pose(*setting);
-            for (auto& point : points) point = pose.modellpunkt_nach_welt(point);
-        }
-        return points;
-    };
-    const auto& mast_element = find_model_element(model, "Mast");
-    const auto mast = read_display_mesh(root, model, mast_element, description).punkte;
-    const auto* mast_setting = element_setting(model, "Mast");
-    const auto mast_pose = mast_setting && mast_setting->at("konfiguriert").get<bool>() ?
-        setting_pose(*mast_setting) : Pose({0., 0., 0.}, {0., 0., 0., 1.});
-    const auto boom = mounted_vertices("Großbaum");
-    const auto stay = mounted_vertices("Vorstag");
-    const auto& boom_mount = find_model_element(model, "Großbaum").at("Montage");
-    const auto boom_cap_a = obj_reference_point(boom, boom_mount.at("anschlag_vertex_indices"));
-    const auto boom_cap_b = obj_reference_point(boom, boom_mount.at("ende_vertex_indices"));
-    const auto boom_midpoint = scale(add(boom_cap_a, boom_cap_b), 0.5);
-    const auto local_midpoint = mast_pose.weltpunkt_nach_modell(boom_midpoint);
-    const auto local_mast_axis = mastachse_bei_z(mast, local_midpoint[2]);
-    const Mastachse mast_axis{
-        mast_pose.modellpunkt_nach_welt(local_mast_axis.punkt_m),
-        mast_pose.modellvektor_nach_welt(local_mast_axis.richtung)};
-    const auto boom_near = norm(subtract(boom_cap_a, mast_axis.punkt_m)) <
-        norm(subtract(boom_cap_b, mast_axis.punkt_m)) ? boom_cap_a : boom_cap_b;
-    const auto boom_far = boom_near == boom_cap_a ? boom_cap_b : boom_cap_a;
-    const auto stay_centers = horizontal_section_centers(stay);
-    const auto deck_center = stay_centers.front();
-    const auto next_stay_center = stay_centers[1];
-    return {mast_axis.punkt_m, mast_axis.richtung, subtract(boom_far, boom_near),
-            deck_center, subtract(next_stay_center, deck_center)};
-}
-
-std::string combine_fingerprints(const std::filesystem::path& root,
-                                 const SourceFiles& entry, const Json& model)
-{
-    std::ostringstream content;
-    for (const auto& relative : {entry.source_path, entry.display_path, entry.lookup_path,
-                                 display_file_reference(model, find_model_element(model, "Mast")),
-                                 display_file_reference(model, find_model_element(model, "Großbaum")),
-                                 display_file_reference(model, find_model_element(model, "Vorstag"))}) {
-        content << relative << ':' << sha256(root / std::filesystem::u8path(relative)) << '\n';
-    }
-    if (shared_geometry_schema(model))
-        for (const auto* id : {"Mast", "Großbaum", "Vorstag"})
-            content << json_string(find_model_element(model, id).at("Darstellung"), "mesh") << '\n';
-    Sha256 digest;
-    const auto text = content.str();
-    digest.update(reinterpret_cast<const unsigned char*>(text.data()), text.size());
-    return digest.finish();
+    if (!detail::ist_modellformat03_datei(path))
+        throw std::runtime_error("CORE-MOD-0002: Nur Modellformat 0.3 wird unterstuetzt");
+    const auto model_folder = path.parent_path();
+    const auto validation = detail::pruefe_modellformat03(
+        model_folder, schemaordner_fuer_modellordner(model_folder), false);
+    if (!validation.schemas_gueltig || !validation.fehler.empty())
+        throw std::runtime_error(validation.fehler.empty()
+            ? "CORE-MOD-0002: Modellformat-0.3-Schema-Pruefung fehlgeschlagen"
+            : validation.fehler.front());
+    return detail::normalisiere_modellformat03(validation.daten, model_folder);
 }
 
 std::string whole_source_fingerprint(const std::vector<SegelReferenz>& references)
@@ -521,61 +356,6 @@ std::string whole_source_fingerprint(const std::vector<SegelReferenz>& reference
     Sha256 digest;
     digest.update(reinterpret_cast<const unsigned char*>(combined.data()), combined.size());
     return digest.finish();
-}
-
-Vektor3 obj_reference_point(const std::vector<Vektor3>& points, const Json& indices)
-{
-    if (!indices.is_array() || indices.empty())
-        throw std::runtime_error("OBJ-Montagereferenz braucht benannte Vertex-Indizes");
-    Vektor3 result{};
-    for (const auto& index : indices) {
-        if (!index.is_number_unsigned() || index.get<std::size_t>() == 0 ||
-            index.get<std::size_t>() > points.size())
-            throw std::runtime_error("OBJ-Montagereferenz liegt ausserhalb der Quelldatei");
-        result = add(result, points.at(index.get<std::size_t>() - 1));
-    }
-    return scale(result, 1. / static_cast<double>(indices.size()));
-}
-
-SegelLage neutral_obj_lage(const SegelReferenz& reference)
-{
-    const auto foot = subtract(reference.ecken.schothorn_m, reference.ecken.hals_m);
-    const auto z = normalized(subtract(reference.ecken.kopf_vorliek_m, reference.ecken.hals_m));
-    const auto x = scale(normalized(subtract(foot, scale(z, dot(foot, z)))), -1.);
-    const auto y = normalized(cross(z, x));
-    const auto tilt = std::hypot(z[0], z[1]);
-    const auto target_z = normalized(Vektor3{z[0] < 0. ? -tilt : tilt, 0., z[2]});
-    const Vektor3 forward{1., 0., 0.};
-    const auto target_x = normalized(subtract(forward, scale(target_z, dot(forward, target_z))));
-    const auto target_y = normalized(cross(target_z, target_x));
-    const Matrix source_transpose{x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]};
-    const Matrix target_basis{target_x[0], target_y[0], target_z[0],
-                        target_x[1], target_y[1], target_z[1],
-                        target_x[2], target_y[2], target_z[2]};
-    SegelLage result;
-    result.element_id = reference.element_id;
-    result.rotation_xyzw = quaternion_from_matrix(multiply(target_basis, source_transpose));
-    auto target = reference.ecken.hals_m;
-    target[1] = 0.;
-    result.translation_m = subtract(target,
-        rotate(matrix_from_quaternion(result.rotation_xyzw), reference.ecken.hals_m));
-    result.konfiguriert = true;
-    return result;
-}
-
-Vektor3 find_contour_point(const Json& source, const std::string& point_id)
-{
-    const auto& points = source.at("grundkontur").at("punkte");
-    if (!points.is_array()) throw std::runtime_error("Segelkontur fehlt");
-    std::optional<Vektor3> found;
-    for (const auto& point : points) {
-        if (point.value("id", std::string{}) == point_id) {
-            if (found) throw std::runtime_error("Doppelter semantischer Segelpunkt: " + point_id);
-            found = json_vector(point.at("position_m"));
-        }
-    }
-    if (!found) throw std::runtime_error("Semantischer Segelpunkt fehlt: " + point_id);
-    return *found;
 }
 
 std::string json_string(const Json& object, const char* field)
@@ -606,32 +386,9 @@ const Json& find_model_element(const Json& model, const std::string& id)
     return *found;
 }
 
-bool shared_geometry_schema(const Json& model)
+std::string display_file_reference(const Json&, const Json& element)
 {
-    const auto version = model.value("schema_version", std::string{});
-    return version == "2" || version == "3";
-}
-
-std::string display_file_reference(const Json& model, const Json& element)
-{
-    return shared_geometry_schema(model) ?
-        json_string(model.at("geometrie"), "datei") :
-        json_string(element.at("Darstellung"), "datei");
-}
-
-Mesh read_display_mesh(const std::filesystem::path& root, const Json& model,
-                       const Json& element, const ModellBeschreibung& description)
-{
-    if (!shared_geometry_schema(model))
-        return lade_quellmesh(root / std::filesystem::u8path(
-            json_string(element.at("Darstellung"), "datei")), std::nullopt, true);
-
-    const auto mesh_id = json_string(element.at("Darstellung"), "mesh");
-    const auto mesh = std::find_if(description.quellmeshes.begin(), description.quellmeshes.end(),
-        [&](const QuellMesh& source) { return source.id == mesh_id; });
-    if (mesh == description.quellmeshes.end())
-        throw std::runtime_error("Darstellungsmesh nicht lesbar: " + mesh_id);
-    return mesh->mesh;
+    return json_string(element.at("Darstellung"), "datei");
 }
 
 Matrix corner_basis(const SegelEcken& corners)
@@ -648,243 +405,126 @@ Matrix transpose(const Matrix& m)
     return {m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]};
 }
 
-SegelEcken indexed_corners(const std::vector<Vektor3>& vertices, const Json& mounting)
-{
-    SegelEcken corners;
-    corners.hals_m = obj_reference_point(vertices, mounting.at("hals_vertex_indices"));
-    corners.schothorn_m = obj_reference_point(vertices, mounting.at("schothorn_vertex_indices"));
-    corners.kopf_vorliek_m = obj_reference_point(vertices, mounting.at("kopf_vorliek_vertex_indices"));
-    if (mounting.contains("kopf_achterliek_vertex_indices"))
-        corners.kopf_achterliek_m = obj_reference_point(vertices, mounting.at("kopf_achterliek_vertex_indices"));
-    (void)corner_basis(corners);
-    return corners;
-}
-
-SegelEcken semantic_corners(const Json& source)
-{
-    SegelEcken corners;
-    corners.hals_m = find_contour_point(source, "hals");
-    corners.schothorn_m = find_contour_point(source, "schothorn");
-    bool found = false;
-    for (const auto& edge : source.at("grundkontur").at("rand").at("kanten")) {
-        if (edge.value("name", std::string{}) != "vorliek") continue;
-        if (found) throw std::runtime_error("Mehrdeutige semantische Vorliekreferenz");
-        const auto ids = edge.at("punkt_ids").get<std::vector<std::string>>();
-        if (ids.size() < 2 || (ids.front() != "hals" && ids.back() != "hals"))
-            throw std::runtime_error("Vorliek muss am semantischen Hals enden");
-        corners.kopf_vorliek_m = find_contour_point(source,
-            ids.front() == "hals" ? ids.back() : ids.front());
-        found = true;
-    }
-    if (!found) throw std::runtime_error("Semantische Vorliekreferenz fehlt");
-    for (const auto& edge : source.at("grundkontur").at("rand").at("kanten")) {
-        if (edge.value("name", std::string{}) != "kopf") continue;
-        const auto ids = edge.at("punkt_ids").get<std::vector<std::string>>();
-        if (ids.size() != 2) throw std::runtime_error("Mehrdeutige semantische Kopfreferenz");
-        for (const auto& id : ids) {
-            const auto point = find_contour_point(source, id);
-            if (norm(subtract(point, corners.kopf_vorliek_m)) > 1e-9)
-                corners.kopf_achterliek_m = point;
-        }
-    }
-    (void)corner_basis(corners);
-    return corners;
-}
-
 QuaternionXyzw rig_rotation(const SegelReferenz& reference, bool main_sail);
 
-SegelReferenz sail_reference(const std::filesystem::path& root, const Json& model,
-                             const Json& element, std::vector<SegelDiagnose>& diagnostics,
-                             bool model_format03, const ModellBeschreibung& description)
+std::optional<Vektor3> montagepunkt03(const Json& model, const Json& mounting,
+                                      const char* role, std::string& error)
 {
-    const auto id = json_string(element, "id");
-    const auto shared_geometry = shared_geometry_schema(model);
-    const auto display = display_file_reference(model, element);
-    const auto display_mesh_id = shared_geometry ?
-        json_string(element.at("Darstellung"), "mesh") : display;
-    const auto source_path = json_string(element.at("Segel"), "quelle_datei");
-    const auto source = read_json(root / std::filesystem::u8path(source_path));
-    const auto display_mesh = read_display_mesh(root, model, element, description);
-    const auto display_hash = sha256(root / std::filesystem::u8path(display));
-    const auto& vertices = display_mesh.punkte;
-    const Json* stored_reference = nullptr;
-    if (element.contains("setting") && element.at("setting").contains("montage_referenz")) {
-        stored_reference = &element.at("setting").at("montage_referenz");
-        if ((!shared_geometry && stored_reference->value("obj_sha256", std::string{}) !=
-                sha256(root / std::filesystem::u8path(display))) ||
-            stored_reference->value("kontur_sha256", std::string{}) !=
-                sha256(root / std::filesystem::u8path(source_path)))
-            throw std::runtime_error("CORE-SEG-0031: Bestaetigte Montagequelle geaendert; explizite Neuzuordnung erforderlich: " + id);
+    if (!mounting.contains(role)) {
+        error = std::string("Montagebezug fehlt: ") + role;
+        return std::nullopt;
     }
-    SegelReferenz result;
-    result.element_id = id;
-    result.darstellungs_mesh_id = display_mesh_id;
-    result.intrinsische_quelle_id = json_string(source.at("segel"), "id");
-    const auto type = json_string(source.at("segel"), "typ");
-    if (type != "grosssegel" && type != "fock")
-        throw std::runtime_error("Unbekannter fachlicher Segeltyp: " + type);
-    result.art = type == "fock" ? SegelArt::Fock : SegelArt::Grosssegel;
-    if (!element.at("Segel").contains("lookup_datei"))
-        diagnostics.push_back({"CORE-SEG-0030",
-            "Darstellung ohne Lookup; intrinsische Rekonstruktion ersetzt keine physische "
-            "Bestandsquelle und erteilt keine Physikfreigabe.", id});
-    result.ecken = semantic_corners(source);
-    const auto point_present = [&](const Vektor3& point) {
-        return std::any_of(vertices.begin(), vertices.end(),
-            [&](const Vektor3& vertex) { return norm(subtract(vertex, point)) <= 1e-7; });
-    };
-    std::ifstream obj(root / std::filesystem::u8path(display));
-    std::string first_line;
-    std::getline(obj, first_line);
-    const auto declaration = "# Source: " + std::filesystem::u8path(source_path).filename().u8string() + ";";
-    const bool semantic_obj = (shared_geometry ||
-        first_line.rfind(declaration, 0) == 0) &&
-        point_present(result.ecken.hals_m) && point_present(result.ecken.kopf_vorliek_m);
-    std::string fingerprint_text = display + (shared_geometry ? "#" + display_mesh_id : "") +
-        ":" + sha256(root / std::filesystem::u8path(display)) +
-        "\n" + source_path + ":" + sha256(root / std::filesystem::u8path(source_path)) + "\n";
-    bool direct_montage = false;
-    const bool declared_placement = model_format03 && element.contains("placement");
-    if (declared_placement) direct_montage = true;
+    const auto& reference = mounting.at(role);
+    const auto id = reference.at("element").get<std::string>();
+    const auto point = reference.at("point").get<std::string>();
+    const Json* found = nullptr;
+    for (const auto& group : model.at("gruppen"))
+        for (const auto& element : group.at("elemente")) {
+            if (element.value("id", std::string{}) != id) continue;
+            if (found) {
+                error = "Montageelement ist nicht eindeutig: " + id;
+                return std::nullopt;
+            }
+            found = &element;
+        }
+    if (!found || !found->contains("mountingPoints") ||
+        !found->at("mountingPoints").contains(point)) {
+        error = "Montagepunkt fehlt: " + id + "." + point;
+        return std::nullopt;
+    }
+    const auto local = json_vector(found->at("mountingPoints").at(point));
+    const auto* setting = element_setting(model, id);
+    return setting ? setting_pose(*setting).modellpunkt_nach_welt(local) : local;
+}
 
-    if (element.contains("Montage")) {
-        const auto& mounting = element.at("Montage");
-        if (mounting.value("schema_version", 0) != 1 ||
-            mounting.value("basis", std::string{}) != "mittschiffs")
-            throw std::runtime_error("Ungueltige Montagebasis: " + id);
-        fingerprint_text += mounting.dump();
-        if (mounting.value("bezug", std::string{}) == "kontur") {
-            if (!semantic_obj) throw std::runtime_error("Kontur-/OBJ-Quellbezug nicht belegt: " + id);
-            direct_montage = true;
-        } else if (mounting.value("bezug", std::string{}) == "obj") {
-            if (shared_geometry) {
-                // The v2 converter rewrites OBJ bytes while retaining mesh-local vertex order.
-                const auto indexed = indexed_corners(vertices, mounting);
-                const auto source_hash = mounting.value("quellen_sha256", std::string{});
-                const bool source_matches = source_hash == display_hash &&
-                    (!stored_reference ||
-                     stored_reference->value("obj_sha256", std::string{}) == display_hash);
-                if (!source_matches)
-                    throw std::runtime_error("CORE-SEG-0031: Gemeinsames OBJ belegt keine bestaetigte Segelmontage: " + id);
-                result.ecken = indexed;
-                direct_montage = true;
-            } else if (mounting.value("quellen_sha256", std::string{}) ==
-                       display_hash) {
-                result.ecken = indexed_corners(vertices, mounting);
-                direct_montage = true;
-            }
-            else {
-                if (!semantic_obj)
-                    throw std::runtime_error("CORE-SEG-0031: Veraltete oder ungepruefte OBJ-Montage; semantischer Quellbezug fehlt: " + id);
-                if (mounting.contains("quellen_sha256"))
-                    throw std::runtime_error("CORE-SEG-0031: OBJ-Quellpruefsumme stimmt nicht; explizite Neuzuordnung erforderlich: " + id);
-                const auto mass_path = element.contains("Hydrostatik") &&
-                    element.at("Hydrostatik").contains("masse") &&
-                    element.at("Hydrostatik").at("masse").contains("datei") ?
-                    json_string(element.at("Hydrostatik").at("masse"), "datei") :
-                    (std::filesystem::u8path(display).parent_path().parent_path() /
-                        "mass" / std::filesystem::u8path(display).filename()).generic_u8string();
-                if (!std::filesystem::is_regular_file(root / std::filesystem::u8path(mass_path)))
-                    throw std::runtime_error("CORE-SEG-0031: Legacy-Montage ohne belegte Originalgeometrie: " + id);
-                const auto legacy = indexed_corners(
-                    read_obj_vertices(root / std::filesystem::u8path(mass_path)), mounting);
-                MontageReferenz adaptation;
-                adaptation.element_id = id;
-                const auto rotation = multiply(corner_basis(legacy), transpose(corner_basis(result.ecken)));
-                adaptation.rotation_xyzw = quaternion_from_matrix(rotation);
-                adaptation.translation_m = subtract(legacy.hals_m, rotate(rotation, result.ecken.hals_m));
-                adaptation.herkunft = "Legacy-OBJ-Montage aus referenzierter Massenquelle; Kontur ohne Skalierung";
-                result.legacy_montage = adaptation;
-                fingerprint_text += "\n" + mass_path + ":" + sha256(root / std::filesystem::u8path(mass_path));
-                auto legacy_reference = result;
-                legacy_reference.ecken = legacy;
-                const auto neutral = neutral_obj_lage(legacy_reference);
-                const auto mounted = multiply(matrix_from_quaternion(neutral.rotation_xyzw), rotation);
-                result.montage.rotation_xyzw = quaternion_from_matrix(mounted);
-                result.montage.translation_m = add(
-                    rotate(matrix_from_quaternion(neutral.rotation_xyzw), adaptation.translation_m),
-                    neutral.translation_m);
-                diagnostics.push_back({"CORE-SEG-0031",
-                    "Veraltete ungepruefte Vertexreferenzen verworfen; semantische aktuelle Kontur "
-                    "starr am belegten Legacy-Hals/Vorliek montiert. Physische Altgeometrie unveraendert.", id});
-            }
-        } else throw std::runtime_error("Unbekannter Montagebezug: " + id);
-    } else {
-        if (!semantic_obj)
-            throw std::runtime_error("Semantischer Kontur-/OBJ-Bezug fehlt: " + id);
+void apply_montage03(const Json& model, const Json& element, SegelReferenz& result,
+                     std::vector<SegelDiagnose>& diagnostics)
+{
+    std::string error;
+    std::optional<Vektor3> tack, upper, boom_start, boom_end;
+    if (!element.contains("mounting"))
+        error = "Montagehilfe fehlt";
+    else {
+        const auto& mounting = element.at("mounting");
+        tack = montagepunkt03(model, mounting, "tack", error);
+        if (tack) upper = montagepunkt03(model, mounting, "luffUpper", error);
+        if (upper && result.art == SegelArt::Grosssegel) {
+            boom_start = montagepunkt03(model, mounting, "boomStart", error);
+            if (boom_start) boom_end = montagepunkt03(model, mounting, "boomEnd", error);
+        }
+        if (upper && norm(subtract(*upper, *tack)) <= 1e-12)
+            error = "Vorliek-Montagepunkte sind identisch";
+        if (boom_start && boom_end && norm(subtract(*boom_end, *boom_start)) <= 1e-12)
+            error = "Baum-Montagepunkte sind identisch";
+        if (error.empty() && upper && tack) {
+            const auto luff = subtract(*upper, *tack);
+            const auto foot = boom_start && boom_end
+                ? subtract(*boom_end, *boom_start) : Vektor3{-1., 0., 0.};
+            if (norm(cross(luff, foot)) <= 1e-12 * norm(luff) * norm(foot))
+                error = "Montageachsen sind parallel";
+        }
     }
-    if (shared_geometry && stored_reference &&
-        stored_reference->value("obj_sha256", std::string{}) != display_hash)
-        throw std::runtime_error("CORE-SEG-0031: Gemeinsames OBJ passt nicht zur bestaetigten Montagequelle: " + id);
+    if (!error.empty()) {
+        diagnostics.push_back({"CORE-SEG-0033",
+            error + "; bitte Segel manuell platzieren.", result.element_id});
+        return;
+    }
+    result.rig_hals_anschlag_m = *tack;
+    result.rig_vorliek_richtung_modell = subtract(*upper, *tack);
+    if (boom_start && boom_end)
+        result.rig_unterliek_richtung_modell = subtract(*boom_end, *boom_start);
+    result.fock_grundhals_m = *tack;
+    result.fock_versatzrichtung_modell = result.rig_vorliek_richtung_modell;
+    result.montage_basis_vorgegeben = false;
+}
+
+SegelReferenz sail_reference03(const std::filesystem::path& root, const Json& model,
+                                const Json& element, SegelArt art,
+                                std::vector<SegelDiagnose>& diagnostics)
+{
+    SegelReferenz result;
+    result.element_id = json_string(element, "id");
+    result.art = art;
+    const auto display = display_file_reference(model, element);
+    result.darstellungs_mesh_id = display;
+    result.intrinsische_quelle_id = display;
+    if (!element.contains("mountingPoints"))
+        throw std::runtime_error("CORE-SEG-0033: Segel-Eckpunkte fehlen: " + result.element_id);
+    const auto& points = element.at("mountingPoints");
+    for (const auto* name : {"tack", "clew", "luffUpper"})
+        if (!points.contains(name))
+            throw std::runtime_error(std::string("CORE-SEG-0033: Segel-Eckpunkt fehlt: ") +
+                                     result.element_id + "." + name);
+    result.ecken.hals_m = json_vector(points.at("tack"));
+    result.ecken.schothorn_m = json_vector(points.at("clew"));
+    result.ecken.kopf_vorliek_m = json_vector(points.at("luffUpper"));
+    if (points.contains("leechUpper"))
+        result.ecken.kopf_achterliek_m = json_vector(points.at("leechUpper"));
+    (void)corner_basis(result.ecken);
     result.vorliek_richtung_lokal = subtract(result.ecken.kopf_vorliek_m, result.ecken.hals_m);
     result.unterliek_richtung_lokal = subtract(result.ecken.schothorn_m, result.ecken.hals_m);
-    if (element.at("Segel").contains("lookup_datei")) {
-        const auto lookup_path = json_string(element.at("Segel"), "lookup_datei");
-        const auto lookup = read_json(root / std::filesystem::u8path(lookup_path));
-        result.lookup_id = json_string(lookup, "segel_id");
-        if (result.lookup_id != result.intrinsische_quelle_id ||
-            lookup.value("status", std::string{}) != "erfolgreich")
-            throw std::runtime_error("Lookup-/Segelidentitaet stimmt nicht: " + id);
-        fingerprint_text += "\n" + lookup_path + ":" + sha256(root / std::filesystem::u8path(lookup_path));
-    }
-    if (!result.legacy_montage && !direct_montage && element.at("Segel").contains("lookup_datei")) {
-        const auto rig = riggreferenzen(root, model, description);
-        result.rig_hals_anschlag_m = result.art == SegelArt::Grosssegel ?
-            rig.grosssegel_hals_m : rig.fock_hals_m;
-        result.rig_vorliek_richtung_modell = result.art == SegelArt::Grosssegel ?
-            rig.mastachse_modell : rig.vorstagachse_modell;
-        result.rig_unterliek_richtung_modell = rig.baumrichtung_modell;
-        SourceFiles mapping{};
-        mapping.source_path = source_path;
-        mapping.display_path = display;
-        mapping.lookup_path = json_string(element.at("Segel"), "lookup_datei");
-        result.quellen_fingerprint = combine_fingerprints(root, mapping, model);
-        if (shared_geometry)
-            result.quellen_fingerprint = sha256_bytes(
-                result.quellen_fingerprint + "\n" + display_mesh_id);
-    } else {
-        if (!result.legacy_montage) {
-            if (declared_placement) {
-                const auto pose = setting_pose(element.at("setting"));
-                result.montage.rotation_xyzw = pose.orientierung_xyzw();
-                result.montage.translation_m = pose.position_m();
-            } else {
-                const auto neutral = neutral_obj_lage(result);
-                result.montage.rotation_xyzw = neutral.rotation_xyzw;
-                result.montage.translation_m = neutral.translation_m;
-            }
-            if (!declared_placement && element.contains("Montage") &&
-                element.at("Montage").contains("translation_m")) {
-                result.montage.translation_m = json_vector(element.at("Montage").at("translation_m"));
-                result.montage.rotation_xyzw = element.at("Montage").at("rotation_xyzw").get<QuaternionXyzw>();
-                if (!valid_rotation(result.montage.rotation_xyzw))
-                    throw std::runtime_error("Ungueltige deklarierte Montagepose: " + id);
-            }
-        }
-        result.rig_hals_anschlag_m = add(
-            rotate(matrix_from_quaternion(result.montage.rotation_xyzw), result.ecken.hals_m),
-            result.montage.translation_m);
-        result.rig_vorliek_richtung_modell = rotate(
-            matrix_from_quaternion(result.montage.rotation_xyzw), result.vorliek_richtung_lokal);
-        result.rig_unterliek_richtung_modell = rotate(
-            matrix_from_quaternion(result.montage.rotation_xyzw), result.unterliek_richtung_lokal);
-        Sha256 hash;
-        hash.update(reinterpret_cast<const unsigned char*>(fingerprint_text.data()), fingerprint_text.size());
-        result.quellen_fingerprint = hash.finish();
-    }
-    result.fock_grundhals_m = result.rig_hals_anschlag_m;
-    result.fock_versatzrichtung_modell = result.rig_vorliek_richtung_modell;
-    result.montage.element_id = id;
+    const auto pose = setting_pose(element.at("setting"));
+    result.montage.element_id = result.element_id;
+    result.montage.rotation_xyzw = pose.orientierung_xyzw();
+    result.montage.translation_m = pose.position_m();
     result.montage.bezugspunkt_lokal_m = result.ecken.hals_m;
     result.montage.laengsrichtung_lokal = result.vorliek_richtung_lokal;
     result.montage.querrichtung_lokal = result.unterliek_richtung_lokal;
-    result.montage.herkunft = semantic_obj ? "Semantische Segelkontur mit OBJ-Quelldeklaration" : "SHA256-gepruefte OBJ-Vertexreferenzen";
+    result.montage.herkunft = "Benannte Segelpunkte im Visualisierungsmesh";
+    result.quellen_fingerprint = sha256_bytes(
+        display + ":" + sha256(root / std::filesystem::u8path(display)) + "\n" +
+        points.dump() + "\n" + (element.contains("mounting") ? element.at("mounting").dump() : ""));
     result.montage.quellen_fingerprint = result.quellen_fingerprint;
-    result.montage_basis_vorgegeben = result.legacy_montage.has_value() ||
-        direct_montage || result.lookup_id.empty();
+    result.rig_hals_anschlag_m = pose.modellpunkt_nach_welt(result.ecken.hals_m);
+    result.rig_vorliek_richtung_modell = pose.modellvektor_nach_welt(result.vorliek_richtung_lokal);
+    result.rig_unterliek_richtung_modell = pose.modellvektor_nach_welt(result.unterliek_richtung_lokal);
+    result.fock_grundhals_m = result.rig_hals_anschlag_m;
+    result.fock_versatzrichtung_modell = result.rig_vorliek_richtung_modell;
+    result.montage_basis_vorgegeben = true;
+    apply_montage03(model, element, result, diagnostics);
     if (!result.montage_basis_vorgegeben) {
         result.montage.rotation_xyzw = quaternion_from_matrix(multiply(
-            matrix_from_quaternion(rig_rotation(result, result.art == SegelArt::Grosssegel)),
+            matrix_from_quaternion(rig_rotation(result, art == SegelArt::Grosssegel)),
             transpose(corner_basis(result.ecken))));
         result.montage.translation_m = subtract(result.rig_hals_anschlag_m,
             rotate(matrix_from_quaternion(result.montage.rotation_xyzw), result.ecken.hals_m));
@@ -997,13 +637,7 @@ QuaternionXyzw rig_rotation(const SegelReferenz& reference, bool main_sail)
         const Vektor3 aft{-1., 0., 0.};
         under = subtract(aft, scale(z, dot(aft, z)));
     }
-    // Montagebasis is always amidships, independent of an opened raw boom.
-    const double horizontal = std::hypot(under[0], under[1]);
-    if (!(horizontal > 1e-12)) throw std::runtime_error("Unterliek hat keine Mittschiffsrichtung");
-    under = {-horizontal, 0., under[2]};
-    const auto under_direction = normalized(under);
-    if (std::abs(dot(z, under_direction)) > angle_tolerance)
-        throw std::runtime_error("Vorliek und Unterliek koennen nicht starr ausgerichtet werden");
+    const auto under_direction = normalized(subtract(under, scale(z, dot(under, z))));
     const auto x = scale(under_direction, -1.);
     const auto y = normalized(cross(z, x));
     const auto x_corrected = normalized(cross(y, z));
@@ -1077,130 +711,7 @@ std::vector<InspectionMesh> render_meshes(const SegelKonfigurationSnapshot& snap
     return meshes;
 }
 
-Json lage_json(const SegelLage& lage, const SegelReferenz& reference)
-{
-    return Json{
-        {"rotation_xyzw", lage.rotation_xyzw},
-        {"translation_m", lage.translation_m},
-        {"quellen_fingerprint", reference.quellen_fingerprint},
-        {"original_buglage", buglage_name(lage.original_buglage)},
-        {"konfiguriert", lage.konfiguriert}};
-}
-
-Json config_json(const SegelKonfigurationSnapshot& snapshot, std::uint64_t revision,
-                 Json config)
-{
-    if (config.is_null()) config = Json::object();
-    config["schema_version"] = 1;
-    config["modell_id"] = snapshot.modell_id;
-    config["modell_fassung"] = snapshot.modell_fassung;
-    config["quellen_fingerprint"] = snapshot.quellen_fingerprint;
-    config["revision"] = revision;
-    return config;
-}
-
-std::uint64_t parse_revision(const std::string& value)
-{
-    if (value.empty() || !std::all_of(value.begin(), value.end(),
-                                      [](unsigned char ch) { return ch >= '0' && ch <= '9'; }))
-        throw std::runtime_error("Ungueltige Konfigurationsrevision");
-    return std::stoull(value);
-}
-
-class ConfigurationLock {
-public:
-    explicit ConfigurationLock(const std::filesystem::path& path)
-    {
-#ifdef _WIN32
-        handle_ = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
-                              OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-        if (handle_ == INVALID_HANDLE_VALUE)
-            throw std::runtime_error("Konfiguration ist durch einen anderen Prozess gesperrt");
-#else
-        descriptor_ = ::open(path.c_str(), O_CREAT | O_RDWR, 0600);
-        if (descriptor_ < 0 || ::flock(descriptor_, LOCK_EX | LOCK_NB) != 0) {
-            if (descriptor_ >= 0) ::close(descriptor_);
-            descriptor_ = -1;
-            throw std::runtime_error("Konfiguration ist durch einen anderen Prozess gesperrt");
-        }
-#endif
-    }
-
-    ~ConfigurationLock()
-    {
-#ifdef _WIN32
-        if (handle_ != INVALID_HANDLE_VALUE) CloseHandle(handle_);
-#else
-        if (descriptor_ >= 0) {
-            ::flock(descriptor_, LOCK_UN);
-            ::close(descriptor_);
-        }
-#endif
-    }
-
-    ConfigurationLock(const ConfigurationLock&) = delete;
-    ConfigurationLock& operator=(const ConfigurationLock&) = delete;
-
-private:
-#ifdef _WIN32
-    HANDLE handle_ = INVALID_HANDLE_VALUE;
-#else
-    int descriptor_ = -1;
-#endif
-};
-
-void atomic_write(const std::filesystem::path& target, const std::string& contents)
-{
-    static std::atomic<std::uint64_t> sequence{0};
-    const auto temporary = target.parent_path() /
-        (target.filename().u8string() + ".tmp." +
-         std::to_string(sequence.fetch_add(1, std::memory_order_relaxed)));
-    try {
-        {
-            std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
-            if (!output) throw std::runtime_error("Temporare Konfigurationsdatei nicht erstellbar");
-            output.write(contents.data(), static_cast<std::streamsize>(contents.size()));
-            output.flush();
-            if (!output) throw std::runtime_error("Konfigurationsdatei nicht vollstaendig schreibbar");
-        }
-#ifdef _WIN32
-        const auto temporary_handle = CreateFileW(
-            temporary.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-        if (temporary_handle == INVALID_HANDLE_VALUE)
-            throw std::runtime_error("Temporare Konfigurationsdatei nicht erneut oeffnbar");
-        const bool flushed = FlushFileBuffers(temporary_handle) != 0;
-        CloseHandle(temporary_handle);
-        if (!flushed) throw std::runtime_error("Konfigurationsdaten nicht dauerhaft schreibbar");
-        if (!MoveFileExW(temporary.c_str(), target.c_str(),
-                         MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
-            throw std::runtime_error("Atomare Konfigurationsdatei-Ersetzung fehlgeschlagen");
-#else
-        const int file_descriptor = ::open(temporary.c_str(), O_RDWR);
-        if (file_descriptor < 0 || ::fsync(file_descriptor) != 0) {
-            if (file_descriptor >= 0) ::close(file_descriptor);
-            throw std::runtime_error("Konfigurationsdaten nicht dauerhaft schreibbar");
-        }
-        ::close(file_descriptor);
-        std::error_code error;
-        std::filesystem::rename(temporary, target, error);
-        if (error) throw std::runtime_error("Atomare Konfigurationsdatei-Ersetzung fehlgeschlagen");
-        const int directory_descriptor = ::open(target.parent_path().c_str(), O_RDONLY);
-        if (directory_descriptor >= 0) {
-            ::fsync(directory_descriptor);
-            ::close(directory_descriptor);
-        }
-#endif
-    } catch (const std::exception&) {
-        std::error_code ignored;
-        std::filesystem::remove(temporary, ignored);
-        throw;
-    }
-}
-
-SegelKonfigurationSnapshot load_snapshot(const std::filesystem::path& root,
-                                         const Json& model, bool model_format03,
-                                         const std::string& model_id,
+SegelKonfigurationSnapshot load_snapshot(const Json& model, const std::string& model_id,
                                          const std::string& model_version,
                                          std::vector<SegelReferenz> references,
                                          std::vector<InspectionMesh> meshes)
@@ -1208,139 +719,32 @@ SegelKonfigurationSnapshot load_snapshot(const std::filesystem::path& root,
     SegelKonfigurationSnapshot result;
     result.modell_id = model_id;
     result.modell_fassung = model_version;
+    result.revision = model_version;
     result.referenzen = std::move(references);
     result.grundmeshes = std::move(meshes);
     result.quellen_fingerprint = whole_source_fingerprint(result.referenzen);
+    validiere_element_settings(model);
     for (const auto& reference : result.referenzen) {
         SegelLage lage;
         lage.element_id = reference.element_id;
         lage.original_buglage = reference.original_buglage;
-        if (reference.art == SegelArt::Fock) {
-            const auto direction = normalized(reference.fock_versatzrichtung_modell);
-            lage.fock_versatz_cm = 100. * dot(
-                subtract(reference.ecken.hals_m, reference.fock_grundhals_m), direction);
+        const auto* setting = element_setting(model, reference.element_id);
+        if (setting) {
+            lage.rotation_xyzw = setting->at("rotation_xyzw").get<QuaternionXyzw>();
+            lage.translation_m = setting->at("translation_m").get<Vektor3>();
+            lage.konfiguriert = true;
+            if (setting->contains("original_buglage"))
+                lage.original_buglage =
+                    parse_buglage(setting->at("original_buglage").get<std::string>());
         }
+        if (reference.art == SegelArt::Fock)
+            lage.fock_versatz_cm = 100. * dot(
+                subtract(transform_point(lage, reference.ecken.hals_m),
+                    reference.fock_grundhals_m),
+                normalized(reference.fock_versatzrichtung_modell));
         result.lagen.push_back(lage);
     }
-
-    validiere_element_settings(model);
-    if (std::filesystem::exists(root / "segelkonfiguration.json"))
-        throw std::runtime_error("Legacy-Segelkonfiguration vorhanden; explizite Migration erforderlich");
-    if (!model.contains("konfiguration")) {
-        for (const auto& reference : result.referenzen) {
-            const auto* setting = element_setting(model, reference.element_id);
-            if (model_format03 && setting) {
-                auto lage = std::find_if(result.lagen.begin(), result.lagen.end(),
-                    [&](const SegelLage& item) { return item.element_id == reference.element_id; });
-                if (lage != result.lagen.end()) {
-                    lage->rotation_xyzw = setting->at("rotation_xyzw").get<QuaternionXyzw>();
-                    lage->translation_m = setting->at("translation_m").get<Vektor3>();
-                    if (setting->contains("original_buglage"))
-                        lage->original_buglage =
-                            parse_buglage(setting->at("original_buglage").get<std::string>());
-                }
-                continue;
-            }
-            if (setting && setting->at("konfiguriert").get<bool>())
-                throw std::runtime_error("Bestaetigte Segel-setting ohne Konfigurationsmetadaten");
-        }
-        result.status = SegelKonfigurationsStatus::NichtKonfiguriert;
-        return result;
-    }
-
-    const auto& config = model.at("konfiguration");
-    if (!config.is_object() || config.value("schema_version", 0) != 1 ||
-        !config.contains("revision") || !config["revision"].is_number_unsigned() ||
-        config.contains("elemente"))
-        throw std::runtime_error("Konfigurationsschema ungueltig");
-    result.revision = std::to_string(config["revision"].get<std::uint64_t>());
-    bool confirmed = false;
-    for (const auto& reference : result.referenzen) {
-        const auto* setting = element_setting(model, reference.element_id);
-        if (setting && setting->at("konfiguriert").get<bool>()) confirmed = true;
-    }
-    const bool unbound_empty = !confirmed && result.revision == "0" &&
-        !config.contains("modell_id") && !config.contains("modell_fassung") &&
-        !config.contains("quellen_fingerprint");
-    const bool legacy_adaptation = std::any_of(result.referenzen.begin(), result.referenzen.end(),
-        [&](const SegelReferenz& ref) {
-            const auto* setting = element_setting(model, ref.element_id);
-            return ref.legacy_montage && setting && !setting->contains("montage_referenz") &&
-                setting->at("konfiguriert").get<bool>() &&
-                setting->value("quellen_fingerprint", std::string{}) != ref.quellen_fingerprint;
-        });
-    const bool shared_geometry_migration = shared_geometry_schema(model) &&
-        config.value("schema2_migration_fassung", std::string{}) == model_version;
-    if (!unbound_empty && config.value("modell_id", std::string{}) != model_id)
-        throw std::runtime_error("Konfiguration gehoert zu anderem Modell");
-    if (!unbound_empty && (
-        config.value("modell_fassung", std::string{}) != model_version ||
-        config.value("quellen_fingerprint", std::string{}) != result.quellen_fingerprint) &&
-        !legacy_adaptation && !shared_geometry_migration)
-        throw std::runtime_error("Konfiguration gehoert zu anderer Modell-/Quellenfassung");
-
-    for (const auto& ref : result.referenzen) {
-        const auto id = ref.element_id;
-        const auto* setting = element_setting(model, id);
-        if (!setting) continue;
-        const auto& stored = *setting;
-        if (!stored.at("konfiguriert").get<bool>()) continue;
-        if (!stored.is_object() || !stored.contains("konfiguriert") ||
-            !stored["konfiguriert"].is_boolean())
-            throw std::runtime_error("Ungueltige Elementkonfiguration");
-        const auto rotation = stored.at("rotation_xyzw");
-        const auto translation = stored.at("translation_m");
-        if (!rotation.is_array() || rotation.size() != 4 ||
-            !translation.is_array() || translation.size() != 3)
-            throw std::runtime_error("Ungueltige starre Elementlage");
-        const auto q = rotation.get<QuaternionXyzw>();
-        const auto t = translation.get<Vektor3>();
-        if (!valid_rotation(q) || !finite(t))
-            throw std::runtime_error("Ungueltige starre Elementlage");
-        const auto* reference = find_reference(result, id);
-        auto* lage = find_lage(result, id);
-        if (reference == nullptr || lage == nullptr)
-            throw std::runtime_error("Fremde oder mehrdeutige Segel-ID in Konfiguration");
-        const bool adapt_legacy = reference->legacy_montage &&
-            !stored.contains("montage_referenz") &&
-            stored.value("quellen_fingerprint", std::string{}) != reference->quellen_fingerprint;
-        if (stored.at("konfiguriert").get<bool>() &&
-            stored.value("quellen_fingerprint", std::string{}) != reference->quellen_fingerprint &&
-            !adapt_legacy && !shared_geometry_migration)
-            throw std::runtime_error("Veraltete Quellzuordnung in Konfiguration");
-        if (!rotation.is_array() || rotation.size() != 4 ||
-            !translation.is_array() || translation.size() != 3)
-            throw std::runtime_error("Ungueltige starre Segellage");
-        for (std::size_t i = 0; i < 4; ++i) lage->rotation_xyzw[i] = rotation.at(i).get<double>();
-        for (std::size_t i = 0; i < 3; ++i) lage->translation_m[i] = translation.at(i).get<double>();
-        if (!valid_rotation(lage->rotation_xyzw) || !finite(lage->translation_m))
-            throw std::runtime_error("Ungueltige starre Segellage");
-        lage->original_buglage = stored.contains("original_buglage") ?
-            parse_buglage(stored.at("original_buglage").get<std::string>()) :
-            SegelBuglage::Unbekannt;
-        lage->konfiguriert = stored.value("konfiguriert", true);
-        if (adapt_legacy) {
-            const auto& adaptation = *reference->legacy_montage;
-            lage->translation_m = add(rotate(matrix_from_quaternion(lage->rotation_xyzw),
-                adaptation.translation_m), lage->translation_m);
-            lage->rotation_xyzw = quaternion_multiply(lage->rotation_xyzw,
-                adaptation.rotation_xyzw);
-            result.diagnosen.push_back({"CORE-SEG-0032",
-                "Bestehende Lage starr auf belegte aktuelle Konturbasis umgerechnet; "
-                "Halsposition und gerichtete Vorliekachse bleiben erhalten, keine Ruecksetzung.", id});
-        }
-        if (reference->art == SegelArt::Fock) {
-            const auto direction = normalized(reference->fock_versatzrichtung_modell);
-            const auto hals = transform_point(*lage, reference->ecken.hals_m);
-            const double derived = 100. * dot(
-                subtract(hals, reference->fock_grundhals_m), direction);
-            lage->fock_versatz_cm = derived;
-        } else {
-            lage->fock_versatz_cm = 0.;
-        }
-    }
-    result.status = confirmed ? SegelKonfigurationsStatus::Bereit :
-        SegelKonfigurationsStatus::NichtKonfiguriert;
+    result.status = SegelKonfigurationsStatus::NichtKonfiguriert;
     return result;
 }
 
@@ -1354,6 +758,16 @@ SegelKonfigurationErgebnis preview_from(SegelKonfigurationSnapshot snapshot,
     if (reference == nullptr || lage == nullptr)
         return error_result("CORE-SEG-0002",
                             "Unbekanntes oder mehrdeutiges Segel-Element", request.element_id);
+    if (request.aktion == SegelAktion::Automatisch ||
+        request.aktion == SegelAktion::FockVersatzCm) {
+        const auto missing = std::find_if(snapshot.diagnosen.begin(), snapshot.diagnosen.end(),
+            [&](const SegelDiagnose& diagnostic) {
+                return diagnostic.code == "CORE-SEG-0033" &&
+                    diagnostic.element_id == request.element_id;
+            });
+        if (missing != snapshot.diagnosen.end())
+            return error_result(missing->code, missing->nachricht, request.element_id);
+    }
 
     try {
         if (!finite(request.translation_m) || !std::isfinite(request.winkel_grad) ||
@@ -1425,6 +839,17 @@ SegelKonfigurationErgebnis preview_from(SegelKonfigurationSnapshot snapshot,
             lage->original_buglage = *request.original_buglage;
             lage->konfiguriert = true;
             break;
+        case SegelAktion::AbsoluteLage:
+            if (!request.absolute_lage || request.absolute_lage->element_id != request.element_id)
+                return error_result("CORE-SEG-0002",
+                                    "Absolute Lage hat keine passende Elementidentitaet",
+                                    request.element_id);
+            (void)buglage_name(request.absolute_lage->original_buglage);
+            lage->rotation_xyzw = request.absolute_lage->rotation_xyzw;
+            lage->translation_m = request.absolute_lage->translation_m;
+            lage->original_buglage = request.absolute_lage->original_buglage;
+            lage->konfiguriert = true;
+            break;
         default:
             return error_result("CORE-SEG-0009", "Unbekannte Segelaktion",
                                 request.element_id);
@@ -1449,11 +874,6 @@ SegelKonfigurationErgebnis preview_from(SegelKonfigurationSnapshot snapshot,
     }
 }
 
-Json read_config_json(const std::filesystem::path& path)
-{
-    const auto model = read_model_json(path);
-    return model.contains("konfiguration") ? model.at("konfiguration") : Json();
-}
 
 }
 
@@ -1472,17 +892,18 @@ SegelKonfigurationSnapshot leseSegelKonfiguration(
         const auto model_file = katalog_datei(katalog, info.model_id, info.model_version);
         const auto root = model_file.parent_path();
         const auto model = read_model_json(model_file);
-        if (modell_fassung(model_file) != info.model_version)
-            throw std::runtime_error("Modell-/Quellenstand passt nicht zum Inspektionssnapshot");
-        const auto description = lies_beschreibung(model_file);
-        const bool model_format03 = detail::ist_modellformat03_datei(model_file);
         std::vector<SegelReferenz> references;
         std::vector<SegelDiagnose> diagnostics;
-        for (const auto& group : model.at("gruppen"))
-            for (const auto& element : group.at("elemente"))
-                if (element.contains("Segel"))
-                    references.push_back(sail_reference(
-                        root, model, element, diagnostics, model_format03, description));
+        for (const auto& group : model.at("gruppen").items())
+            for (const auto& element : group.value().at("elemente")) {
+                const auto id = element.value("id", std::string{});
+                if (group.key() == "mainsail" && id == "Mainsail")
+                    references.push_back(sail_reference03(
+                        root, model, element, SegelArt::Grosssegel, diagnostics));
+                else if (group.key() == "jib" && id == "Jib")
+                    references.push_back(sail_reference03(
+                        root, model, element, SegelArt::Fock, diagnostics));
+            }
         std::vector<std::string> ids;
         for (const auto& reference : references) ids.push_back(reference.element_id);
         std::vector<InspectionMesh> meshes;
@@ -1491,14 +912,15 @@ SegelKonfigurationSnapshot leseSegelKonfiguration(
                 [&](const SegelReferenz& ref) { return ref.element_id == mesh.element_id; });
             if (reference != references.end()) reference->darstellungs_mesh_id = mesh.id;
             const auto& element = find_model_element(model, mesh.element_id);
-            const auto raw = read_display_mesh(root, model, element, description);
+            const auto raw = lade_quellmesh(root / std::filesystem::u8path(
+                json_string(element.at("Darstellung"), "datei")), std::nullopt, true);
             mesh.points_m = raw.punkte;
             mesh.triangles = raw.dreiecke;
             meshes.push_back(std::move(mesh));
         }
         if (!references.empty() && meshes.empty())
             return snapshot_error("CORE-SEG-0011", "Keine Segelmeshes vorhanden");
-        auto snapshot = load_snapshot(root, model, model_format03,
+        auto snapshot = load_snapshot(model,
                              info.model_id, info.model_version,
                              std::move(references), std::move(meshes));
         snapshot.diagnosen.insert(snapshot.diagnosen.begin(), diagnostics.begin(), diagnostics.end());
@@ -1558,61 +980,25 @@ SegelKonfigurationErgebnis bestaetigeSegelAktion(
     if (preview.status != SegelErgebnisStatus::Vorschau) return preview;
     try {
         const auto root = model_root(katalog, inspection);
-        const auto model_file = katalog_datei(
-            katalog, inspection.info().model_id, inspection.info().model_version);
-        if (detail::ist_modellformat03_datei(model_file))
-            return error_result("CORE-SEG-0017",
-                "Persistente Segelkonfiguration ist fuer Modellformat 0.3 nicht definiert",
-                anforderung.element_id);
-        const auto path = root / "modells_information.json";
-        ConfigurationLock lock(root / "modells_information.lock");
-        const auto current = read_config_json(path);
-        const std::string current_revision = current.is_null() ? "0" :
-            std::to_string(current.at("revision").get<std::uint64_t>());
-        if (current_revision != erwartete_revision)
-            return error_result("CORE-SEG-0015",
-                                "Konfiguration wurde von einem anderen Prozess geaendert",
-                                anforderung.element_id);
-        auto latest = leseSegelKonfiguration(katalog, inspection);
-        if (latest.status == SegelKonfigurationsStatus::Fehler ||
-            latest.quellen_fingerprint != snapshot.quellen_fingerprint ||
-            latest.modell_fassung != snapshot.modell_fassung)
-            return error_result("CORE-SEG-0016",
-                                "Modell-/Quellenstand hat sich seit der Vorschau geaendert",
-                                anforderung.element_id);
-        const auto latest_preview = preview_from(latest, anforderung);
-        if (latest_preview.status != SegelErgebnisStatus::Vorschau) return latest_preview;
-        auto updated = latest;
-        auto* changed = find_lage(updated, anforderung.element_id);
-        if (changed == nullptr)
-            return error_result("CORE-SEG-0002",
-                                "Unbekanntes oder mehrdeutiges Segel-Element",
-                                anforderung.element_id);
-        *changed = *latest_preview.lage;
-        const auto revision = parse_revision(current_revision);
-        if (revision == std::numeric_limits<std::uint64_t>::max())
-            throw std::runtime_error("Konfigurationsrevision erschoepft");
-        const auto next_revision = revision + 1;
-        const auto information = read_json(path);
-        auto model = normalisiere_modell_information(information);
-        auto& element = const_cast<Json&>(find_model_element(model, anforderung.element_id));
-        if (!element.contains("setting")) element["setting"] = Json::object();
-        element["setting"].update(lage_json(*changed,
-            *find_reference(updated, anforderung.element_id)));
-        const auto display = json_string(element.at("Darstellung"), "datei");
-        const auto source = json_string(element.at("Segel"), "quelle_datei");
-        element["setting"]["montage_referenz"] = {
-            {"schema_version", 1}, {"bezug", "kontur"},
-            {"obj_sha256", sha256(root / std::filesystem::u8path(display))},
-            {"kontur_sha256", sha256(root / std::filesystem::u8path(source))}};
-        model["konfiguration"] = config_json(updated, next_revision, current);
-        const auto content = aktualisiere_modell_information(information, model).dump(2) + "\n";
-        atomic_write(path, content);
-        auto result = latest_preview;
-        result.status = SegelErgebnisStatus::Gespeichert;
-        result.revision = std::to_string(next_revision);
-        result.lage = *changed;
-        return result;
+        {
+            auto result = preview;
+            if (result.status != SegelErgebnisStatus::Vorschau || !result.lage)
+                return result;
+            const auto& lage = *result.lage;
+            std::string tack;
+            switch (lage.original_buglage) {
+            case SegelBuglage::Unbekannt: tack = "unknown"; break;
+            case SegelBuglage::Backbord: tack = "port"; break;
+            case SegelBuglage::Steuerbord: tack = "starboard"; break;
+            default: throw std::runtime_error("Ungueltige Original-Buglage");
+            }
+            const Json placement = {{"translation_m", lage.translation_m},
+                {"rotation_xyzw", lage.rotation_xyzw}, {"originalTack", tack}};
+            result.revision = detail::speichere_segel_placement03(
+                root, anforderung.element_id, placement, snapshot.modell_fassung);
+            result.status = SegelErgebnisStatus::Gespeichert;
+            return result;
+        }
     } catch (const std::exception& error) {
         if (std::string(error.what()).rfind("CORE-KAT-0004", 0) == 0)
             return error_result("CORE-SEG-0016", error.what(), anforderung.element_id);

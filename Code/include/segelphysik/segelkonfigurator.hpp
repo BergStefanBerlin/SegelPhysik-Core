@@ -19,7 +19,8 @@ enum class SegelAktion {
     Translation,
     Rotation,
     FockVersatzCm,
-    OriginalBuglage
+    OriginalBuglage,
+    AbsoluteLage
 };
 enum class SegelKonfigurationsStatus { NichtKonfiguriert, Bereit, Fehler };
 enum class SegelErgebnisStatus { Vorschau, Gespeichert, Fehler };
@@ -48,7 +49,6 @@ struct SegelReferenz {
     SegelBuglage original_buglage = SegelBuglage::Unbekannt;
     std::string quellen_fingerprint;
     MontageReferenz montage;
-    std::optional<MontageReferenz> legacy_montage;
     bool montage_basis_vorgegeben{};
 };
 
@@ -88,6 +88,7 @@ struct SegelAktionAnforderung {
     double winkel_grad{};
     double fock_versatz_cm{};
     std::optional<SegelBuglage> original_buglage;
+    std::optional<SegelLage> absolute_lage;
 };
 
 struct SegelKonfigurationErgebnis {
