@@ -72,6 +72,60 @@ Die CLI aktiviert sie nicht; die Gesamtlaufzeitmessung ist immer aktiv.
 Die [Messliste](../Dokumentationen/Zeitmessungen.md) beschreibt Grenzen,
 Verschachtelungen und zugehörige Tests.
 
+## sailforce (C-0.25)
+
+Der Core bindet die vorbereitete SegelMacher-Bibliothek ueber das Target
+`SegelMacher::Modell` ein, ohne Produzententools oder -tests mitzubauen.
+`SEGELPHYSIK_SEGELMACHER_SOURCE_DIR` zeigt standardmaessig auf den
+benachbarten Checkout `SegelMacher`; ein anderer Ort ist beim Configure
+als Cachepfad anzugeben. Arrow und Parquet muessen als CMake-Pakete
+auffindbar sein. Bei getrennten vcpkg-Installationen deren Prefix
+hinzufuegen, zum Beispiel:
+
+```powershell
+cmake -S Code -B build\sailforce -DBUILD_TESTING=ON `
+  "-DCMAKE_PREFIX_PATH=C:\_DATEN\Code\Cpp\SegelMacher\build-parquet\vcpkg_installed\x64-windows"
+cmake --build build\sailforce --config Release
+ctest --test-dir build\sailforce -C Release --output-on-failure `
+  -R "^(sailforce_contract|sailforce_integration|wind_contract)$"
+```
+
+Unter Windows kopiert der Produzentenhelfer `segelmacher_deploy_runtime`
+auch die privaten Arrow-/Parquet-DLL-Abhaengigkeiten neben die Core-EXEs.
+Ein eigener CMake-Konsument ruft diesen Helfer nach `add_executable`
+und `target_link_libraries(... segelphysik_core)` im selben Verzeichnis
+auf. Eine zusaetzliche Producer-PATH-Aenderung ist dann nicht erforderlich.
+
+Explizite `physics.aerodynamic.sailModel`-Zuordnungen werden einmal pro
+Lauf geladen. `sailforce_start` bereitet immutable Modelle und echte
+Streifengrenzlinien vor; `sailforce_stellwinkel` erzeugt historische,
+quasistatische Stellungsrevisionen. Luftdaten und Aktivierung bleiben
+Laufkonstanten. Dynamik und stationaere Fahrt bilanzieren volle
+Kraefte/Momente genau einmal neben der weiterhin separaten Fremdkraft.
+Reine Hydrostatik mit aktiven Segeln wird explizit abgelehnt.
+Details: [Ergebnisversion 8](../Dokumentationen/Schnittstelle_Core_GUI.md).
+
+Der optionale Headless-Nachweis
+`sailforce_integration_tests.exe MODELLWURZEL --benchmark ERGEBNISDATEI`
+misst je Referenzboot 6000 gueltige Schritte; `--profile` verwendet
+100 Schritte nur zur Engpassanalyse und ist kein Echtzeitnachweis.
+Das Kurzprofil vergleicht ausserdem 20 unterschiedliche Zustandspositionen
+je Boot: erneute Reader-Kraftauswertung samt JSON gegen Snapshot-JSON,
+mit byteidentischer Ausgabe und separat gemessener Cacheuebernahme.
+Im instrumentierten Build enthaelt `--profile` zusaetzlich `core_phasen`
+mit Aufrufzahlen und kumulierten Millisekunden. Diese Detailmessung ist
+kein Echtzeitnachweis.
+Tatsaechliche Ergebnisse und offene Abnahmen stehen ausschliesslich im
+[Plan C-0.25](../Umsetzungsplaene/Umsetzungsplan_C-0.25.md).
+
+Der Core aktiviert fuer Release die vom Compiler unterstuetzte
+interprozedurale Optimierung (MSVC: `/GL`, beim Konsumenten `/LTCG`).
+Die Verfuegbarkeit wird beim Konfigurieren geprueft und ein fehlender
+Support explizit ausgegeben. `/fp:precise` und alle numerischen
+Pruefungen bleiben unveraendert; Debug ist davon nicht betroffen.
+IPO-Archive und ihre Konsumenten muessen mit kompatiblen Compiler-/
+Linkerfassungen gebaut werden.
+
 ## CLI und Bibliothek
 
 Die CLI unterstützt `--help`, `--build-info`, `--fehlerdoku`,

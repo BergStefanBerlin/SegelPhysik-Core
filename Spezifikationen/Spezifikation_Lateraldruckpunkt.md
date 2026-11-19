@@ -1,5 +1,12 @@
 # Spezifikation: Lateraldruckpunkt
 
+**Finaler Nachtrag C-0.25, 17.11.2026:** Abschnitt 6 erweitert den
+historischen LDP-/Ersatz-SDP-Umfang um den aerodynamischen
+Seitenkraft-SDP A-C-00178. Einziger zugehoeriger Plan:
+[C-0.25](../Umsetzungsplaene/Umsetzungsplan_C-0.25.md).
+Fruehere Abgrenzungen des Segeldruckpunkts beziehen sich auf die
+vorherigen Versionsschritte, nicht auf den neuen Abschnitt 6.
+
 **Status:** Abschnitte 1–4 am 28.10.2026 für C-0.7 finalisiert (A-C-00093 bis A-C-00097); Abschnitt 5 am 02.11.2026 für C-0.8 finalisiert (A-C-00123 bis A-C-00125). Umsetzung und technische Abnahme: siehe Plan. Keine Commit-, Push-, Tag- oder Release-Freigabe.
 **Zielversion:** C-0.7 und C-0.8 · **Umsetzungspläne:** [C-0.7](../Umsetzungsplaene/Umsetzungsplan_C-0.7_Hydrodynamik.md), Teil D; [C-0.8](../Umsetzungsplaene/Umsetzungsplan_Modellinspektion.md), Abschnitt „Korrekter LDP und Ersatz-SDP“
 **Herkunft:** [Entwurfspunkteliste](Entwurfspunkte/Lateraldruckpunkt.json) (IDEE-C-00060 bis IDEE-C-00065 und IDEE-C-00085 bis IDEE-C-00087)
@@ -257,3 +264,73 @@ Solverergebnisse und Zustandsverlauf sind mit und ohne
 Druckpunktauswertung identisch. Die Regression enthält einen echten
 420er-Lauf mit vollständigen Eingaben; ein Screenshot allein ist kein
 vollständiger numerischer Nachweis.
+
+## 6. C-0.25: Aerodynamischer Seitenkraft-SDP
+
+**Status:** FINAL auf Nutzerauftrag vom 17.11.2026. Umsetzung und
+Nachweise offen. Einziger Plan:
+[C-0.25](../Umsetzungsplaene/Umsetzungsplan_C-0.25.md).
+Die vorherigen Abschnitte bleiben historisch und fuer ihre bestehenden
+Quellen gueltig. Die neue Segelphysik steht in der
+[sailforce-Spezifikation](Spezifikation_sailforce.md).
+
+### A-C-00178: Seitenkraft-Druckpunkt je Segel und gemeinsam
+
+**Herkunft:** IDEE-C-00122; bestaetigte Schwellen 17.11.2026.
+
+Die tatsaechlichen aerodynamischen Einzellasten aller aktiven Segel
+werden im gemeinsamen Modellkoordinatensystem ausgewertet:
+
+```text
+Q = Summe(F_y,i)
+B = Summe(abs(F_y,i))
+X = Summe(x_i * F_y,i)
+Z = Summe(z_i * F_y,i)
+bestimmbar genau wenn abs(Q) >= 1 N und abs(Q) >= 0.05 * B
+SDP = (X/Q, 0, Z/Q)
+```
+
+Die Einzellasten sind die tatsaechlichen Integrationsbeitraege der
+Segelberechnung vor ihrer Streifenaggregation; ihre Definition und
+Numerikfassung gehoeren zum Produzentenvertrag. Keine Abfragepunkt-
+Gewichtung als Naeherung. B bleibt auch bei Gegenkraeften innerhalb
+eines Streifens erhalten. Summation in anderem Frame und anschliessendes
+Drehen eines bereits bestimmten Punkts ersetzen diese Auswertung nicht.
+
+Je aktivem Segel und gemeinsam fuer alle aktiven Segel werden Q/B/X/Z,
+Gueltigkeitsstatus, Quelle, Segelzuordnung und bei Bestimmbarkeit die
+Position geliefert. Fuer den gemeinsamen Punkt werden die Rohsummen
+addiert, nicht die Segel-SDPs gemittelt. Ein gemeinsamer SDP kann gueltig
+sein, obwohl ein Einzel-SDP nicht bestimmbar ist, und umgekehrt.
+Inaktive Segel werden nicht einbezogen und bleiben als inaktiv erkennbar.
+Bei keiner aktiven Segellast ist kein aktiver Gesamt-SDP auszuweisen.
+Fehlende benoetigte Daten sind ein Datenfehler, nicht kleine Seitenkraft.
+
+Der SDP ist ein auf die Bootsmittschiffsebene projizierter
+Seitenkraft-Ersatzpunkt, kein garantierter Punkt auf dem Segeltuch,
+kein Flaechenschwerpunkt und nicht der Angriffspunkt der vollstaendigen
+Segellast. Gueltige Aussenpunkte nicht klemmen. Bei zu kleiner oder
+stark kompensierter Seitenkraft keine Position liefern; vollstaendige
+Kraefte und Momente bleiben unveraendert erhalten.
+
+Fremdkraft, Gewicht, Auftrieb und Wasserlasten gehen nicht direkt in
+diesen SDP ein. Der bestehende hydrodynamische LDP und der separat
+gekennzeichnete Fremdkraft-Ersatz-SDP bleiben unveraendert. Die drei
+Punktarten duerfen in Ergebnissen und Historie nicht vermischt werden.
+
+Der SDP-LDP-Abstand erlaeutert den Seitenkrafthebel, ist aber keine
+vollstaendige Luv-/Leegierigkeitsdiagnose. Die Ergebnisbilanz liefert
+ergaenzend die tatsaechlichen Giermomentanteile um S nach Quellen,
+einschliesslich der weiteren wirksamen Lasten. Insbesondere duerfen
+`-y*Fx` und freie Momente nicht in X versteckt werden. Kein automatischer
+Ruder-/Trimmabgleich und kein Punktabstand als Konvergenzkriterium.
+
+**Abnahme:** Die signierte Zweilastreferenz `+100 N bei x=+1 m` und
+`-80 N bei x=-1 m` ergibt Q=20 N, B=180 N, X=180 Nm und x=9 m.
+Beide Schwellen exakt sowie knapp darunter/darueber, kompensierte
+Lasten innerhalb eines Streifens, reine Momente, Nullwind, ein/zwei
+Segel und getrennte/gesamte Bestimmbarkeit pruefen. Geneigte und
+gespiegelte Modellrahmen sowie ein Fall mit gleichem X, aber anderem
+`-y*Fx` belegen, dass die Seitenkraftauswertung nicht aus dem vollen
+Giermoment rekonstruiert wird. Mit/ohne Druckpunktauswertung bleiben
+Physik und vollstaendige Lasten gleich.

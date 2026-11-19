@@ -37,6 +37,8 @@ void vergleich(const Modell& m,int fall)
     Modellaufbereitung cache(m);
     auto a=start(m,fall),b=a;
     const auto historisch=a;
+    std::shared_ptr<const ErgebnisSnapshot> gespeichert;
+    std::string gespeichertes_json;
     std::vector<std::string> bewegungen;
     for(const auto& e:m.elemente) if(e.bewegung) bewegungen.push_back(e.id);
     for(int i=0;i<4;++i) {
@@ -49,7 +51,20 @@ void vergleich(const Modell& m,int fall)
         check(zustand_json(m,a,"laufend")==cache.json(b,"laufend"),
             "JSON/Physik/Stellung/CG/Traegheitskontext nicht identisch");
         const auto einmal=cache.json(b,"laufend");
+        if(gespeichert)
+            check(snapshot_json(*gespeichert,"laufend")==gespeichertes_json,
+                "Neuer Schritt veraendert eingefrorenen Ergebnissnapshot");
+        gespeichert=cache.snapshot(b);
+        gespeichertes_json=snapshot_json(*gespeichert,"laufend");
+        check(gespeichertes_json==einmal,"Snapshot-JSON weicht von vollstaendiger Auswertung ab");
+        check(snapshot_json(*gespeichert,"laufend",{},ErgebnisJsonFormat::Kompatibel)==
+            cache.json(b,"laufend",{},nullptr,nullptr,ErgebnisJsonFormat::Kompatibel),
+            "Snapshot veraendert kompatiblen Ergebnisvertrag");
+        auto leser=std::async(std::launch::async,[gespeichert] {
+            return snapshot_json(*gespeichert,"laufend");
+        });
         cache.auswertung(b);
+        check(leser.get()==einmal,"Paralleler Snapshot-Leser veraendert Ergebnis");
         check(einmal==cache.json(b,"laufend"),"Ergebniswiederverwendung veraendert JSON");
     }
     if(fall==3) check(b.testantrieb->uebergang->begrenzung.wirksam,
@@ -112,6 +127,7 @@ void vergleich(const Modell& m,int fall)
     ungueltig.dynamische_fremdkraft_erforderlich=true;
     ungueltig.dynamische_fremdkraft.reset();
     fehler([&] {cache.json(ungueltig,"ungueltig");});
+    fehler([&] {cache.snapshot(ungueltig);});
     check(cache.json(b,"laufend")==zustand_json(m,b,"laufend"),
         "Fehlerpfad vergiftet Cache");
     if(b.hydrodynamik) {
@@ -136,11 +152,18 @@ int main(int argc,char** argv)
             for(int fall:{0,1,2,3,4,5,12,13}) vergleich(m,fall);
             Modellaufbereitung original(m);
             const auto unveraendert=original.json({},"laufend");
+            auto snapshot_aus_freigegebenem_kontext=[&] {
+                Modellaufbereitung kurzlebig(m);
+                return kurzlebig.snapshot({});
+            };
+            const auto unabhaengig=snapshot_aus_freigegebenem_kontext();
             m.elemente.front().schwerpunkt_m[0]+=.5;
             if(m.elemente.front().volumen)
                 m.elemente.front().volumen->punkte.front()[2]+=.01;
             check(original.json({},"laufend")==unveraendert,
                 "Unveraenderliche Basis teilt mutable Quelldaten");
+            check(snapshot_json(*unabhaengig,"laufend")==unveraendert,
+                "Snapshot verliert Modellbesitz oder teilt mutable Quelldaten");
             Modellaufbereitung neu(m);
             check(neu.json({},"laufend")==zustand_json(m,{},"laufend"),
                 "Neues Modell bei gleicher Fassung ignoriert");
@@ -210,6 +233,22 @@ int main(int argc,char** argv)
                     "Unveraenderte Elemente kopiert oder mitbewegte Kinder vergessen");
                 break;
             }
+            const auto vor_uebernahme=testmessungen();
+            const auto snapshot=cache.snapshot(s);
+            const auto vor_serialisierung=testmessungen();
+            check(vor_uebernahme.at("kraftauswertung").anzahl==
+                vor_serialisierung.at("kraftauswertung").anzahl &&
+                vor_uebernahme.at("modellbasis_aufbau").anzahl==
+                vor_serialisierung.at("modellbasis_aufbau").anzahl,
+                "Snapshot-Uebernahme verwirft fertige Lasten oder kopiert Modellbasis");
+            snapshot_json(*snapshot,"laufend");
+            snapshot_json(*snapshot,"laufend");
+            const auto nach_serialisierung=testmessungen();
+            check(vor_serialisierung.at("kraftauswertung").anzahl==
+                nach_serialisierung.at("kraftauswertung").anzahl &&
+                vor_serialisierung.at("modellbasis_aufbau").anzahl==
+                nach_serialisierung.at("modellbasis_aufbau").anzahl,
+                "Snapshot-Serialisierung wiederholt Physik oder Modellinitialisierung");
         }
         testmessungen_aktivieren(false);
 #endif

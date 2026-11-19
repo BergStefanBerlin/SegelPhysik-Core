@@ -221,6 +221,11 @@ SegelKonfigurationSnapshot fixture(bool quadrilateral)
     reference.ecken.schothorn_m = {-2., 0., 0.};
     reference.ecken.kopf_vorliek_m = {0., 0., 3.};
     if (quadrilateral) reference.ecken.kopf_achterliek_m = Vektor3{-0.2, 0., 3.};
+    Bewegungsdefinition groupMovement;
+    groupMovement.art = Bewegungsart::drehen;
+    groupMovement.achse_modell = {0., 0., 1.};
+    groupMovement.drehpunkt_modell_m = {0., 0., 0.};
+    reference.gruppenbewegung = groupMovement;
     reference.rig_hals_anschlag_m = {0., 0., 0.};
     reference.rig_vorliek_richtung_modell = {0., 0., 1.};
     reference.rig_unterliek_richtung_modell = {-1., 0., 0.};
@@ -315,7 +320,7 @@ void test_synthetic_operations()
                  "Negative local -Z angle must render to steuerbord");
     require(close(positive.meshes[0].points_m[1][1], 2.) &&
             close(negative.meshes[0].points_m[1][1], -2.),
-            "Stellwinkel sign must follow local -Z convention");
+            "Stellwinkel must use the JSON group axis and its direction convention");
 
     auto incompatible = fixture(false);
     incompatible.referenzen[0].rig_unterliek_richtung_modell = {0., 0., 1.};

@@ -4,6 +4,16 @@ Projektweites Register dauerhafter C++-Interfacekennungen (`CPPI-*`).
 Die Kennungen ergänzen A-/U-Verweise und bleiben bei Umbenennung oder
 Weiterentwicklung erhalten.
 
+**Planung C-0.25 (17.11.2026):** A-C-00177 und U-C-000149 im
+[einzigen sailforce-Plan](../Umsetzungsplaene/Umsetzungsplan_C-0.25.md)
+verlangen die Konkretisierung des neuen Vertrags und die Einzelvergabe
+neuer oeffentlicher Schnittstellen vor Implementierung. Die konkreten
+unabhaengigen Vertragsbausteine sind als CPPI-0173 bis CPPI-0185
+registriert, implementiert und gezielt getestet. Das ist noch kein
+integrierter Last-/Snapshotvertrag. Der Produzenten-SDP-Zusatzvertrag
+ist geliefert; Formparitaet, Modellzuordnung und Core-Anbindung bleiben
+offene Gates. Keine Sammel- oder Platzhalter-CPPI-IDs.
+
 | CPPI-ID | C++-Schnittstelle | Status | Version/Anforderung | Bemerkung |
 |---|---|---|---|---|
 | CPPI-0001 | `HydrodynamikRolle` | implementiert | C-0.6 / A-C-00061 | Rollen `rumpf`, `kiel`, `ruder` |
@@ -199,7 +209,7 @@ Die Schnittstellen ergänzen den unveränderlichen Inspektionssnapshot.
 | CPPI-0125 | `SegelKonfigurationsStatus` | implementiert | A-C-00143; nicht konfiguriert, bereit oder Fehler |
 | CPPI-0126 | `SegelErgebnisStatus` | implementiert | A-C-00143; Vorschau, gespeichert oder Fehler |
 | CPPI-0127 | `SegelEcken` | implementiert | A-C-00136; Hals, Schothorn, vorderer und optional hinterer Kopf |
-| CPPI-0128 | `SegelReferenz` | implementiert | A-C-00136, A-C-00145; explizite Quellen-/Element-/Lookup-/Riggzuordnung und Fingerprint |
+| CPPI-0128 | `SegelReferenz` | implementiert | A-C-00136, A-C-00145; Quellen-/Element-/Lookup-/Riggzuordnung und Fingerprint; C-0.25: explizite intrinsische x/z-Formspiegelung bei zugeordnetem Aero-Laufzeitmodell |
 | CPPI-0129 | `SegelLage` | implementiert | A-C-00137 bis A-C-00141, A-C-00147; normierte starre Lage, abgeleiteter Fockversatz, Originalbuglage |
 | CPPI-0130 | `SegelDiagnose` | implementiert | A-C-00143; maschinenlesbarer Code, Meldung und Elementbezug |
 | CPPI-0131 | `SegelKonfigurationSnapshot` | implementiert | A-C-00141, A-C-00143; Modellfassung, Revision, Referenzen, bestätigte Lagen und Ausgangsmeshes |
@@ -244,3 +254,39 @@ Die Schnittstellen ergänzen den unveränderlichen Inspektionssnapshot.
 | CPPI-0170 | `katalog_nach_segel_speicherung(const Modellkatalog&, const string&, const string&, const string&)` | implementiert, gezielt getestet | Übernimmt die bestätigte Segelrevision in eine Kopie des geprüften Katalogs ohne erneute Ressourcen-Fingerprints |
 | CPPI-0171 | `modellAusInspektion(const ModelInspection&)` | implementiert, gezielt getestet | Gibt das zur Simulation freigegebene, eingelesene Modell als Kopie zurück |
 | CPPI-0172 | `simulieren(const Modell&, const filesystem::path&, const filesystem::path&, const Laufoptionen&)` | implementiert, gezielt getestet | Simuliert ein bereits eingelesenes Modell ohne erneutes Fingerprinting; der Modellpfad schützt vor Überschreiben der Quelldatei |
+| CPPI-0173 | `Lufteigenschaften` | implementiert, integriert getestet | C-0.25 / A-C-00183; explizite Luftdichte und kinematische Viskositaet mit bestaetigten Vorgaben |
+| CPPI-0174 | `LuftGueltigkeitsbereich` | implementiert, integriert getestet | C-0.25 / A-C-00180, A-C-00183; explizite inklusive Manifestgrenzen eines aktiven Modells |
+| CPPI-0175 | `pruefe_lufteigenschaften(const Lufteigenschaften&, const LuftGueltigkeitsbereich&)` | implementiert, integriert getestet | C-0.25 / A-C-00183; endliche positive Eingaben und gueltige Manifestgrenzen pruefen, Fehler CORE-SIM-0001 |
+| CPPI-0176 | `SailforceSdpSummen` | implementiert, integriert getestet | C-0.25 / A-C-00178; Q/B/X/Z im Modellrahmen aus Produzentenauswertung, keine Streifenpunkt-Naeherung |
+| CPPI-0177 | `SailforceSdpStatus` | implementiert, integriert getestet | C-0.25 / A-C-00178; gueltig, nicht_bestimmbar, inaktiv |
+| CPPI-0178 | `SailforceSdp` | implementiert, integriert getestet | C-0.25 / A-C-00178; Rohsummen, Status und optionale Modellposition |
+| CPPI-0179 | `sailforce_sdp(const SailforceSdpSummen&)` | implementiert, integriert getestet | C-0.25 / A-C-00178; bestaetigte inklusive 1-N-/5-Prozent-Schwellen |
+| CPPI-0180 | `sailforce_sdp_gesamt(const std::vector<SailforceSdpSummen>&)` | implementiert, integriert getestet | C-0.25 / A-C-00178; aktive Rohsummen vor Division addieren, leere Liste inaktiv, Ueberlauf als Fehler |
+| CPPI-0181 | `SailforceStreifenlast` | implementiert, integriert getestet | C-0.25 / A-C-00173; lokaler Abfragepunkt, Kraft und vollstaendiges Moment um diesen Punkt |
+| CPPI-0182 | `SailforceModelllast` | implementiert, integriert getestet | C-0.25 / A-C-00173; Modellkraft und vollstaendiges Moment um S, expliziter Darstellungsbezug |
+| CPPI-0183 | `sailforce_modelllast(const SailforceStreifenlast&, const Pose&, const Vektor3&)` | implementiert, integriert getestet | C-0.25 / A-C-00173, A-C-00184; eigentliche starre Segel-zu-Modell-Pose; Formparitaet separat durch Produzent und gemeinsame Darstellung nachgewiesen |
+| CPPI-0184 | `WindPunktAuswertung` | implementiert, integriert getestet | C-0.25 / A-C-00170, A-C-00172; beliebiger starr mitbewegter Punkt mit Weltposition/-geschwindigkeit und wahrem/scheinbarem Wind |
+| CPPI-0185 | `wind_am_punkt(const Modell&, const Zustand&, const Vektor3&, const Vektor3&)` | implementiert, integriert getestet | C-0.25 / A-C-00170, A-C-00172; bestehendes Windfeld ohne Mastvoraussetzung, ungueltige Auswertung als Fehler CORE-SIM-0001 |
+| CPPI-0186 | `SailforceSegelwahl` | implementiert, integriert getestet | C-0.25 / A-C-00181, A-C-00182; explizite Aktivierung und quasistatischer Winkel |
+| CPPI-0187 | `SailforceKonfiguration` | implementiert, integriert getestet | C-0.25 / A-C-00181, A-C-00183; Laufkonfiguration |
+| CPPI-0188 | `SailforceKontext` | implementiert, integriert getestet | C-0.25 / A-C-00174; unveraenderliche gemeinsame Vorbereitung und Stellungsrevision |
+| CPPI-0189 | `SailforceStreifenErgebnis` | implementiert, integriert getestet | C-0.25 / A-C-00173; stabile ID und volle Last um S |
+| CPPI-0190 | `SailforceSegelErgebnis` | implementiert, integriert getestet | C-0.25 / A-C-00173, A-C-00176, A-C-00178; Teilresultate, reale Linien und SDP |
+| CPPI-0191 | `SailforceAuswertung` | implementiert, integriert getestet | C-0.25 / A-C-00174; konsistente Gesamtprojektion |
+| CPPI-0192 | `sailforce_start` | implementiert, integriert getestet | C-0.25 / A-C-00169, A-C-00184; explizite Modellreferenzen laden und pruefen |
+| CPPI-0193 | `sailforce_stellwinkel` | implementiert, integriert getestet | C-0.25 / A-C-00182; neue unveraenderliche Stellung |
+| CPPI-0194 | `sailforce_auswertung` | implementiert, integriert getestet | C-0.25 / A-C-00172, A-C-00173; gekoppelte Produzentenauswertung |
+| CPPI-0195 | `sailforce_json` | implementiert, integriert getestet | C-0.25 / A-C-00177; JSON-Projektion des typisierten Ergebnisses |
+| CPPI-0196 | `sailforce_addieren` | implementiert, integriert getestet | C-0.25 / A-C-00171; genau einmal Einzelbeitraege und physische Summe integrieren |
+| CPPI-0197 | `Zustand::sailforce` | implementiert, integriert getestet | C-0.25 / A-C-00174; historischer Kontext |
+| CPPI-0198 | `Kraefte::sailforce` | implementiert, integriert getestet | C-0.25 / A-C-00174; unveraenderliche Auswertung derselben Bilanz |
+| CPPI-0199 | `kraefte(..., const Zustand*)` | implementiert, integriert getestet | C-0.25 / A-C-00171, A-C-00179; optionaler Segelkontext, vorhandene Aufrufe bleiben unveraendert |
+| CPPI-0200 | `Laufoptionen::sailforce` | implementiert, integriert getestet | C-0.25 / A-C-00181, A-C-00183; optionale explizite Laufkonfiguration und Dateiexport fuer alle drei Referenzmodelle |
+| CPPI-0201 | `SegelStellung` | implementiert, integriert getestet | C-0.25 / A-C-00182, A-C-00184; gemeinsame starre Pose plus explizite Formseite |
+| CPPI-0202 | `segel_stellung` | implementiert, integriert getestet | C-0.25 / A-C-00182, A-C-00184; identische Stellungsabbildung fuer Darstellung und Aerodynamik |
+| CPPI-0203 | `Zustand::sailforce_erforderlich` | implementiert, integriert getestet | C-0.25 / A-C-00180; verlorenen Pflichtkontext diagnostizieren |
+| CPPI-0204 | `SailforceVorbereitung` | implementiert, opak | C-0.25 / A-C-00174, A-C-00184; unveraenderliche gemeinsame Bibliotheks-/Quellen-/Schnittvorbereitung |
+| CPPI-0205 | `SailforceGrenzlinie` | implementiert, integriert getestet | C-0.25 / A-C-00176; stabile Linien-/Grenzkennung, angrenzende echte Streifen-IDs und intrinsische Schnittpunkte |
+| CPPI-0206 | `ErgebnisSnapshot` | implementiert, opak, gezielt getestet | C-0.25 / A-C-00174, A-C-00175; unveraenderlicher Zustand mit bereits berechneter Last und gemeinsam besessener eingefrorener Modellbasis |
+| CPPI-0207 | `Modellaufbereitung::snapshot(const Zustand&)` | implementiert, gezielt getestet | C-0.25 / A-C-00174, A-C-00175; passenden Endzustands-Kraftcache uebernehmen, keine Modellkopie je Snapshot |
+| CPPI-0208 | `snapshot_json(const ErgebnisSnapshot&, const string&, const string&, ErgebnisJsonFormat)` | implementiert, gezielt getestet | C-0.25 / A-C-00174, A-C-00175, A-C-00177; historischen Snapshot ohne neue Physikauswertung und ohne Worker-Mutex serialisieren |

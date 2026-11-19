@@ -52,6 +52,10 @@ Vektor3 cross(const Vektor3& a, const Vektor3& b)
 }
 bool gleicher_stationaerer_snapshot(const Zustand& zustand, const Zustand& snapshot)
 {
+    if (zustand.sailforce != snapshot.sailforce ||
+        zustand.sailforce_erforderlich != snapshot.sailforce_erforderlich ||
+        (zustand.sailforce && zustand.wind != snapshot.wind))
+        return false;
     if (zustand.schritt != snapshot.schritt || zustand.zeit_s != snapshot.zeit_s ||
         zustand.pose.position_m() != snapshot.pose.position_m() ||
         zustand.pose.orientierung_xyzw() != snapshot.pose.orientierung_xyzw() ||
@@ -87,6 +91,9 @@ std::string pruefung_json(const std::filesystem::path& path,bool& gueltig)
 namespace detail {
 void pruefe_auswertungszustand(const Modell& m,const Zustand& s)
 {
+    if ((s.sailforce_erforderlich && !s.sailforce) ||
+        (s.sailforce && s.sailforce->modell_fassung != m.fassung))
+        throw std::invalid_argument("CORE-SIM-0001: Fehlender oder fremder sailforce-Ergebniskontext.");
     if(!std::isfinite(s.zeit_s))
         throw std::invalid_argument("CORE-SIM-0001: Simulationszeit nicht endlich.");
     if(s.testantrieb_erforderlich&&!s.testantrieb)
@@ -142,7 +149,14 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
         throw std::invalid_argument("CORE-SIM-0001: Stationaerer Druckpunktsnapshot passt nicht zum serialisierten Zustand.");
     auto k=kraefte(m,s.pose,s.testantrieb.get(),1000.,9.81,s.geflutet,
         s.hydrodynamik.get(),s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s,
-        s.bewegungsstellungen,s.dynamische_fremdkraft.get());
+        s.bewegungsstellungen,s.dynamische_fremdkraft.get(),&s);
+    return detail::zustand_json_mit_kraeften(m,s,std::move(k),status,diagnose,gg,stationaer,format);
+}
+
+std::string detail::zustand_json_mit_kraeften(const Modell& m,const Zustand& s,Kraefte k,
+    const std::string& status,const std::string& diagnose,const Gleichgewichtsangaben* gg,
+    const StationaeresGleichgewichtErgebnis* stationaer,ErgebnisJsonFormat format)
+{
     if (stationaer && stationaer->status != "ungueltig") {
         const auto force_world = !stationaer->konfiguration.aktiv ? Vektor3{} :
             stationaer->konfiguration.modellfest
@@ -182,7 +196,7 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
     if (format == ErgebnisJsonFormat::V6 && stationaer && heading_rate_status == "gueltig") {
         heading_rate = stationaer->kursdrehrate_rad_s;
     }
-    const char* contract = s.dynamische_fremdkraft ? "7" :
+    const char* contract = s.sailforce ? "8" : s.dynamische_fremdkraft ? "7" :
         format == ErgebnisJsonFormat::V6 ? "6" :
         stationaer ? "5" : beweglich ? "4" : s.testantrieb ? "3" : "2";
     out<<"{\"vertragsversion\":"<<text(contract)<<",\"modell_id\":"<<text(m.id)
@@ -489,6 +503,8 @@ std::string zustand_json(const Modell& m,const Zustand& s,const std::string& sta
             out<<"]}";
         }
     }
+    if (k.sailforce)
+        out << ",\"sailforce\":" << sailforce_json(*k.sailforce, s.sailforce->konfiguration.luft);
     const auto ldp=lateraldruckpunkt(m,s.pose,k,s.bewegungsstellungen);
     if(ldp.vorhanden || stationaer || s.dynamische_fremdkraft) {
         out<<",\"druckpunkte\":{";
@@ -620,6 +636,12 @@ static Laufbericht simulieren_impl(const std::filesystem::path& path,
         if(o.dynamische_fremdkraft && !o.dynamisch)
             throw std::invalid_argument("CORE-SIM-0001: Dynamische Fremdkraft ist nur im dynamischen Lauf zulaessig.");
         const bool stationaer_aktiv = o.stationaer.has_value();
+        if ((o.dynamisch || stationaer_aktiv || o.sailforce) && !s.sailforce) {
+            s = sailforce_start(m,s,path,o.sailforce.value_or(SailforceKonfiguration{}));
+            if (s.sailforce && !s.wind)
+                s = wind_start(m,s,WindKonfiguration{},std::nullopt,"",
+                    "Keine Mastreferenz; lokales Segelwindfeld bleibt verfuegbar.");
+        }
         if(o.hydrodynamik && !o.dynamisch && !stationaer_aktiv)
             throw std::invalid_argument("CORE-HYD-0001: Hydrodynamik ist nur fuer dynamische Laeufe verfuegbar.");
         if(stationaer_aktiv && o.dynamisch)

@@ -7,6 +7,7 @@
 #include "../src/modell_intern.hpp"
 #include "../src/modellformat_03_intern.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -141,6 +142,24 @@ void pruefe_420_bewegungsvorschau(const segelphysik::ModelInspection& inspection
         keel->poses.size() == 3 && rudder && rudder->minimum_value == -90. &&
         rudder->maximum_value == 90. && rudder->poses.size() == 3,
         "Explizite Schwert- oder Rudergrenzen fehlen");
+    const auto requested_sail = segelphysik::getGroupMovementPreview(
+        inspection, "mainsail", 20.);
+    pruefung(requested_sail.has_value(),
+        "Angeforderte Segelstellung liefert keine Gruppenvorschau");
+    const auto requested_sail_pose = std::find_if(requested_sail->poses.begin(),
+        requested_sail->poses.end(), [](const auto& pose) { return pose.label == "requested"; });
+    pruefung(requested_sail_pose != requested_sail->poses.end() &&
+        requested_sail_pose->meshes.size() == 2,
+        "Angeforderte Segelstellung bewegt nicht die vollstaendige JSON-Gruppe");
+    const auto normal_sail = std::find_if(requested_sail->poses.begin(),
+        requested_sail->poses.end(), [](const auto& pose) { return pose.label == "normal"; });
+    bool sail_group_moved = normal_sail != requested_sail->poses.end();
+    if (sail_group_moved)
+        for (std::size_t mesh = 0; mesh < normal_sail->meshes.size(); ++mesh)
+            sail_group_moved = sail_group_moved &&
+                normal_sail->meshes[mesh].points_m != requested_sail_pose->meshes[mesh].points_m;
+    pruefung(sail_group_moved,
+        "Segel und Baum folgen nicht derselben JSON-Gruppenachse");
     bool unknown_group_rejected = false;
     try { (void)segelphysik::getGroupMovementPreview(inspection, "unbekannt"); }
     catch (const std::runtime_error&) { unknown_group_rejected = true; }

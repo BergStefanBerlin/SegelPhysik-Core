@@ -34,6 +34,7 @@ struct SegelEcken {
 
 struct SegelReferenz {
     std::string element_id;
+    std::string gruppen_id;
     std::string intrinsische_quelle_id;
     std::string darstellungs_mesh_id;
     std::string lookup_id;
@@ -48,8 +49,10 @@ struct SegelReferenz {
     Vektor3 fock_versatzrichtung_modell{};
     SegelBuglage original_buglage = SegelBuglage::Unbekannt;
     std::string quellen_fingerprint;
+    std::optional<Bewegungsdefinition> gruppenbewegung;
     MontageReferenz montage;
     bool montage_basis_vorgegeben{};
+    bool intrinsische_xz_spiegelung{};
 };
 
 struct SegelLage {
@@ -98,6 +101,13 @@ struct SegelKonfigurationErgebnis {
     std::vector<InspectionMesh> meshes;
     std::vector<SegelDiagnose> diagnosen;
 };
+
+struct SegelStellung {
+    Pose segel_nach_modell{{}, {0., 0., 0., 1.}};
+    bool form_gespiegelt{};
+};
+SegelStellung segel_stellung(const SegelKonfigurationSnapshot&,
+    const std::string& element_id, double stellwinkel_grad);
 
 SegelKonfigurationSnapshot leseSegelKonfiguration(
     const Modellkatalog& katalog, const ModelInspection& inspection);

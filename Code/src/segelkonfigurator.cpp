@@ -500,6 +500,8 @@ SegelReferenz sail_reference03(const std::filesystem::path& root, const Json& mo
     result.ecken.kopf_vorliek_m = json_vector(points.at("luffUpper"));
     if (points.contains("leechUpper"))
         result.ecken.kopf_achterliek_m = json_vector(points.at("leechUpper"));
+    result.intrinsische_xz_spiegelung = element.contains("Segel") &&
+        element.at("Segel").contains("modell_verzeichnis");
     (void)corner_basis(result.ecken);
     result.vorliek_richtung_lokal = subtract(result.ecken.kopf_vorliek_m, result.ecken.hals_m);
     result.unterliek_richtung_lokal = subtract(result.ecken.schothorn_m, result.ecken.hals_m);
@@ -687,22 +689,23 @@ std::vector<InspectionMesh> render_meshes(const SegelKonfigurationSnapshot& snap
     const auto luff = subtract(reference.ecken.kopf_vorliek_m, pivot);
     const auto foot = subtract(reference.ecken.schothorn_m, pivot);
     const auto axis = scale(normalized(luff), -1.);
-    const auto q_stell = axis_angle(axis, delta * pi / 180.);
-    const auto q_total = quaternion_multiply(lage.rotation_xyzw, q_stell);
-    const auto total_matrix = matrix_from_quaternion(q_total);
+    const auto stellung = segel_stellung(snapshot, reference.element_id, delta);
     for (auto& mesh : meshes) {
         mesh.montage = reference.montage;
         mesh.montage->rotation_xyzw = lage.rotation_xyzw;
         mesh.montage->translation_m = lage.translation_m;
         for (auto& point : mesh.points_m) {
-            point = subtract(point, pivot);
-            if (mirror) {
+            if (mirror && reference.intrinsische_xz_spiegelung)
+                point[1] = -point[1];
+            else if (mirror) {
+                point = subtract(point, pivot);
                 const auto x = normalized(subtract(foot,
                     scale(normalized(axis), dot(foot, normalized(axis)))));
                 const auto normal = normalized(cross(axis, x));
                 point = subtract(point, scale(normal, 2. * dot(point, normal)));
+                point = add(point, pivot);
             }
-            point = add(rotate(total_matrix, point), transform_point(lage, pivot));
+            point = stellung.segel_nach_modell.modellpunkt_nach_welt(point);
             if (!finite(point)) throw std::runtime_error("Transformation erzeugt ungueltige Geometrie");
         }
         if (mirror)
@@ -923,6 +926,20 @@ SegelKonfigurationSnapshot leseSegelKonfiguration(
         auto snapshot = load_snapshot(model,
                              info.model_id, info.model_version,
                              std::move(references), std::move(meshes));
+        const auto structure = modellstruktur(inspection);
+        for (auto& reference : snapshot.referenzen) {
+            for (const auto& group : structure.gruppen) {
+                const auto member = std::find_if(group.elemente.begin(), group.elemente.end(),
+                    [&](const StrukturElement& element) {
+                        return element.id == reference.element_id;
+                    });
+                if (member == group.elemente.end()) continue;
+                reference.gruppen_id = group.id;
+                reference.gruppenbewegung = group.bewegung
+                    ? group.bewegung : member->bewegung;
+                break;
+            }
+        }
         snapshot.diagnosen.insert(snapshot.diagnosen.begin(), diagnostics.begin(), diagnostics.end());
         return snapshot;
     } catch (const std::exception& error) {
@@ -1004,6 +1021,41 @@ SegelKonfigurationErgebnis bestaetigeSegelAktion(
             return error_result("CORE-SEG-0016", error.what(), anforderung.element_id);
         return error_result("CORE-SEG-0017", error.what(), anforderung.element_id);
     }
+}
+
+SegelStellung segel_stellung(const SegelKonfigurationSnapshot& snapshot,
+    const std::string& element_id, double stellwinkel_grad)
+{
+    if (snapshot.status == SegelKonfigurationsStatus::Fehler || !std::isfinite(stellwinkel_grad))
+        throw std::invalid_argument("CORE-SEG-0003: Ungueltiger Segelstellungssnapshot oder Winkel.");
+    const auto* reference = find_reference(snapshot, element_id);
+    const auto* lage = find_lage(snapshot, element_id);
+    if (!reference || !lage)
+        throw std::invalid_argument("CORE-SEG-0002: Unbekanntes Segel-Element: " + element_id);
+    std::string error;
+    const bool mirror = should_mirror(lage->original_buglage, stellwinkel_grad, error);
+    if (!error.empty()) throw std::invalid_argument("CORE-SEG-0008: " + error);
+    if (std::abs(stellwinkel_grad) <= 1e-12)
+        return {Pose{lage->translation_m, lage->rotation_xyzw}, mirror};
+    if (!reference->gruppenbewegung ||
+        reference->gruppenbewegung->art != Bewegungsart::drehen)
+        throw std::invalid_argument("CORE-SEG-0008: JSON-Gruppenrotation fuer Segelstellung fehlt (" +
+            reference->gruppen_id + "/" + element_id + ").");
+    const auto& movement = *reference->gruppenbewegung;
+    const auto axis_length = std::sqrt(dot(movement.achse_modell, movement.achse_modell));
+    if (!(axis_length > 1e-12) || !std::isfinite(axis_length) ||
+        !finite(movement.drehpunkt_modell_m))
+        throw std::invalid_argument("CORE-SEG-0008: JSON-Gruppenachse fuer Segelstellung ungueltig.");
+    const auto axis = scale(movement.achse_modell, 1. / axis_length);
+    const auto group_rotation = axis_angle(axis, -stellwinkel_grad * pi / 180.);
+    const Pose rotation{{}, group_rotation};
+    const auto pivot = movement.drehpunkt_modell_m;
+    const auto group_translation = subtract(pivot,
+        rotation.modellvektor_nach_welt(pivot));
+    const auto translation = add(group_translation,
+        rotation.modellvektor_nach_welt(lage->translation_m));
+    const auto orientation = quaternion_multiply(group_rotation, lage->rotation_xyzw);
+    return {Pose{translation, orientation}, mirror};
 }
 
 SegelKonfigurationErgebnis stelleSegelStellwinkelVorschauDar(

@@ -165,7 +165,7 @@ private:
     friend std::optional<InspectionMovementPreview> getMovementPreview(
         const ModelInspection&, const std::string&);
     friend std::optional<InspectionGroupMovementPreview> getGroupMovementPreview(
-        const ModelInspection&, const std::string&);
+        const ModelInspection&, const std::string&, std::optional<double>);
     friend std::vector<InspectionType> getAvailableMeshTypes(const ModelInspection&);
     friend std::vector<InspectionMesh> getMesh(
         const ModelInspection&, const std::string&,
@@ -196,7 +196,8 @@ std::vector<InspectionProperty> getObjectProperties(
 std::optional<InspectionMovementPreview> getMovementPreview(
     const ModelInspection& inspection, const std::string& element_id);
 std::optional<InspectionGroupMovementPreview> getGroupMovementPreview(
-    const ModelInspection& inspection, const std::string& group_id);
+    const ModelInspection& inspection, const std::string& group_id,
+    std::optional<double> requested_value = std::nullopt);
 std::vector<InspectionType> getAvailableMeshTypes(const ModelInspection& inspection);
 std::vector<InspectionMesh> getMesh(
     const ModelInspection& inspection, const std::string& mesh_type,

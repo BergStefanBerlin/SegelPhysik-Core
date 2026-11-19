@@ -1,5 +1,7 @@
 #include "segelphysik/hydrostatik.hpp"
 #include "segelphysik/messung.hpp"
+#include "segelphysik/sailforce.hpp"
+#include "segelphysik/wind.hpp"
 #include "aufbereitung_intern.hpp"
 
 #include <algorithm>
@@ -310,11 +312,27 @@ std::vector<Nasspanel> nasspanels(const Mesh& mesh, const Pose& pose)
     }
     std::vector<Nasspanel> result;
     result.reserve(mesh.dreiecke.size());
+    auto add=[&](const Vektor3& a,const Vektor3& b,const Vektor3& c) {
+        const auto ab = plus(b, mal(a, -1.));
+        const auto ac = plus(c, mal(a, -1.));
+        const auto area_vector = cross(ab, ac);
+        const double twice_area = std::sqrt(dot(area_vector, area_vector));
+        if (!std::isfinite(twice_area))
+            throw std::overflow_error("CORE-HYD-0001: Benetztes Meshpanel nicht endlich.");
+        if (twice_area <= 1e-14) return;
+        result.push_back({mal(plus(plus(a, b), c), 1. / 3.),
+            mal(area_vector, 1. / twice_area), .5 * twice_area});
+    };
     for (const auto& triangle : mesh.dreiecke) {
         std::array<Vektor3, 3> vertices{
             welt.punkte.at(triangle[0]),
             welt.punkte.at(triangle[1]),
             welt.punkte.at(triangle[2])};
+        if (vertices[0][2]>0. && vertices[1][2]>0. && vertices[2][2]>0.) continue;
+        if (vertices[0][2]<=0. && vertices[1][2]<=0. && vertices[2][2]<=0.) {
+            add(vertices[0],vertices[1],vertices[2]);
+            continue;
+        }
         std::array<Vektor3, 4> clipped{};
         std::size_t count = 0;
         for (std::size_t i = 0; i < vertices.size(); ++i) {
@@ -328,15 +346,7 @@ std::vector<Nasspanel> nasspanels(const Mesh& mesh, const Pose& pose)
             }
         }
         for (std::size_t i = 1; i + 1 < count; ++i) {
-            const auto ab = plus(clipped[i], mal(clipped[0], -1.));
-            const auto ac = plus(clipped[i + 1], mal(clipped[0], -1.));
-            const auto area_vector = cross(ab, ac);
-            const double twice_area = std::sqrt(dot(area_vector, area_vector));
-            if (!std::isfinite(twice_area))
-                throw std::overflow_error("CORE-HYD-0001: Benetztes Meshpanel nicht endlich.");
-            if (twice_area <= 1e-14) continue;
-            result.push_back({mal(plus(plus(clipped[0], clipped[i]), clipped[i + 1]), 1. / 3.),
-                mal(area_vector, 1. / twice_area), .5 * twice_area});
+            add(clipped[0],clipped[i],clipped[i+1]);
         }
     }
     return result;
@@ -484,6 +494,7 @@ Beitrag reibungsbeitrag(const Element& element, const Modell& modell, const Pose
     const HydrodynamikKonfiguration& config, const Vektor3& velocity,
     const Vektor3& omega, const std::vector<Nasspanel>& panels)
 {
+    SEGEL_MESSUNG("hydro_reibungsbeitrag");
     const auto* model = kraftmodell(element, "hautreibung");
     const auto* side_model = kraftmodell(element, "seitenkraft");
     if (element.hydrodynamik_rolle != HydrodynamikRolle::rumpf &&
@@ -565,6 +576,7 @@ Beitrag druckbeitrag(const Element& element, const Modell& modell, const Pose& p
     const HydrodynamikKonfiguration& config, const Vektor3& velocity,
     const Vektor3& omega, const std::vector<Nasspanel>& panels)
 {
+    SEGEL_MESSUNG("hydro_druckbeitrag");
     const auto* model = kraftmodell(element, "druckwiderstand");
     const auto method = model ? model->methode : "geschaetzter_normaler_formwiderstand";
     if (method != "geschaetzter_normaler_formwiderstand" && method != "platten_normal_drag")
@@ -625,6 +637,7 @@ Beitrag seitenkraftbeitrag(const Element& element, const Modell& modell,
     const Vektor3& omega, const std::vector<Nasspanel>& panels,
     const std::vector<Bewegungsstellung>& bewegungsstellungen)
 {
+    SEGEL_MESSUNG("hydro_seitenkraftbeitrag");
     const auto* model = kraftmodell(element, "seitenkraft");
     const auto method = model ? model->methode : "geschaetzte_endliche_streckungspolare";
     if (method != "geschaetzte_endliche_streckungspolare" && method != "polare_2d")
@@ -879,8 +892,11 @@ VolumenWerte wasseranteil(const Mesh& mesh, const Pose& pose)
     const auto n=pose.weltvektor_nach_modell({0.,0.,1.});
     const double offset=-pose.position_m()[2];
     double minimum=std::numeric_limits<double>::infinity(),maximum=-minimum;
+    std::vector<double> abstaende;
+    abstaende.reserve(mesh.punkte.size());
     for(const auto& p:mesh.punkte) {
         const double d=dot(n,p)-offset;
+        abstaende.push_back(d);
         minimum=std::min(minimum,d);maximum=std::max(maximum,d);
     }
     if(minimum>=0.) return {};
@@ -895,8 +911,17 @@ VolumenWerte wasseranteil(const Mesh& mesh, const Pose& pose)
         moment=plus(moment,mal(plus(plus(a,b),c),v/4.));
     };
     for (const auto& tri : mesh.dreiecke) {
+        const auto& p0=mesh.punkte.at(tri[0]);
+        const auto& p1=mesh.punkte.at(tri[1]);
+        const auto& p2=mesh.punkte.at(tri[2]);
         if(maximum<=0.) {
-            add(mesh.punkte.at(tri[0]),mesh.punkte.at(tri[1]),mesh.punkte.at(tri[2]));
+            add(p0,p1,p2);
+            continue;
+        }
+        const double d0=abstaende[tri[0]],d1=abstaende[tri[1]],d2=abstaende[tri[2]];
+        if(d0>0. && d1>0. && d2>0.) continue;
+        if(d0<=0. && d1<=0. && d2<=0.) {
+            add(p0,p1,p2);
             continue;
         }
         std::array<Vektor3,4> clipped{};
@@ -904,7 +929,7 @@ VolumenWerte wasseranteil(const Mesh& mesh, const Pose& pose)
         for (std::size_t i=0;i<3;++i) {
             const auto& a=mesh.punkte.at(tri[i]);
             const auto& b=mesh.punkte.at(tri[(i+1)%3]);
-            const double da=dot(n,a)-offset,db=dot(n,b)-offset;
+            const double da=abstaende[tri[i]],db=abstaende[tri[(i+1)%3]];
             if (da<=0.) clipped[count++]=a;
             if ((da<0. && db>0.) || (da>0. && db<0.))
                 clipped[count++]=plus(a,mal(plus(b,mal(a,-1.)),da/(da-db)));
@@ -992,6 +1017,7 @@ const char* name(Quelle wert)
 {
     switch (wert) {
     case Quelle::externe_kraft: return "externe_kraft";
+    case Quelle::sailforce: return "sailforce";
     case Quelle::testantrieb: return "testantrieb";
     case Quelle::schwerkraft: return "schwerkraft";
     case Quelle::hydrostatik: return "hydrostatik";
@@ -1031,7 +1057,8 @@ Bilanz bilanz(const Modell& modell,std::vector<Beitrag>& beitraege,bool hydrodyn
         [](const Beitrag& b){return b.quelle==Quelle::testantrieb;}))
         result.erwartete_beitraege.push_back("testantrieb.bug.kraft");
     for (const auto& b : beitraege)
-        if (b.quelle == Quelle::externe_kraft && b.rolle == Rolle::einzelbeitrag)
+        if ((b.quelle == Quelle::externe_kraft || b.quelle == Quelle::sailforce) &&
+            b.rolle == Rolle::einzelbeitrag)
             result.erwartete_beitraege.push_back(b.id);
     for (const auto& e : modell.elemente) {
         result.erwartete_beitraege.push_back(e.id+":gewicht");
@@ -1162,6 +1189,11 @@ SolverErgebnis gleichgewicht_suche(const Modell& modell,const Zustand& start,
 SolverErgebnis gleichgewicht(const Modell& modell,const Zustand& start,
     double ftol,double mtol,std::size_t budget,const std::atomic_bool* abbruch)
 {
+    if (start.sailforce_erforderlich && !start.sailforce)
+        throw std::invalid_argument("CORE-SIM-0001: Erforderlicher sailforce-Kontext fehlt.");
+    if (start.sailforce && std::any_of(start.sailforce->konfiguration.segel.begin(),
+        start.sailforce->konfiguration.segel.end(), [](const SailforceSegelwahl& s) { return s.aktiv; }))
+        throw std::invalid_argument("CORE-SIM-0001: Aktives sailforce ist keine reine Hydrostatik.");
     if((start.testantrieb_erforderlich&&!start.testantrieb) ||
         (start.testantrieb&&start.testantrieb->aktiv))
         throw std::invalid_argument("CORE-SIM-0001: Aktiver Testantrieb in Statik oder fehlender Kontext.");
@@ -1366,9 +1398,16 @@ StationaeresGleichgewichtErgebnis stationaeres_kurvengleichgewicht(
                 ftol, mtol, std::min<std::size_t>(budget, 80), abbruch);
             if (seed.status == "konvergiert") initial = seed.zustand;
             else {
-                const auto hydrostatic = gleichgewicht(physical_model, start, ftol, mtol,
+                auto hydro_start = start;
+                hydro_start.sailforce.reset();
+                hydro_start.sailforce_erforderlich = false;
+                const auto hydrostatic = gleichgewicht(physical_model, hydro_start, ftol, mtol,
                     std::min<std::size_t>(budget, 80), abbruch);
-                if (hydrostatic.status == "konvergiert") initial = hydrostatic.zustand;
+                if (hydrostatic.status == "konvergiert") {
+                    initial = hydrostatic.zustand;
+                    initial.sailforce = start.sailforce;
+                    initial.sailforce_erforderlich = start.sailforce_erforderlich;
+                }
             }
         }
         initial.bewegungsstellungen = settings;
@@ -1417,7 +1456,7 @@ StationaeresGleichgewichtErgebnis stationaeres_kurvengleichgewicht(
                 context.traegheit = std::make_shared<const HydrodynamischeTraegheit>(
                     berechne_hydrodynamische_traegheit(physical_model, pose, hydro_config.rho_kg_m3, 9.81));
             auto forces = kraefte(modell, pose, nullptr, hydro_config.rho_kg_m3, 9.81,
-                flooded, &context, velocity_world, omega_body, settings);
+                flooded, &context, velocity_world, omega_body, settings, nullptr, &start);
             add_stationaere_kraft(forces, physical_model, pose, konfiguration);
             const auto inertia = context.traegheit.get();
             Vektor3 added_linear_momentum{};
@@ -1550,7 +1589,10 @@ StationaeresGleichgewichtErgebnis stationaeres_kurvengleichgewicht(
                     const auto rp=evaluate(positive,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr);
                     const auto rm=evaluate(negative,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr);
                     for(std::size_t row=0;row<6;++row) jacobian[row*6+col]=(rp[row]-rm[row])/(2.*h);
-                } catch (...) { singular=true; break; }
+                } catch (...) {
+                    if (start.sailforce) throw;
+                    singular=true; break;
+                }
             }
             if(singular) { result.status="rangdefizit"; result.diagnose="CORE-SIM-0004: Bewegungsabbildung ist singulaer."; break; }
             std::array<double,6> column_norm{};
@@ -1603,7 +1645,7 @@ StationaeresGleichgewichtErgebnis stationaeres_kurvengleichgewicht(
                             double candidate_merit=0.;
                             for(double value:values) candidate_merit+=value*value;
                             if(candidate_merit<merit) { variables=candidate; improved=true; lambda=std::max(1e-12,lambda*.3); break; }
-                        } catch (...) {}
+                        } catch (...) { if (start.sailforce) throw; }
                     }
                     scale*=.5;
                 }
@@ -1777,7 +1819,10 @@ StationaeresGleichgewichtErgebnis stationaeres_gleichgewicht(const Modell& model
         initial.geschwindigkeit_welt_m_s[2] = 0.;
         initial.hydrodynamik.reset();
         initial.hydrodynamik_erforderlich = false;
-        auto static_seed = gleichgewicht(physisches_modell, initial, .05, .05,
+        auto seed_start = initial;
+        seed_start.sailforce.reset();
+        seed_start.sailforce_erforderlich = false;
+        auto static_seed = gleichgewicht(physisches_modell, seed_start, .05, .05,
             std::min<std::size_t>(budget, 200), abbruch);
         if (static_seed.status == "konvergiert") initial = static_seed.zustand;
         initial.bewegungsstellungen = settings;
@@ -1807,7 +1852,7 @@ StationaeresGleichgewichtErgebnis stationaeres_gleichgewicht(const Modell& model
             const auto pose = pose_for(u);
             const auto velocity = speed_for(u);
             auto forces = kraefte(modell, pose, nullptr, hydro_config.rho_kg_m3, 9.81,
-                flooded, &hydro_context, velocity, {}, settings);
+                flooded, &hydro_context, velocity, {}, settings, nullptr, &start);
             add_stationaere_kraft(forces, physisches_modell, pose, konfiguration);
             if (force_residual) *force_residual = forces.kraft_welt_n;
             if (moment_residual) *moment_residual = forces.moment_modell_nm;
@@ -1860,6 +1905,7 @@ StationaeresGleichgewichtErgebnis stationaeres_gleichgewicht(const Modell& model
                 variables[5] = hydro_config.fluidgeschwindigkeit_welt_m_s[1];
             }
         } catch (...) {
+            if (start.sailforce) throw;
         }
 
         const std::array<double, 6> lower{-100., -31.41592653589793,
@@ -1869,7 +1915,12 @@ StationaeresGleichgewichtErgebnis stationaeres_gleichgewicht(const Modell& model
         std::size_t total_iterations = 0;
         // A model-fixed load does not define an absolute heading: rotating
         // heading and water-relative velocity together leaves the balance unchanged.
-        const bool heading_reference = !konfiguration.aktiv || konfiguration.modellfest;
+        const bool wind_heading = start.sailforce && start.wind &&
+            start.wind->konfiguration.modus == WindModus::weltfest &&
+            std::any_of(start.sailforce->konfiguration.segel.begin(),
+                start.sailforce->konfiguration.segel.end(),
+                [](const SailforceSegelwahl& s) { return s.aktiv; });
+        const bool heading_reference = (!konfiguration.aktiv || konfiguration.modellfest) && !wind_heading;
         bool yaw_fixed = heading_reference;
         if (heading_reference) result.referenzkurs_verwendet = true;
         for (std::size_t iteration = 0; !converged && iteration < budget; ++iteration) {
@@ -2022,7 +2073,7 @@ StationaeresGleichgewichtErgebnis stationaeres_gleichgewicht(const Modell& model
         result.zustand.hydrodynamik_erforderlich = true;
         auto final_forces = kraefte(modell, result.zustand.pose, nullptr,
             hydro_config.rho_kg_m3, 9.81, flooded, &hydro_context,
-            result.zustand.geschwindigkeit_welt_m_s, {}, settings);
+            result.zustand.geschwindigkeit_welt_m_s, {}, settings, nullptr, &start);
         add_stationaere_kraft(final_forces, physisches_modell,
             result.zustand.pose, konfiguration);
         result.residuum_kraft_welt_n = final_forces.kraft_welt_n;
@@ -2104,6 +2155,9 @@ std::optional<Vektor3> bugpunkt(const Modell& m)
 }
 void kontextpruefung(const Modell& m,const Zustand& s)
 {
+    if ((s.sailforce_erforderlich && !s.sailforce) ||
+        (s.sailforce && s.sailforce->modell_fassung != m.fassung))
+        throw std::invalid_argument("CORE-SIM-0001: Fehlender oder fremder sailforce-Kontext.");
     if(s.testantrieb_erforderlich&&!s.testantrieb)
         throw std::invalid_argument("CORE-SIM-0001: Erforderlicher Testkontext fehlt.");
     if(s.testantrieb && (s.testantrieb->modell_fassung!=m.fassung ||
@@ -2167,7 +2221,7 @@ Zustand hydrodynamik_start(const Modell& m,const Zustand& s,
             berechne_hydrodynamische_traegheit(physisches_modell,s.pose,config.rho_kg_m3,9.81));
     kraefte(m,s.pose,s.testantrieb.get(),1000.,9.81,s.geflutet,context.get(),
         s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s,s.bewegungsstellungen,
-        s.dynamische_fremdkraft.get());
+        s.dynamische_fremdkraft.get(),&s);
     auto result=s;
     result.hydrodynamik=context;
     result.hydrodynamik_erforderlich=true;
@@ -2237,7 +2291,7 @@ Zustand dynamische_fremdkraft_start(const Modell& m,const Zustand& s,
     kraefte(m,result.pose,result.testantrieb.get(),1000.,9.81,result.geflutet,
         result.hydrodynamik.get(),result.geschwindigkeit_welt_m_s,
         result.omega_modell_rad_s,result.bewegungsstellungen,
-        result.dynamische_fremdkraft.get());
+        result.dynamische_fremdkraft.get(),&result);
     return result;
 }
 
@@ -2305,8 +2359,17 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
     double rho,double g,const std::vector<std::string>& geflutet,
     const HydrodynamikKontext* hydro,const Vektor3& geschwindigkeit,
     const Vektor3& omega,const std::vector<Bewegungsstellung>& bewegungsstellungen,
-    const DynamischeFremdkraftKontext* dynamische_fremdkraft)
+    const DynamischeFremdkraftKontext* dynamische_fremdkraft,
+    const Zustand* segelzustand)
 {
+    if (segelzustand && segelzustand->sailforce_erforderlich && !segelzustand->sailforce)
+        throw std::invalid_argument("CORE-SIM-0001: Erforderlicher sailforce-Kraftkontext fehlt.");
+    if (segelzustand && segelzustand->sailforce &&
+        segelzustand->sailforce->modell_fassung != m.fassung)
+        throw std::invalid_argument("CORE-SIM-0001: Fremder sailforce-Kraftkontext.");
+    if (segelzustand && segelzustand->sailforce && segelzustand->wind &&
+        segelzustand->wind->modell_fassung != m.fassung)
+        throw std::invalid_argument("CORE-SIM-0001: Fremder sailforce-Windkontext.");
     auto* cache=detail::aktive_aufbereitung;
     if(cache && &cache->basis!=&m) cache=nullptr;
     std::string key;
@@ -2315,6 +2378,28 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
             bewegungsstellungen,dynamische_fremdkraft);
         schluesselwert(key,cache->zeit_s);
         schluesselwert(key,cache->schritt);
+        const bool sail = segelzustand && segelzustand->sailforce;
+        schluesselwert(key,sail);
+        if (sail) {
+            const auto& aero = *segelzustand->sailforce;
+            key += aero.quellen_fassung;
+            schluesselwert(key,aero.revision);
+            schluesselwert(key,aero.konfiguration.luft.dichte_kg_m3);
+            schluesselwert(key,aero.konfiguration.luft.kinematische_viskositaet_m2_s);
+            for (const auto& w : aero.konfiguration.segel) {
+                key += w.element_id;
+                schluesselwert(key,w.aktiv);
+                schluesselwert(key,w.stellwinkel_grad);
+            }
+            if (segelzustand->wind) {
+                const auto& wind = *segelzustand->wind;
+                schluesselwert(key,wind.konfiguration.herkunft_welt_grad);
+                schluesselwert(key,wind.konfiguration.referenzgeschwindigkeit_m_s);
+                schluesselwert(key,wind.konfiguration.referenzhoehe_m);
+                schluesselwert(key,wind.konfiguration.modus);
+                schluesselwert(key,wind.referenzkurs_grad);
+            } else key += "kein_wind";
+        }
         if(cache->kraft && key==cache->kraftschluessel) {
             SEGEL_MESSUNG("kraft_ergebnis_wiederverwendung");
             return *cache->kraft;
@@ -2429,6 +2514,13 @@ Kraefte kraefte(const Modell& m,const Pose& p,const TestantriebKontext* c,
         k.kraft_welt_n=plus(k.kraft_welt_n,force_world);
         k.moment_modell_nm=plus(k.moment_modell_nm,b.moment_s_nm);
         k.beitraege.push_back(std::move(b));
+    }
+    if (segelzustand && segelzustand->sailforce) {
+        Zustand stage = *segelzustand;
+        stage.pose = p;
+        stage.geschwindigkeit_welt_m_s = geschwindigkeit;
+        stage.omega_modell_rad_s = omega;
+        sailforce_addieren(k, m, stage);
     }
     for(auto& sum:k.beitraege) if(sum.rolle==Rolle::gesamtsumme) {
         sum.vektor=k.moment_modell_nm;sum.moment_s_nm=k.moment_modell_nm;
@@ -2644,7 +2736,7 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
     };
     const auto k=kraefte(modell,s.pose,context.get(),rho,g,geflutet,
         hydro_context.get(),s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s,
-        bewegungsstellungen,fremdkraft_context.get());
+        bewegungsstellungen,fremdkraft_context.get(),&s);
     const auto beschl=beschleunigung(s.pose,k,s.geschwindigkeit_welt_m_s,s.omega_modell_rad_s);
     const auto a=beschl.linear_welt;
     const auto alpha=beschl.winkel;
@@ -2668,7 +2760,7 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
     if(aufbereitung) aufbereitung->zeit_s=s.zeit_s+dt/2.;
     const auto midforce=kraefte(modell,midpose,context.get(),rho,g,geflutet,
         hydro_context.get(),midvelocity,omega_mid,bewegungsstellungen,
-        fremdkraft_context.get());
+        fremdkraft_context.get(),&s);
     const auto midbeschl=beschleunigung(midpose,midforce,midvelocity,omega_mid);
     const auto midalpha=midbeschl.winkel;
     const auto cgnew=plus(plus(cg,mal(s.geschwindigkeit_welt_m_s,dt)),mal(a,dt*dt/2));
@@ -2681,6 +2773,8 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
     result.zeit_s=s.zeit_s+dt;result.schritt=s.schritt+1;
     result.mast=s.mast;
     result.wind=s.wind;
+    result.sailforce=s.sailforce;
+    result.sailforce_erforderlich=s.sailforce_erforderlich;
     result.geflutet=flutung(physisches_modell,result.pose,geflutet);
     result.bewegungsstellungen=std::move(bewegungsstellungen);
     result.letzte_bewegungsereigniskennung=letzte_bewegungskennung;
@@ -2697,7 +2791,7 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         result.hydrodynamik_erforderlich=true;
         kraefte(modell,result.pose,context.get(),rho,g,result.geflutet,
             hydro_context.get(),result.geschwindigkeit_welt_m_s,result.omega_modell_rad_s,
-            result.bewegungsstellungen,fremdkraft_context.get());
+            result.bewegungsstellungen,fremdkraft_context.get(),&result);
     } else result.hydrodynamik_erforderlich=false;
     if(context) {
         auto& b=context->uebergang->begrenzung;
@@ -2728,7 +2822,7 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
             kraefte(modell,result.pose,context.get(),rho,g,result.geflutet,
                 hydro_context.get(),result.geschwindigkeit_welt_m_s,
                 result.omega_modell_rad_s,result.bewegungsstellungen,
-                fremdkraft_context.get());
+                fremdkraft_context.get(),&result);
     }
     if(fremdkraft_context) {
         fremdkraft_context->auswertung_schritt=result.schritt;
@@ -2736,6 +2830,11 @@ Zustand dynamikschritt(const Modell& modell,const Zustand& s,double dt,
         result.dynamische_fremdkraft=fremdkraft_context;
         result.dynamische_fremdkraft_erforderlich=true;
     } else result.dynamische_fremdkraft_erforderlich=false;
+    if (result.sailforce)
+        kraefte(modell,result.pose,result.testantrieb.get(),rho,g,result.geflutet,
+            result.hydrodynamik.get(),
+            result.geschwindigkeit_welt_m_s,result.omega_modell_rad_s,
+            result.bewegungsstellungen,result.dynamische_fremdkraft.get(),&result);
     for(double value:result.geschwindigkeit_welt_m_s)
         if(!std::isfinite(value)) throw std::overflow_error("CORE-SIM-0001: Geschwindigkeitsueberlauf.");
     for(double value:result.omega_modell_rad_s)

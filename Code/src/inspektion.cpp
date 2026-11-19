@@ -1156,7 +1156,8 @@ std::optional<InspectionMovementPreview> getMovementPreview(
 }
 
 std::optional<InspectionGroupMovementPreview> getGroupMovementPreview(
-    const ModelInspection& inspection, const std::string& group_id)
+    const ModelInspection& inspection, const std::string& group_id,
+    std::optional<double> requested_value)
 {
     const auto& impl = *inspection.impl_;
     if (std::find(impl.description.gruppen.begin(), impl.description.gruppen.end(), group_id) ==
@@ -1164,6 +1165,8 @@ std::optional<InspectionGroupMovementPreview> getGroupMovementPreview(
         inspection_error("CORE-INSP-0002", "Unbekannte Gruppen-ID");
     const auto found = impl.description.gruppenbewegungen.find(group_id);
     if (found == impl.description.gruppenbewegungen.end()) return std::nullopt;
+    if (requested_value && !std::isfinite(*requested_value))
+        inspection_error("CORE-INSP-0004", "Ungueltiger Wert fuer die Gruppenbewegung");
     const auto& movement = found->second;
     const auto& group = impl.description.dokument.at("gruppen").at(group_id);
     const auto& data = group.at("Bewegung");
@@ -1335,6 +1338,15 @@ std::optional<InspectionGroupMovementPreview> getGroupMovementPreview(
     append_pose("normal", preview.reference_value);
     if (preview.minimum_value) append_pose("minimum", *preview.minimum_value);
     if (preview.maximum_value) append_pose("maximum", *preview.maximum_value);
+    if (requested_value) {
+        if ((preview.minimum_value && *requested_value < *preview.minimum_value) ||
+            (preview.maximum_value && *requested_value > *preview.maximum_value)) {
+            preview.diagnostics.push_back({"CORE-INSP-0004",
+                "Angeforderte Gruppenbewegung ausserhalb des Kontrollbereichs", group_id});
+        } else {
+            append_pose("requested", *requested_value);
+        }
+    }
     if (sail_group && movement.art == Bewegungsart::drehen) {
         append_pose("backbord", 90.);
         append_pose("steuerbord", -90.);

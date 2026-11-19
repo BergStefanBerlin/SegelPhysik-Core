@@ -2,7 +2,8 @@
 
 Nativer C++17-Rechenkern fuer Bootsmodelle: Modellimport und -pruefung,
 Masse und Traegheit, Hydrostatik, hydrodynamische Kraefte, statisches
-Gleichgewicht, Starrkoerperdynamik und stationaere Kurvenfahrt.
+Gleichgewicht, Starrkoerperdynamik, stationaere Kurvenfahrt und gekoppelte
+Wind-/Segelkraefte aus vorbereiteten SegelMacher-Modellen.
 Bibliothek und CLI sind ohne GUI und ohne Python nutzbar.
 
 ## Projekte und Daten
@@ -22,7 +23,10 @@ weder GUI noch Modelle automatisch.
 ## Einstieg
 
 Voraussetzungen: CMake ab 3.20, C++17-Compiler; unter Windows z. B.
-Visual Studio 2022 Build Tools. Beispiel vom Repository-Stamm:
+Visual Studio 2022 Build Tools. Die sailforce-Bibliothek benoetigt den
+benachbarten SegelMacher-Checkout sowie Arrow/Parquet; Konfiguration siehe
+[Build-Abhaengigkeiten](Code/README.md#sailforce-c-025).
+Beispiel vom Repository-Stamm:
 
 ```powershell
 cmake -S Code -B build\standard -DBUILD_TESTING=ON

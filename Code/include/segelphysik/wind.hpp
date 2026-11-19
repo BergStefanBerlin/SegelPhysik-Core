@@ -38,6 +38,16 @@ struct WindAuswertung {
     std::string diagnose;
 };
 
+struct WindPunktAuswertung {
+    Vektor3 position_welt_m{};
+    Vektor3 geschwindigkeit_welt_m_s{};
+    WindVektor wahr;
+    WindVektor scheinbar;
+};
+
+WindPunktAuswertung wind_am_punkt(const Modell& modell, const Zustand& zustand,
+    const Vektor3& punkt_modell_m, const Vektor3& schwerpunkt_modell_m);
+
 Zustand wind_start(const Modell& modell, const Zustand& zustand,
     const WindKonfiguration& konfiguration, std::optional<Vektor3> mastspitze_modell_m,
     const std::string& mast_element_id, const std::string& mast_diagnose);

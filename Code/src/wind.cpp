@@ -66,6 +66,25 @@ WindVektor auswerten(const Vektor3& v)
     return result;
 }
 
+WindPunktAuswertung punkt_auswerten(const WindKonfiguration& konfiguration,
+    double richtung_grad, const Vektor3& position, const Vektor3& geschwindigkeit)
+{
+    const double speed = windprofil(konfiguration, position[2]);
+    const double angle = richtung_grad * pi / 180.;
+    const Vektor3 true_wind{-speed * std::cos(angle), speed * std::sin(angle), 0.};
+    const Vektor3 apparent{true_wind[0] - geschwindigkeit[0],
+        true_wind[1] - geschwindigkeit[1], true_wind[2] - geschwindigkeit[2]};
+    WindPunktAuswertung result;
+    result.position_welt_m = position;
+    result.geschwindigkeit_welt_m_s = geschwindigkeit;
+    result.wahr = auswerten(true_wind);
+    result.scheinbar = auswerten(apparent);
+    if (!std::isfinite(result.wahr.raeumlich_m_s) ||
+        !std::isfinite(result.scheinbar.raeumlich_m_s))
+        throw std::invalid_argument("CORE-SIM-0001: Windvektor nicht endlich darstellbar.");
+    return result;
+}
+
 }
 
 Zustand wind_start(const Modell& modell, const Zustand& zustand,
@@ -133,6 +152,31 @@ double windprofil(const WindKonfiguration& konfiguration, double hoehe_m)
         (std::log(konfiguration.referenzhoehe_m) - std::log(z0)));
 }
 
+WindPunktAuswertung wind_am_punkt(const Modell& modell, const Zustand& zustand,
+    const Vektor3& punkt_modell_m, const Vektor3& schwerpunkt_modell_m)
+{
+    if (!zustand.wind || zustand.wind->modell_fassung != modell.fassung)
+        throw std::invalid_argument("CORE-SIM-0001: Fehlender oder fremder Windkontext.");
+    const auto finite = [](const Vektor3& v) {
+        return std::all_of(v.begin(), v.end(), [](double value) { return std::isfinite(value); });
+    };
+    if (!finite(punkt_modell_m) || !finite(schwerpunkt_modell_m))
+        throw std::invalid_argument("CORE-SIM-0001: Ungueltiger Windabfragepunkt oder Schwerpunkt.");
+    const auto& context = *zustand.wind;
+    pruefe_konfiguration(context.konfiguration);
+    const auto direction = richtung(context, zustand.pose);
+    if (!direction)
+        throw std::invalid_argument("CORE-SIM-0001: Horizontaler Bootskurs nicht bestimmbar.");
+    WindPunktAuswertung result;
+    result.position_welt_m = zustand.pose.modellpunkt_nach_welt(punkt_modell_m);
+    if (!finite(result.position_welt_m))
+        throw std::invalid_argument("CORE-SIM-0001: Windabfrageposition nicht endlich.");
+    result.geschwindigkeit_welt_m_s =
+        detail::starre_punktgeschwindigkeit(zustand, punkt_modell_m, schwerpunkt_modell_m);
+    return punkt_auswerten(context.konfiguration, *direction,
+        result.position_welt_m, result.geschwindigkeit_welt_m_s);
+}
+
 WindAuswertung wind_auswertung(const Modell& modell, const Zustand& zustand,
     const Vektor3& schwerpunkt_modell_m)
 {
@@ -170,12 +214,9 @@ WindAuswertung wind_auswertung(const Modell& modell, const Zustand& zustand,
         result.diagnose = "Horizontaler Bootskurs nicht bestimmbar";
         return result;
     }
-    const double speed = windprofil(context.konfiguration, point[2]);
-    const double angle = *direction * pi / 180.;
-    const Vektor3 true_wind{-speed * std::cos(angle), speed * std::sin(angle), 0.};
-    result.wahr = auswerten(true_wind);
-    result.scheinbar = auswerten({true_wind[0] - velocity[0],
-        true_wind[1] - velocity[1], true_wind[2] - velocity[2]});
+    const auto local = punkt_auswerten(context.konfiguration, *direction, point, velocity);
+    result.wahr = local.wahr;
+    result.scheinbar = local.scheinbar;
     return result;
 }
 

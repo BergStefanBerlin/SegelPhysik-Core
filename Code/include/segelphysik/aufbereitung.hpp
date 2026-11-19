@@ -4,6 +4,10 @@
 
 namespace segelphysik {
 namespace detail { struct Aufbereitungsdaten; class Aufbereitungsbereich; }
+struct ErgebnisSnapshot;
+
+std::string snapshot_json(const ErgebnisSnapshot&, const std::string& status,
+    const std::string& diagnose = {}, ErgebnisJsonFormat format = ErgebnisJsonFormat::V6);
 
 // Owns a frozen model snapshot. Create a new context after changing model data
 // or derived geometry; historical states retain their own movement/settings.
@@ -19,6 +23,7 @@ public:
         const std::vector<Bewegungsereignis>& bewegungsereignisse = {},
         double rho = 1000., double g = 9.81);
     Kraefte auswertung(const Zustand&, double rho = 1000., double g = 9.81);
+    std::shared_ptr<const ErgebnisSnapshot> snapshot(const Zustand&);
     std::string json(const Zustand&, const std::string& status,
         const std::string& diagnose = {},
         const Gleichgewichtsangaben* gleichgewicht = nullptr,

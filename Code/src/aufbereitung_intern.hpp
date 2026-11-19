@@ -10,8 +10,10 @@ struct Weltmesh {
     bool gueltig{};
 };
 struct Aufbereitungsdaten {
-    explicit Aufbereitungsdaten(const Modell& modell) : basis(modell) {}
-    const Modell basis;
+    explicit Aufbereitungsdaten(const Modell& modell)
+        : basis_besitz(std::make_shared<const Modell>(modell)), basis(*basis_besitz) {}
+    const std::shared_ptr<const Modell> basis_besitz;
+    const Modell& basis;
     std::recursive_mutex mutex;
     std::shared_ptr<Modell> physisch;
     std::vector<Bewegungsstellung> stellungen;
@@ -24,6 +26,9 @@ struct Aufbereitungsdaten {
 };
 extern thread_local Aufbereitungsdaten* aktive_aufbereitung;
 void pruefe_auswertungszustand(const Modell&,const Zustand&);
+std::string zustand_json_mit_kraeften(const Modell&, const Zustand&, Kraefte,
+    const std::string&, const std::string&, const Gleichgewichtsangaben*,
+    const StationaeresGleichgewichtErgebnis*, ErgebnisJsonFormat);
 inline void zaehle_meshkopien(const Element& element)
 {
 #ifdef SEGELPHYSIK_TEST_INSTRUMENTATION

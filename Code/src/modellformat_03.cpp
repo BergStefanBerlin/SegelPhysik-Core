@@ -808,6 +808,8 @@ Json normalisiere_modellformat03(const Json& daten, const std::filesystem::path&
                         element["Segel"] = {{"quelle_datei", aero["definition"]}};
                     if (aero.contains("lookup"))
                         element["Segel"]["lookup_datei"] = aero["lookup"];
+                    if (aero.contains("sailModel"))
+                        element["Segel"]["modell_verzeichnis"] = aero["sailModel"];
                 }
             }
             if (source.contains("placement") && source["placement"].is_object()) {

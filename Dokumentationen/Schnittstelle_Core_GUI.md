@@ -1,5 +1,110 @@
 # Schnittstellenbeschreibung / Ergebnisvertrag Core → GUI
 
+## C-0.25: sailforce und Ergebnisversion 8 implementiert
+
+Stand 17.11.2026: Die finale
+[sailforce-Spezifikation](../Spezifikationen/Spezifikation_sailforce.md)
+und [SDP-Definition](../Spezifikationen/Spezifikation_Lateraldruckpunkt.md#6-c-025-aerodynamischer-seitenkraft-sdp)
+erweitern den fachlichen Vertrag. Der einzige
+[Core-Plan](../Umsetzungsplaene/Umsetzungsplan_C-0.25.md) legt die
+Liefergates fest; die GUI hat ihren getrennten
+[Plan](../../GUI/Umsetzungsplaene/Umsetzungsplan_G-0.25.md).
+Die neue Ergebnisversion 8 erweitert die Bestandsformate nur bei
+vorbereitetem sailforce-Kontext.
+
+Implementiert sind konsistente unveraenderliche Zustaende mit
+Streifenlasten, Segel-/Gesamtsummen, gemeinsamem Momentenbezug S,
+expliziten Darstellungsbezugspunkten, Einzel-/Gesamt-SDPs, realen
+Streifengrenzlinien und bestaetigter Lauf-/Stellungsfassung.
+Der Core rechnet unabhaengig, die GUI ruft asynchron ab.
+Quasistatische Livewinkel gelten ab bestaetigter Schrittgrenze;
+Aktivierung und Luftdaten sind fuer den Lauf eingefroren.
+Fremdkraft und ihr Ersatzpunkt bleiben getrennt erhalten.
+
+Die eingebettete SegelMacher-Bibliothek liefert
+`berechnen_mit_sdp` mit Q/B/X/Z aus transformierten Einzellasten vor
+Streifenaggregation; Produzenten-Vertragstests einschliesslich
+Formspiegelung und unveraenderter optimierter Lastenauswertung bestanden.
+Streifenlasten bleiben lokal, SDP-Summen sind bereits im Zielframe.
+Die zusaetzliche starre Transformation bleibt eine eigentliche Rotation;
+die Formspiegelung ist ein eigener expliziter Produzentenparameter.
+Dabei werden polare Vektoren mit S=diag(1,-1,1), Momente axial mit
+det(S)*S behandelt. Die Darstellung verwendet bei diesen zugeordneten
+Aeroquellen dieselbe intrinsische x/z-Spiegelebene, nicht eine aus
+verdrillten Schothornpunkten erratene Ebene. Keine SDP-Naeherung aus
+Streifenabfragepunkten.
+
+Typisierte Grundlagen und der integrierte Laufzeitvertrag sind in
+[sailforce.hpp](../Code/include/segelphysik/sailforce.hpp) und
+[wind.hpp](../Code/include/segelphysik/wind.hpp) implementiert und
+einzeln als CPPI-0173 bis CPPI-0205 im
+[Register](Schnittstellenregister_Core.md) dokumentiert:
+Luftbereichspruefung, Kraft-/Eigenmomenttransformation nach S,
+SDP-Rohsummenreduktion und beliebige starr mitbewegte Windpunkte.
+Die reale Drei-Boot-Integration, vier parallele historische Leser und
+der GUI-Livewinkel-/Historienpfad sind gezielt getestet. Vollstaendige
+Nachweise, Leistungswerte und verbleibende Abnahmen stehen im Plan.
+
+### Konkreter Vertrag: Ergebnisversion 8
+
+Version 8 erweitert Version 7 um `sailforce`. Ohne vorbereitete
+Segelmodelle bleibt die bisherige Versionsauswahl unveraendert.
+Typisierte Quelle ist `Kraefte::sailforce` / `SailforceAuswertung`,
+der historische Kontext `Zustand::sailforce`. Laden erfolgt einmal
+mit `sailforce_start`, neue Winkel erzeugen ueber
+`sailforce_stellwinkel` eine neue unveraenderliche Kontextrevision.
+Vorbereitung, Quellen und lokale Grenzlinien werden geteilt, nicht in
+jedem Integratorschritt neu geladen oder geschnitten.
+
+| Feld unter `sailforce` | Typ / Bezug |
+|---|---|
+| `revision` | Nichtnegative bestaetigte Stellungsrevision dieses Zustands |
+| `luft.dichte_kg_m3`, `luft.kinematische_viskositaet_m2_s` | Endliche positive Laufkonstanten; gueltig fuer alle aktiven Modellbereiche |
+| `kraft_modell_n`, `moment_s_modell_nm` | Vollstaendige Summen als 3-Vektoren in Modellachsen; Moment um aktuellen Gesamtschwerpunkt S |
+| `darstellungsbezug_modell_m` | S als expliziter Bezug fuer den Summenpfeil, kein behaupteter Segeldruckpunkt |
+| `sdp_gesamt` | Status, optionale Position und signierte Gesamt-Rohsummen |
+| `segel` | Liste eindeutiger Elementzuordnungen, auch explizit deaktivierte |
+
+Je Segel stehen `element_id`, `quellfassung` (SHA-256 des
+Produzentenmanifests), `aktiv`, `stellwinkel_grad`, `form_gespiegelt`,
+`kraft_modell_n`, `moment_s_modell_nm`, `darstellungsbezug_modell_m`,
+`sdp`, `streifen` und `grenzlinien_modell_m`.
+Ein Streifen enthaelt `id`, `punkt_modell_m`, `kraft_modell_n`,
+`moment_s_modell_nm`. Der Punkt ist ausschliesslich Darstellungsbezug;
+freie Streifenmomente bleiben im vollstaendigen Moment um S erhalten.
+Grenzlinien sind Listen von Modellpunkt-Polylinien; Bootspose erst in
+der Darstellung anwenden. Schnitte liegen auf den tatsaechlichen
+vorbereiteten Streifengrenzhoehen der passenden intrinsischen Flaeche.
+Das Pflichtarray `grenzlinien_zuordnung` hat dieselbe Laenge. Je Linie
+enthaelt es die stabile `id`, die `grenze_id` und die echten angrenzenden
+`streifen_unten_id`/`streifen_oben_id` (am Aussenrand jeweils `null`).
+Mindestens ein Nachbar ist vorhanden. Mehrere getrennte Polylinien
+derselben Grenze teilen deren `grenze_id`, nicht ihre Linien-ID.
+Die Zuordnung bleibt auch bei deaktiviertem Segel erhalten.
+
+Jeder SDP-Block enthaelt `status` (`gueltig`, `nicht_bestimmbar`,
+`inaktiv`), `position_modell_m` (3-Vektor oder `null`) und `Q_N`,
+`B_N`, `X_Nm`, `Z_Nm`. Keine Division unbestimmbarer Punkte in der GUI,
+kein Mittelwert von Einzelpunkten. Inaktive Segel liefern keine
+Streifenlasten; die echte Geometrie kann weiterhin angezeigt werden.
+Fehler sind keine inaktiven oder gueltigen Null-Snapshots.
+
+Die `vektoren`-Liste enthaelt zusaetzlich die einzelnen Kraefte mit
+Quelle `sailforce`, Gruppe `sailforce` und `punktart=bezugspunkt`.
+Diese Einzelbeitraege gehen genau einmal in die Bilanz ein; die
+Summen im `sailforce`-Block sind zusaetzliche Projektionen und duerfen
+nicht nochmals addiert werden. Fremdkraft bleibt eigene Quelle.
+
+Die Versionen 2 bis 7 behalten ihren Vertrag; ein fehlender
+`sailforce`-Block ist dort kein aktueller Nullkraftnachweis. Ein
+Version-8-Ergebnis ohne die neuen Pflichtfelder ist dagegen
+ungueltig. Ein neuer GUI-Winkel darf historische Geometrie/Lasten
+nicht ueberschreiben: Darstellung nur mit bestaetigter Revision und
+Winkeln aus demselben Ergebnisstand.
+
+Implementierungs- und Teststatus stehen im einzigen C-0.25-Plan;
+die Schemafestlegung allein ist kein Integrations-/Echtzeitnachweis.
+
 ## C-0.8: Modellinspektion – technisch in GUI integriert, Nutzerabnahme offen
 
 Der finale [Inspektionsvertrag, Abschnitt 3.7](../Spezifikationen/Spezifikation_Modellkatalog_Schnittstelle.md#37-normativer-daten--und-api-vertrag)
@@ -1122,3 +1227,33 @@ Zustandsfolge und Ausgabedichte bleiben unveraendert. Bestehende freie
 APIs sind weiter verfuegbar. Die statischen Solveralgorithmen,
 Integratorgleichungen, Physikmeshes und fachlichen Toleranzen aendern
 sich nicht.
+
+## C-0.25: fertige dynamische Auswertung asynchron uebernehmen
+
+CPPI-0206..0208 im selben Header ergaenzen den aufbereiteten Pfad:
+
+```cpp
+auto snapshot = kontext.snapshot(zustand);
+// On an independent reader thread, after publishing the shared handle:
+auto json = segelphysik::snapshot_json(*snapshot, "laufend");
+```
+
+`snapshot` prueft den Zustand und uebernimmt die zur Endauswertung
+passenden Kraefte aus dem Kontextcache. Ohne passenden Cache wird einmal
+ausgewertet. Es gelten die JSON-Standardwerte rho=1000 kg/m3 und g=9.81 m/s2.
+Die unveraenderliche Modellbasis wird einmal je Aufbereitung angelegt und
+gemeinsam besessen, nicht je Snapshot kopiert. Der Snapshot bleibt nach
+weiteren Schritten, Stellungswechseln und Freigabe des Erzeugers gueltig.
+
+`snapshot_json` erzeugt denselben Ergebnisvertrag wie `kontext.json`,
+einschliesslich Kontextpruefung, Diagnose und Formatauswahl (Default V6,
+bei aktiven Segeln Version 8). Es berechnet keine Kraefte erneut und
+benoetigt keinen Worker-Mutex. Reine Darstellungsableitungen wie der
+geometrische Lateralpunkt koennen weiterhin berechnet werden. Stationaere
+Zusatzangaben verbleiben beim bisherigen `json`-Vertrag.
+
+Die GUI veroeffentlicht Index und Snapshot-Handle gemeinsam unter ihrem
+Historienmutex und serialisiert ausserhalb dieses Mutex. Ihr Cache ist auf
+64 aktuelle Snapshots begrenzt; aeltere Historie nutzt die unabhaengige
+Reader-Aufbereitung. Der Core erhaelt keine GUI-Abhaengigkeit und keine
+unbegrenzte Speicherung vollstaendiger Kraftauswertungen.

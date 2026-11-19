@@ -61,18 +61,42 @@ string(REPLACE "\n" "\n)CORE_ERRORS\"\nR\"CORE_ERRORS("
     FEHLERKATALOG_JSON "${FEHLERKATALOG_JSON}")
 configure_file(src/fehlerkatalog.hpp.in generated/fehlerkatalog.hpp @ONLY)
 
+set(SEGELPHYSIK_SEGELMACHER_SOURCE_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../SegelMacher"
+    CACHE PATH "SegelMacher checkout providing the prepared sail model library")
+if(NOT TARGET SegelMacher::Modell)
+    if(NOT EXISTS "${SEGELPHYSIK_SEGELMACHER_SOURCE_DIR}/CMakeLists.txt")
+        message(FATAL_ERROR "SegelMacher model library missing: set SEGELPHYSIK_SEGELMACHER_SOURCE_DIR")
+    endif()
+    set(SEGELMACHER_BUILD_TOOLS OFF)
+    set(SEGELMACHER_BUILD_TESTS OFF)
+    add_subdirectory("${SEGELPHYSIK_SEGELMACHER_SOURCE_DIR}"
+        "${CMAKE_CURRENT_BINARY_DIR}/segelmacher")
+endif()
+
 add_library(segelphysik_core STATIC src/core.cpp src/pose.cpp src/modell.cpp
     src/modellformat_03.cpp src/hydrostatik.cpp src/hydrotraegheit.cpp src/messung.cpp
     src/simulation.cpp src/katalog.cpp
     src/inspektion.cpp src/aufbereitung.cpp src/segelkonfigurator.cpp src/wind.cpp
-    src/referenzpunkte.cpp)
+    src/referenzpunkte.cpp src/sailforce.cpp src/sailforce_laufzeit.cpp)
 target_include_directories(segelphysik_core PUBLIC include)
 target_include_directories(segelphysik_core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_include_directories(segelphysik_core SYSTEM PRIVATE
     "${core_jsoncons_SOURCE_DIR}/include" "${core_picosha2_SOURCE_DIR}")
 target_link_libraries(segelphysik_core PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(segelphysik_core PRIVATE SegelMacher::Modell)
 target_compile_features(segelphysik_core PUBLIC cxx_std_17)
 set_target_properties(segelphysik_core PROPERTIES CXX_EXTENSIONS OFF)
+include(CheckIPOSupported)
+check_ipo_supported(RESULT core_ipo_supported OUTPUT core_ipo_diagnose LANGUAGES CXX)
+if(core_ipo_supported)
+    set_property(TARGET segelphysik_core PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+    if(MSVC)
+        target_link_options(segelphysik_core INTERFACE "$<$<CONFIG:Release>:/LTCG>")
+    endif()
+else()
+    message(STATUS "Core Release IPO unavailable: ${core_ipo_diagnose}")
+endif()
 if(SEGELPHYSIK_TEST_INSTRUMENTATION)
     target_compile_definitions(segelphysik_core PUBLIC SEGELPHYSIK_TEST_INSTRUMENTATION=1)
 endif()
@@ -117,6 +141,17 @@ if(BUILD_TESTING)
     target_link_libraries(wind_tests PRIVATE segelphysik_core)
     list(APPEND core_targets wind_tests)
     add_test(NAME wind_contract COMMAND wind_tests)
+    add_executable(sailforce_tests tests/sailforce_tests.cpp)
+    target_link_libraries(sailforce_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets sailforce_tests)
+    add_test(NAME sailforce_contract COMMAND sailforce_tests)
+    add_executable(sailforce_integration_tests tests/sailforce_integration_tests.cpp)
+    target_link_libraries(sailforce_integration_tests PRIVATE segelphysik_core)
+    list(APPEND core_targets sailforce_integration_tests)
+    add_test(NAME sailforce_integration COMMAND sailforce_integration_tests
+        "${SEGELPHYSIK_MODELFORMAT03_TEST_ROOT}")
+    set_tests_properties(sailforce_integration PROPERTIES TIMEOUT 120
+        ENVIRONMENT "SEGELPHYSIK_TEST_SCHEMA_ROOT=${SEGELPHYSIK_MODELFORMAT03_TEST_ROOT}")
     add_executable(physik_tests tests/physik_tests.cpp)
     target_link_libraries(physik_tests PRIVATE segelphysik_core)
     list(APPEND core_targets physik_tests)
@@ -236,6 +271,9 @@ if(BUILD_TESTING)
 endif()
 
 foreach(target IN LISTS core_targets)
+    if(NOT target STREQUAL "segelphysik_core")
+        segelmacher_deploy_runtime(${target})
+    endif()
     if(MSVC)
         target_compile_options(${target} PRIVATE /W4 /WX /permissive- /fp:precise /utf-8)
     else()

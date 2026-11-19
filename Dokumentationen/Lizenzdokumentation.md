@@ -78,6 +78,16 @@ nicht, dass das Paket ausschließlich aus frei lizenzierten Komponenten besteht.
 
 ## 4. Abgrenzung gegenüber GUI und Modellen
 
+**Technischer Nachtrag C-0.25, 17.11.2026:** Die obige Bestandspruefung
+vom 27.10.2026 ist historisch und beschreibt nicht den neuen sailforce-Build.
+Dieser bindet `SegelMacher::Modell` mit Arrow/Parquet sowie deren
+Kompressions- und Laufzeitabhaengigkeiten ein. Der Windows-Deploymenthelfer
+kopiert diese rekursiv neben die EXE. Das ist eine technische Bereitstellung,
+keine Lizenz- oder Verteilungsfreigabe. Ein spaeteres Verteilpaket muss auch
+diese Bibliotheken, deren konkrete Fassungen und erforderliche Beigaben
+in die offene Komponenten-/Rechtepruefung aufnehmen. Core bleibt ohne
+GUI-/Qt-/VTK-Anforderung nutzbar.
+
 Ein späterer nicht-kommerzieller Lizenztext für CORE macht Qt/VTK weder
 nicht-kommerziell noch freigegeben. Bei Einbindung von CORE in GUI sind die
 GUI-spezifischen Fremdlizenzen für die Kombination gesondert zu prüfen,

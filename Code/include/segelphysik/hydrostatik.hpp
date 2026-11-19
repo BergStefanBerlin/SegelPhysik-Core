@@ -16,7 +16,7 @@ struct VolumenWerte {
 
 // Contract version 2 metadata is stored as enums to keep the per-evaluation
 // cost of the solver hot path unchanged; names appear only when serialised.
-enum class Quelle { schwerkraft, hydrostatik, hydrodynamik, summe, nicht_zugeordnet, testantrieb, externe_kraft };
+enum class Quelle { schwerkraft, hydrostatik, hydrodynamik, summe, nicht_zugeordnet, testantrieb, externe_kraft, sailforce };
 enum class Rolle { einzelbeitrag, gruppensumme, gesamtsumme };
 enum class Punktart { angriffspunkt, bezugspunkt };
 enum class Datenzustand { gueltig, null, deaktiviert, nicht_berechnet, ungueltig };
@@ -58,6 +58,7 @@ struct Beitrag {
     LateraldruckpunktPanelbilanz lateraldruckpunkt_panelbilanz;
 };
 
+struct SailforceAuswertung;
 struct Kraefte {
     Vektor3 kraft_welt_n{};
     Vektor3 moment_modell_nm{};
@@ -65,6 +66,7 @@ struct Kraefte {
     std::vector<Beitrag> beitraege;
     std::vector<std::pair<std::string, VolumenWerte>> elementvolumina;
     Vektor3 schwerpunkt_modell_m{};
+    std::shared_ptr<const SailforceAuswertung> sailforce;
 };
 struct Bewegungsstellung;
 
@@ -197,6 +199,7 @@ struct DynamischeFremdkraftKontext {
 };
 
 struct WindKontext;
+struct SailforceKontext;
 
 struct MastReferenz {
     std::optional<Vektor3> position_modell_m;
@@ -224,6 +227,8 @@ struct Zustand {
     bool dynamische_fremdkraft_erforderlich = false;
     std::optional<MastReferenz> mast;
     std::shared_ptr<const WindKontext> wind;
+    std::shared_ptr<const SailforceKontext> sailforce;
+    bool sailforce_erforderlich = false;
 };
 
 // Returned states own an immutable historical context; no global live flag.
@@ -242,7 +247,8 @@ Kraefte kraefte(const Modell&, const Pose&, const TestantriebKontext*,
     const Vektor3& geschwindigkeit_welt_m_s = {},
     const Vektor3& omega_modell_rad_s = {},
     const std::vector<Bewegungsstellung>& bewegungsstellungen = {},
-    const DynamischeFremdkraftKontext* dynamische_fremdkraft = nullptr);
+    const DynamischeFremdkraftKontext* dynamische_fremdkraft = nullptr,
+    const Zustand* segelzustand = nullptr);
 std::array<double, 16> bewegungstransformation(const Modell&, const std::string& element_id,
     const std::vector<Bewegungsstellung>& bewegungsstellungen = {});
 

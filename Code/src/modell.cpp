@@ -1730,13 +1730,17 @@ void validiere_element_settings(const nlohmann::json& dokument, const std::strin
             }
             if (element.contains("Segel")) {
                 const auto& source = element["Segel"];
-                if (!source.is_object() || source.size() > 2 ||
+                if (!source.is_object() ||
+                    source.size() != 1 + source.count("lookup_datei") + source.count("modell_verzeichnis") ||
                     !source.contains("quelle_datei") || !source["quelle_datei"].is_string() ||
                     source["quelle_datei"].get<std::string>().empty() ||
                     (source.contains("lookup_datei") &&
                      (!source["lookup_datei"].is_string() ||
-                      source["lookup_datei"].get<std::string>().empty())))
-                    fehler(2, ort + ".Segel", "Segel braucht Quelle und optional vorhandenen Lookup");
+                      source["lookup_datei"].get<std::string>().empty())) ||
+                    (source.contains("modell_verzeichnis") &&
+                     (!source["modell_verzeichnis"].is_string() ||
+                      source["modell_verzeichnis"].get<std::string>().empty())))
+                    fehler(2, ort + ".Segel", "Segel braucht Quelle und optional Lookup oder vorbereitetes Modell");
             }
         }
     }

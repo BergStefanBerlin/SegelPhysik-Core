@@ -1,6 +1,7 @@
 #pragma once
 #include "segelphysik/hydrostatik.hpp"
 #include "segelphysik/messung.hpp"
+#include "segelphysik/sailforce.hpp"
 #include <filesystem>
 
 namespace segelphysik {
@@ -23,6 +24,7 @@ struct Laufoptionen {
     std::vector<std::pair<std::size_t, TestantriebEreignis>> testantrieb_ereignisse;
     std::vector<std::pair<std::size_t, Bewegungsereignis>> bewegungsereignisse;
     std::optional<DynamischeFremdkraftKonfiguration> dynamische_fremdkraft;
+    std::optional<SailforceKonfiguration> sailforce;
 };
 struct Laufbericht {
     std::string status;
