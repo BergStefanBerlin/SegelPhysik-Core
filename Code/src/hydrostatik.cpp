@@ -1474,7 +1474,16 @@ StationaeresGleichgewichtErgebnis stationaeres_kurvengleichgewicht(
                 effective_inertia[0]*omega_body[0] + effective_inertia[1]*omega_body[1] + effective_inertia[2]*omega_body[2],
                 effective_inertia[3]*omega_body[0] + effective_inertia[4]*omega_body[1] + effective_inertia[5]*omega_body[2],
                 effective_inertia[6]*omega_body[0] + effective_inertia[7]*omega_body[1] + effective_inertia[8]*omega_body[2]};
-            const auto angular_inertia = cross(omega_body, angular_momentum);
+            auto angular_inertia = cross(omega_body, angular_momentum);
+            if (inertia) {
+                // Dieselbe Kirchhoff-Kopplung wie im dynamischen Schritt.
+                const auto vb = pose.weltvektor_nach_modell(velocity_world);
+                const Vektor3 added_momentum{
+                    inertia->zusatzmasse[0].wert * vb[0],
+                    inertia->zusatzmasse[1].wert * vb[1],
+                    inertia->zusatzmasse[2].wert * vb[2]};
+                angular_inertia = plus(angular_inertia, cross(vb, added_momentum));
+            }
             const auto rf = plus(forces.kraft_welt_n, mal(linear_inertia_world, -1.));
             const auto rm = plus(forces.moment_modell_nm, mal(angular_inertia, -1.));
             if (outer_force) *outer_force = forces.kraft_welt_n;

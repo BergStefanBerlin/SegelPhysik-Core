@@ -201,6 +201,7 @@ if(BUILD_TESTING)
         "${SEGELPHYSIK_MODELLE_DIR}/quader/modells_information.json"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/testdata/stationaere_referenz/modells_information.json"
         "${SEGELPHYSIK_MODELLE_DIR}/420/modells_information.json")
+    add_test(NAME stationaere_kurvenfahrt_synthetisch COMMAND stationaere_kurvenfahrt_tests --synthetic)
     add_test(NAME stationaere_kurvenfahrt COMMAND stationaere_kurvenfahrt_tests
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/testdata/stationaere_kurvenreferenz/modells_information.json"
         "${SEGELPHYSIK_MODELLE_DIR}/420/modells_information.json")

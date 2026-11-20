@@ -81,9 +81,10 @@ Modell test_model(bool added_mass)
     return m;
 }
 StationaereGleichgewichtKonfiguration matched_load(const Modell& model,
-    const Pose& attitude, double speed, double rate, const HydrodynamikKonfiguration& config)
+    const Pose& attitude, double speed, double rate, const HydrodynamikKonfiguration& config,
+    double leeway_speed=0.)
 {
-    const Vektor3 velocity_body{speed,0.,0.};
+    const Vektor3 velocity_body{speed,leeway_speed,0.};
     const Vektor3 velocity_world=attitude.modellvektor_nach_welt(velocity_body);
     const Vektor3 omega_world{0.,0.,rate};
     const Vektor3 omega_body=attitude.weltvektor_nach_modell(omega_world);
@@ -112,7 +113,8 @@ StationaereGleichgewichtKonfiguration matched_load(const Modell& model,
         inertia[0]*omega_body[0]+inertia[1]*omega_body[1]+inertia[2]*omega_body[2],
         inertia[3]*omega_body[0]+inertia[4]*omega_body[1]+inertia[5]*omega_body[2],
         inertia[6]*omega_body[0]+inertia[7]*omega_body[1]+inertia[8]*omega_body[2]};
-    const Vektor3 desired_moment=minus(cross(omega_body,h),internal.moment_modell_nm);
+    const Vektor3 desired_moment=minus(
+        plus(cross(omega_body,h),cross(velocity_body,added_momentum)),internal.moment_modell_nm);
     const Vektor3 force_body=attitude.weltvektor_nach_modell(desired_force_world);
     const double force_squared=dot(force_body,force_body);
     require(force_squared>1e-8,"analytic forcing is degenerate");
@@ -126,6 +128,22 @@ StationaereGleichgewichtKonfiguration matched_load(const Modell& model,
     result.angriffspunkt_modell_m=plus(model.schwerpunkt_m,point_offset);
     result.kurvenfahrt=true;
     return result;
+}
+void test_curved_solution_with_leeway()
+{
+    const auto model=test_model(true);
+    HydrodynamikKonfiguration hydro;
+    hydro.zusatzmasse_daempfung=true;
+    Zustand start;
+    start.pose=pose(0.,0.,.7);
+    start.geschwindigkeit_welt_m_s=start.pose.modellvektor_nach_welt({2.,.5,0.});
+    start.omega_modell_rad_s={0.,0.,.4};
+    const auto config=matched_load(model,start.pose,2.,.4,hydro,.5);
+    const auto result=stationaeres_gleichgewicht(model,start,config,hydro,.05,.05,30);
+    require(result.status=="konvergiert",result.diagnose.c_str());
+    require(result.iterationen==0,"known equilibrium with leeway must close at the initial state");
+    require(std::abs(result.residuum_bewegung_moment_modell_nm[2])<1e-8,
+        "stationary yaw moment must balance anisotropic added mass at nonzero leeway");
 }
 void test_curved_solution(double rate, double yaw, bool added_mass)
 {
@@ -274,6 +292,8 @@ int main(int argc, char* argv[])
         test_curved_solution(.4,0.,false);
         test_curved_solution(-.4,0.,false);
         test_curved_solution(.4,.7,true);
+        test_curved_solution_with_leeway();
+        if (argc==2 && std::string(argv[1])=="--synthetic") return 0;
         test_json_contract();
         test_failures();
         require(argc==2 || argc==3,"persistent turning model fixture path missing");

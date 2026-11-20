@@ -225,6 +225,13 @@ unterschlagen noch doppelt zaehlen. Keine neue unabhaengige GUI-Physik.
 Bei stationaerer Roll-/Stampflage ist dot(omega_B) null; der Kreiselterm
 kann dennoch ungleich null sein.
 
+Mit hydrodynamischer Zusatzmasse enthaelt die Momentenbilanz wie der
+dynamische Schritt `omega_B x H_B` und `v_B x P_Z,B`. Dabei enthaelt `H_B`
+auch die rotatorische Zusatztraegheit, `v_B` ist die in Modellachsen
+transformierte Weltgeschwindigkeit und `P_Z,B` ihr linearer
+Zusatzmassenimpuls. Der Starrkoerperimpuls `m*v_B` ist parallel zu `v_B`
+und traegt daher zum zweiten Kreuzprodukt nichts bei.
+
 Hydrodynamik erhaelt auch die lokale Anstroemung aus Rotation
 omega_W x (p_W-S_W). Bewegte Elementgeometrie, Schwerpunkt, Traegheit,
 Benetzung und Hebelarme muessen denselben eingefrorenen Stellungen folgen.
