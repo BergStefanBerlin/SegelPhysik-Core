@@ -336,18 +336,20 @@ Darstellungsgeometrie darstellungsgeometrie_aus_beschreibung(
     for (const auto& e : beschreibung.elemente) {
         if (element_id && e.id != *element_id) continue;
         gefunden = true;
-        if (e.darstellung_verborgen) continue;
-        const auto& quelle = e.darstellung ? e.darstellung : e.volumen;
+        const bool mask = e.darstellung_verborgen && e.volumen_aus_massenschale;
+        if (e.darstellung_verborgen && !mask) continue;
+        const bool use_display = e.darstellung.has_value() && !mask;
+        const auto& quelle = use_display ? e.darstellung : e.volumen;
         if (!quelle) continue;
         Darstellungsteil teil;
         teil.element_id = e.id;
         teil.gruppe = e.gruppe;
-        teil.herkunft = e.darstellung ? "darstellung" : "volumen_ersatz";
+        teil.herkunft = mask ? "wassermaske" : use_display ? "darstellung" : "volumen_ersatz";
         teil.farbe_rgb = e.farbe_rgb;
-        teil.oberflaeche = e.oberflaeche;
+        teil.oberflaeche = mask ? std::optional<std::string>{"unsichtbar"} : e.oberflaeche;
         const auto name = relativer_name(*quelle, ordner);
         try {
-            const auto& mesh_id = e.darstellung ? e.darstellung_mesh : e.volumen_mesh;
+            const auto& mesh_id = use_display ? e.darstellung_mesh : e.volumen_mesh;
             const auto mesh = std::find_if(beschreibung.quellmeshes.begin(), beschreibung.quellmeshes.end(),
                 [&](const QuellMesh& q) { return mesh_id && q.id == *mesh_id; });
             if (mesh != beschreibung.quellmeshes.end()) {
@@ -359,12 +361,17 @@ Darstellungsgeometrie darstellungsgeometrie_aus_beschreibung(
                 if (shared_geometry_schema && !mesh_id)
                     throw std::runtime_error("CORE-MOD-0006: Mesh-ID fehlt");
                 const auto netz = lade_quellmesh(*quelle,
-                    shared_geometry_schema ? mesh_id : std::nullopt, !shared_geometry_schema);
+                    shared_geometry_schema ? mesh_id : std::nullopt, !shared_geometry_schema && !mask);
                 teil.punkte_m = netz.punkte;
                 teil.dreiecke = netz.dreiecke;
             }
-            if (const auto* definition = geometrieableitung(beschreibung, e.id,
-                    e.darstellung ? "Darstellung" : "volumen")) {
+            if (!use_display && e.volumen_aus_massenschale) {
+                auto netz = verdraengung_aus_schale(
+                    Mesh{std::move(teil.punkte_m), std::move(teil.dreiecke)});
+                teil.punkte_m = std::move(netz.punkte);
+                teil.dreiecke = std::move(netz.dreiecke);
+            } else if (const auto* definition = geometrieableitung(beschreibung, e.id,
+                    use_display ? "Darstellung" : "volumen")) {
                 auto netz = abgeleitetes_mesh(
                     Mesh{std::move(teil.punkte_m), std::move(teil.dreiecke)}, *definition);
                 teil.punkte_m = std::move(netz.punkte);

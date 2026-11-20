@@ -329,9 +329,17 @@ bei. Dies gilt allgemein für alle Modelle:
 - Liegt der Innenraum nicht im Volumen des Rumpfs, wird er als eigenes
   Element modelliert, das den Rumpf nach A-C-00050 nicht durchdringt.
 
+Bei Modellformat 0.3 kann `physics.hydrostatic.source: "closedMassShell"`
+die separate Volumendatei ersetzen. Der Core schließt die offene
+Massenschale an einem einzelnen ebenen Randring rechnerisch. Nur das
+Verdrängungsnetz wird geschlossen; der ursprüngliche Rand bleibt die
+Überlaufkante. Nicht eindeutig schließbare Geometrien werden abgelehnt
+und benötigen ein explizites Verdrängungsnetz. Eine verborgene, abgeleitete
+Geometrie steht der GUI als unsichtbare Wasserflächenmaske zur Verfügung.
+
 **Abnahme:** Optimist und Folkeboot enthalten den Innenraum im
-Rumpfvolumen; der 420er besitzt einen eigenen Cockpit-Luftkörper und
-schwimmt statisch trocken höher als ohne ihn.
+Rumpfvolumen. Beim 420er wird die Plicht aus der offenen Schale
+abgeleitet, ohne das bisherige Auftriebs- und Flutungsverhalten zu ändern.
 
 **Herkunft:** Nutzerauftrag vom 28.10.2026 (Lufttanks bleiben immer
 gefüllt; Regel gilt für alle künftigen Yachten).

@@ -786,9 +786,16 @@ Json normalisiere_modellformat03(const Json& daten, const std::filesystem::path&
                     }
                     hydro["masse"] = std::move(converted_mass);
                 }
-                if (physics->contains("hydrostatic") && (*physics)["hydrostatic"].is_object() &&
-                    (*physics)["hydrostatic"].contains("geometry"))
-                    hydro["volumen"] = {{"datei", (*physics)["hydrostatic"]["geometry"]}};
+                if (physics->contains("hydrostatic") && (*physics)["hydrostatic"].is_object()) {
+                    const auto& volume = (*physics)["hydrostatic"];
+                    if (volume.contains("geometry"))
+                        hydro["volumen"] = {{"datei", volume["geometry"]}};
+                    else if (volume.value("source", std::string{}) == "closedMassShell") {
+                        if (!hydro.contains("masse") || hydro["masse"].value("art", "") != "schale")
+                            modelfehler("physics.hydrostatic.source", "Offene Massenschale erforderlich");
+                        hydro["volumen"] = {{"aus_massenschale", true}};
+                    }
+                }
                 if (!hydro.empty()) element["Hydrostatik"] = std::move(hydro);
 
                 if (physics->contains("hydrodynamic") &&
@@ -859,7 +866,7 @@ Json normalisiere_modellformat03(const Json& daten, const std::filesystem::path&
                     !source["physics"].is_object() ||
                     !source["physics"].contains("hydrostatic")) continue;
                 const auto& hydro = source["physics"]["hydrostatic"];
-                if (hydro.is_object() && hydro.contains("geometry")) {
+                if (hydro.is_object() && (hydro.contains("geometry") || hydro.contains("source"))) {
                     controller = i;
                     break;
                 }

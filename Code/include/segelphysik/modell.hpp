@@ -182,6 +182,7 @@ struct ElementBeschreibung {
     bool referenz_hydrostatik = false;
     bool referenz_hydrodynamik = false;
     bool referenz_aerodynamik = false;
+    bool volumen_aus_massenschale = false;
 };
 struct QuellMesh {
     std::string id;

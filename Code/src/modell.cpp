@@ -1159,6 +1159,8 @@ Mesh kompakt(const Mesh& mesh)
     return result;
 }
 
+Mesh schliesse_offene_schale(Mesh mesh);
+
 Mesh geometrie_ableiten(const Mesh& source, const Json& definition, const std::string& ort)
 {
     objekt(definition, {"art", "z_m", "steigung_x", "steigung_y"}, ort, 9);
@@ -1232,6 +1234,13 @@ Mesh geometrie_ableiten(const Mesh& source, const Json& definition, const std::s
         for (std::size_t i = 1; i+1 < polygon.size(); ++i)
             result.dreiecke.push_back({polygon[0], polygon[i], polygon[i+1]});
     }
+    return schliesse_offene_schale(std::move(result));
+}
+
+Mesh schliesse_offene_schale(Mesh result)
+{
+    const std::string ort = "Hydrostatik.volumen: Schalenabschluss";
+    constexpr double epsilon = 1e-9;
     struct Edge { std::size_t a{}, b{}, count{}; };
     std::map<std::pair<std::size_t, std::size_t>, Edge> edges;
     for (const auto& face : result.dreiecke)
@@ -1242,10 +1251,8 @@ Mesh geometrie_ableiten(const Mesh& source, const Json& definition, const std::s
         }
     std::map<std::size_t, std::size_t> next;
     for (const auto& [key, edge] : edges) if (edge.count == 1) {
-        if (std::abs(distance(result.punkte[edge.a])) > epsilon ||
-            std::abs(distance(result.punkte[edge.b])) > epsilon ||
-            !next.emplace(edge.b, edge.a).second)
-            fehler(9, ort, "Schnittrand ist kein eindeutiger ebener Ring");
+        if (!next.emplace(edge.b, edge.a).second)
+            fehler(9, ort, "Schalenrand ist kein eindeutiger Ring");
     }
     if (next.empty()) fehler(9, ort, "Kein Schnittrand vorhanden");
     std::vector<std::size_t> ring;
@@ -1259,11 +1266,35 @@ Mesh geometrie_ableiten(const Mesh& source, const Json& definition, const std::s
         next.erase(found);
     } while (current != start);
     if (!next.empty()) fehler(9, ort, "Mehrere Schnittringe oder Loecher nicht unterstuetzt");
+    const auto& origin = result.punkte[ring.front()];
+    Vektor3 normal{};
+    for (std::size_t i = 0; i < ring.size(); ++i) {
+        const auto& p = result.punkte[ring[i]];
+        const auto& q = result.punkte[ring[(i+1)%ring.size()]];
+        for (std::size_t j = 0; j < 3; ++j) {
+            const auto u = (j+1)%3, v = (j+2)%3;
+            normal[j] += (p[u]-origin[u])*(q[v]-origin[v]) -
+                         (p[v]-origin[v])*(q[u]-origin[u]);
+        }
+    }
+    const auto axis = static_cast<std::size_t>(std::max_element(normal.begin(), normal.end(),
+        [](double a, double b) { return std::abs(a) < std::abs(b); }) - normal.begin());
+    if (std::abs(normal[axis]) <= epsilon*epsilon)
+        fehler(9, ort, "Schalenrand ohne Flaeche");
+    const auto u = (axis+1)%3, v = (axis+2)%3;
+    for (const auto i : ring) {
+        const auto& p = result.punkte[i];
+        const double distance = (p[axis]-origin[axis]) +
+            (p[u]-origin[u])*normal[u]/normal[axis] +
+            (p[v]-origin[v])*normal[v]/normal[axis];
+        if (std::abs(distance) > epsilon) fehler(9, ort, "Schalenrand ist nicht eben");
+    }
     const auto cross2 = [&](std::size_t a, std::size_t b, std::size_t c) {
         const auto& p = result.punkte[a];
         const auto& q = result.punkte[b];
         const auto& r = result.punkte[c];
-        return (q[0]-p[0])*(r[1]-p[1]) - (q[1]-p[1])*(r[0]-p[0]);
+        return std::copysign(1., normal[axis]) *
+            ((q[u]-p[u])*(r[v]-p[v]) - (q[v]-p[v])*(r[u]-p[u]));
     };
     // Ear clipping retains boundary vertices, including collinear intersections.
     while (ring.size() > 3) {
@@ -1538,10 +1569,18 @@ Modell lade_modell_aus_json(const std::filesystem::path& datei, const Json& root
                             }
                         if (einzelnnetz) register_mesh(*volumen, volumenort);
                     } else {
-                        objekt(*volumen, {"datei"}, elementort + ".volumen");
-                        const auto pfad = referenz(pflicht(*volumen, "datei", elementort), datei.parent_path(), elementort);
-                        e.volumen = obj_lesen(pfad, elementort + ".volumen", fassung);
-                        volumenort += ", Mesh " + pfad.u8string();
+                        objekt(*volumen, {"datei", "aus_massenschale"}, elementort + ".volumen");
+                        if (const auto* derived = optional(*volumen, "aus_massenschale")) {
+                            if (derived->typ != Json::Typ::boolesch || !derived->bool_wert ||
+                                optional(*volumen, "datei") || !e.massen_mesh ||
+                                e.massenart != "schale" || e.flutrand_m.empty())
+                                fehler(9, volumenort, "Ableitung erfordert eine offene Massenschale statt einer Volumendatei");
+                            e.volumen = schliesse_offene_schale(*e.massen_mesh);
+                        } else {
+                            const auto pfad = referenz(pflicht(*volumen, "datei", elementort), datei.parent_path(), elementort);
+                            e.volumen = obj_lesen(pfad, elementort + ".volumen", fassung);
+                            volumenort += ", Mesh " + pfad.u8string();
+                        }
                     }
                     validieren(*e.volumen, true, volumenort);
                     // A-C-00050: nested hulls/air bodies are legal unless they intersect or contain each other.
@@ -1807,6 +1846,11 @@ Mesh abgeleitetes_mesh(const Mesh& quelle, const nlohmann::json& definition)
         "Geometrieableitung");
 }
 
+Mesh verdraengung_aus_schale(const Mesh& quelle)
+{
+    return schliesse_offene_schale(quelle);
+}
+
 namespace {
 const Json* text_feld(const Json& wert, const char* feld)
 {
@@ -1917,8 +1961,15 @@ ModellBeschreibung beschreibung_aus_json(const std::filesystem::path& datei, con
                         e.volumen = shared_geometry_schema ? gemeinsame_datei : relativ(*volumen, "datei", basis);
                         e.volumen_mesh = quelle_lesen(*volumen, false);
                     }
-                    if (const auto* masse = optional(*hydro, "masse"))
+                    if (const auto* masse = optional(*hydro, "masse")) {
                         e.masse_mesh = quelle_lesen(*masse, false);
+                        if (const auto* volumen = optional(*hydro, "volumen");
+                            volumen && optional(*volumen, "aus_massenschale")) {
+                            e.volumen = relativ(*masse, "datei", basis);
+                            e.volumen_mesh = e.masse_mesh;
+                            e.volumen_aus_massenschale = true;
+                        }
+                    }
                 }
             }
             result.elemente.push_back(std::move(e));

@@ -3,6 +3,7 @@
 #include "segelphysik/katalog.hpp"
 #include "segelphysik/inspektion.hpp"
 #include "segelphysik/core.hpp"
+#include "segelphysik/hydrostatik.hpp"
 #include "segelphysik/segelkonfigurator.hpp"
 #include "../src/modell_intern.hpp"
 #include "../src/modellformat_03_intern.hpp"
@@ -1139,8 +1140,25 @@ int main(int argc, char** argv)
                         message += " [" + diagnostic.fehler_id + "] " + diagnostic.text;
                     throw std::runtime_error(message);
                 }
-                if (entry.modell_id == "420")
+                if (entry.modell_id == "420") {
                     pruefe_420_bewegungsvorschau(*inspection);
+                    const auto model = segelphysik::lade_modell(
+                        segelphysik::katalog_datei(catalog, entry.modell_id, entry.modell_fassung));
+                    const segelphysik::Pose dry({0., 0., -.2}, {0., 0., 0., 1.});
+                    const segelphysik::Pose submerged({0., 0., -.6}, {0., 0., 0., 1.});
+                    pruefung(segelphysik::flutung(model, dry, {}).empty(),
+                        "420: Plicht flutet vor dem Eintauchen der Ueberlaufkante");
+                    const auto flooded = segelphysik::flutung(model, submerged, {});
+                    pruefung(flooded == std::vector<std::string>{"Cockpit"} &&
+                        segelphysik::flutung(model, dry, flooded) == flooded,
+                        "420: Plichtflutung fehlt oder geht beim Auftauchen verloren");
+                    const auto display = segelphysik::darstellungsgeometrie(
+                        catalog, entry.modell_id, entry.modell_fassung);
+                    pruefung(std::any_of(display.teile.begin(), display.teile.end(), [](const auto& part) {
+                        return part.element_id == "Cockpit" && part.herkunft == "wassermaske" &&
+                               part.oberflaeche == "unsichtbar" && !part.dreiecke.empty();
+                    }), "420: Abgeleitete Plicht fehlt als unsichtbare Wasserflaechenmaske");
+                }
                 std::cout << entry.modell_id << ": Katalog, Physikimport und Inspektion "
                     << inspection->info().status << '\n';
             }
